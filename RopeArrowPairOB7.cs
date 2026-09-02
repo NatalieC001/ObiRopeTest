@@ -76,12 +76,24 @@ public class RopeArrowPairOB7 : ScriptableObject
             CurrentState = RopeState.Bash;
             DisableTargetLogic(Arrow1.transform.parent?.gameObject);
             DisableTargetLogic(Arrow2.transform.parent?.gameObject);
+
+            // Physics overrides for VR Bashing
+            ApplyBashPhysics(Arrow1.transform.parent?.gameObject);
+            ApplyBashPhysics(Arrow2.transform.parent?.gameObject);
         }
         else if (t1Movable || t2Movable)
         {
             CurrentState = RopeState.Tether;
-            if (t1Movable) DisableTargetLogic(Arrow1.transform.parent?.gameObject);
-            if (t2Movable) DisableTargetLogic(Arrow2.transform.parent?.gameObject);
+            if (t1Movable)
+            {
+                DisableTargetLogic(Arrow1.transform.parent?.gameObject);
+                ApplyBashPhysics(Arrow1.transform.parent?.gameObject);
+            }
+            if (t2Movable)
+            {
+                DisableTargetLogic(Arrow2.transform.parent?.gameObject);
+                ApplyBashPhysics(Arrow2.transform.parent?.gameObject);
+            }
             IsInfusible = true;
             infusionTimer = MAX_INFUSION_TIME;
         }
@@ -118,7 +130,61 @@ public class RopeArrowPairOB7 : ScriptableObject
     private bool IsMovable(GameObject obj)
     {
         if (obj == null) return false;
+
+        // NEW LOGIC: Check explicit ObjectWeight component first
+        ObjectWeight weight = obj.GetComponentInParent<ObjectWeight>();
+        if (weight == null) weight = obj.GetComponent<ObjectWeight>();
+
+        if (weight != null)
+        {
+            return weight.mobility == RopeTargetMobility.Lightweight;
+        }
+
+        // LEGACY FALLBACK for sandbox testing
         return obj.CompareTag("Enemy") || obj.GetComponentInParent<MovingTarget>() != null || obj.GetComponent<MovingTarget>() != null;
+    }
+
+    private void ApplyBashPhysics(GameObject obj)
+    {
+        if (obj == null) return;
+
+        // Find rigidbodies anywhere on the target hierarchy
+        Rigidbody rb = obj.GetComponentInParent<Rigidbody>();
+        if (rb == null) rb = obj.GetComponentInChildren<Rigidbody>();
+
+        if (rb != null)
+        {
+            // Crucial for Obi Rope pulling in VR
+            rb.isKinematic = false;
+
+            // Temporary drag to prevent massive whipping/slingshotting during winch
+            // (Values based on standard VR physics best practices for smoothing impulses)
+            rb.drag = 3f;
+            rb.angularDrag = 2f;
+        }
+    }
+
+    private void RevertBashPhysics(GameObject obj)
+    {
+        if (obj == null) return;
+
+        Rigidbody rb = obj.GetComponentInParent<Rigidbody>();
+        if (rb == null) rb = obj.GetComponentInChildren<Rigidbody>();
+
+        if (rb != null)
+        {
+            ObjectWeight weight = obj.GetComponentInParent<ObjectWeight>();
+            if (weight == null) weight = obj.GetComponent<ObjectWeight>();
+
+            // Restore default values - assume new lightweight objects want to be kinematic when free
+            if (weight != null && weight.mobility == RopeTargetMobility.Lightweight)
+            {
+                rb.isKinematic = true;
+            }
+
+            rb.drag = 0f;
+            rb.angularDrag = 0.05f;
+        }
     }
 
     private void DisableTargetLogic(GameObject obj)
@@ -136,6 +202,9 @@ public class RopeArrowPairOB7 : ScriptableObject
         MovingTarget mt = obj.GetComponentInParent<MovingTarget>();
         if (mt == null) mt = obj.GetComponent<MovingTarget>();
         if (mt != null) mt.EnableInternalLogic();
+
+        // Always revert physics state when logic is re-enabled (slumped/broken rope)
+        RevertBashPhysics(obj);
     }
 
     public void HandleArrowDestroyed(StickingArrow destroyedArrow)
