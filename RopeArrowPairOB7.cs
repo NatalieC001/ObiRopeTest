@@ -38,7 +38,7 @@ public class RopeArrowPairOB7 : ScriptableObject
         IsLocked = false;
     }
 
-    public void CompletePair(StickingArrow secondArrow, ObiRope generatedRope, ObiRopeCursor cursor1, ObiRopeCursor cursor2, GameObject spawnedHitMe, ObiParticleAttachment att1, ObiParticleAttachment att2)
+    public void CompletePair(StickingArrow secondArrow, ObiRope generatedRope, ObiRopeCursor cursor1, ObiRopeCursor cursor2, GameObject spawnedHitMe)
     {
         if (IsLocked)
         {
@@ -53,8 +53,6 @@ public class RopeArrowPairOB7 : ScriptableObject
         Cursor1 = cursor1;
         Cursor2 = cursor2;
         HitMeObject = spawnedHitMe;
-        Attachment1 = att1;
-        Attachment2 = att2;
 
         Vector3 pos1 = Arrow1.tailPoint != null ? Arrow1.tailPoint.position : Arrow1.transform.position;
         Vector3 pos2 = Arrow2.tailPoint != null ? Arrow2.tailPoint.position : Arrow2.transform.position;
@@ -200,15 +198,15 @@ public class RopeArrowPairOB7 : ScriptableObject
 
         if (Arrow1 == null || Arrow1.transform.parent == null || Arrow2 == null || Arrow2.transform.parent == null)
         {
-             // Missing a target, so we transition to slumped
-             if (CurrentState != RopeState.Slumped)
-             {
-                 CurrentState = RopeState.Slumped;
-                 UnfreezeRopeParticles();
-                 EnableTargetLogic(Arrow1 != null ? Arrow1.transform.parent?.gameObject : null);
-                 EnableTargetLogic(Arrow2 != null ? Arrow2.transform.parent?.gameObject : null);
-             }
-             return;
+            // Missing a target, so we transition to slumped
+            if (CurrentState != RopeState.Slumped)
+            {
+                CurrentState = RopeState.Slumped;
+                UnfreezeRopeParticles();
+                EnableTargetLogic(Arrow1 != null ? Arrow1.transform.parent?.gameObject : null);
+                EnableTargetLogic(Arrow2 != null ? Arrow2.transform.parent?.gameObject : null);
+            }
+            return;
         }
 
         Vector3 pos1 = Arrow1.tailPoint != null ? Arrow1.tailPoint.position : Arrow1.transform.position;
@@ -304,3 +302,5 @@ public class RopeArrowPairOB7 : ScriptableObject
         Destroy(this); // Destroy the ScriptableObject itself since it's fully broken
     }
 }
+
+
