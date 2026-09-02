@@ -315,20 +315,29 @@ public class RopeArrowManagerObi7 : MonoBehaviour
             rope.SetConstraintsDirty(Oni.ConstraintType.Distance);
         }
 
-        // 4. Fallback to Static Attachments (same as DynamicObiRope)
+        // 4. Determine correct attachment types based on target mobility
+        // Retrieve object weight to determine correct attachment type
+        ObjectWeight w1 = t1.GetComponentInParent<ObjectWeight>();
+        if (w1 == null) w1 = t1.GetComponent<ObjectWeight>();
+        bool isT1Lightweight = w1 != null && w1.mobility == RopeTargetMobility.Lightweight;
+
+        ObjectWeight w2 = t2.GetComponentInParent<ObjectWeight>();
+        if (w2 == null) w2 = t2.GetComponent<ObjectWeight>();
+        bool isT2Lightweight = w2 != null && w2.mobility == RopeTargetMobility.Lightweight;
+
+        // Use Dynamic attachments for lightweight objects so they can be pulled by the rope.
+        // Use Static attachments for anchors to ensure perfect stability.
         ObiParticleAttachment attachment1 = ropeObject.AddComponent<ObiParticleAttachment>();
         attachment1.target = t1;
         attachment1.particleGroup = instanceBlueprint.groups[0];
-        attachment1.attachmentType = ObiParticleAttachment.AttachmentType.Static;
+        attachment1.attachmentType = isT1Lightweight ? ObiParticleAttachment.AttachmentType.Dynamic : ObiParticleAttachment.AttachmentType.Static;
 
         ObiParticleAttachment attachment2 = ropeObject.AddComponent<ObiParticleAttachment>();
         attachment2.target = t2;
         attachment2.particleGroup = instanceBlueprint.groups[2]; // Since we strictly generated 3 points
-        attachment2.attachmentType = ObiParticleAttachment.AttachmentType.Static;
+        attachment2.attachmentType = isT2Lightweight ? ObiParticleAttachment.AttachmentType.Dynamic : ObiParticleAttachment.AttachmentType.Static;
 
         GameObject spawnedHitMe = null;
-
-        // Spawn HitMe at the midpoint between the two arrows
         if (hitMePrefab != null)
         {
             Vector3 centerPos = (t1.position + t2.position) / 2f;
