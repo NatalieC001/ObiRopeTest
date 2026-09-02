@@ -15,7 +15,7 @@ using System.Text;
 /// WHAT IT CHECKS:
 /// - Presence of a Collider (needed for arrows to stick).
 /// - Presence and value of ObjectWeight (determines Lightweight vs Heavyweight).
-/// - Rigidbody configuration (Lightweight MUST be non-kinematic to be pulled, Heavyweight/Anchors should be kinematic or very heavy).
+/// - Rigidbody configuration (Lightweight can be kinematic or non-kinematic; Rope system will override. Heavyweight/Anchors should be kinematic or very heavy).
 /// - ObiParticleAttachment configuration (Runtime): Lightweight objects MUST be attached with AttachmentType.Dynamic to be pulled by the rope.
 /// </summary>
 [ExecuteAlways]
@@ -86,12 +86,11 @@ public class RopeTargetPhysicsDiagnostic : MonoBehaviour
             {
                 if (rb.isKinematic)
                 {
-                    report.AppendLine("❌ ERROR: Target is Lightweight but Rigidbody is KINEMATIC. The rope cannot physically move it for Bash or Tether. It must be non-kinematic when hit.");
-                    allGood = false;
+                    report.AppendLine("✅ Rigidbody is KINEMATIC. This is valid for objects with custom movement (e.g. NavMesh). The Rope System will automatically disable Kinematic physics when connected.");
                 }
                 else
                 {
-                    report.AppendLine("✅ Rigidbody found and is non-kinematic. Ready to be pulled.");
+                    report.AppendLine("✅ Rigidbody is non-kinematic. Ready to be pulled.");
                 }
             }
             else // Heavyweight or Immovable

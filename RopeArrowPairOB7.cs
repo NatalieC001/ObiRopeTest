@@ -150,6 +150,13 @@ public class RopeArrowPairOB7 : ScriptableObject
     private void DisableTargetLogic(GameObject obj)
     {
         if (obj == null) return;
+
+        // When the rope takes over a target, explicitly disable kinematic physics
+        // so the Obi Rope can pull it in. Do not modify physics until this exact moment.
+        Rigidbody rb = obj.GetComponentInParent<Rigidbody>();
+        if (rb == null) rb = obj.GetComponent<Rigidbody>();
+        if (rb != null) rb.isKinematic = false;
+
         MovingTarget mt = obj.GetComponentInParent<MovingTarget>();
         if (mt == null) mt = obj.GetComponent<MovingTarget>();
         if (mt != null) mt.DisableInternalLogic();
@@ -159,6 +166,11 @@ public class RopeArrowPairOB7 : ScriptableObject
     {
         if (obj == null) return;
         if (GetMobility(obj) != RopeTargetMobility.Lightweight) return;
+
+        // When the rope releases a target, we DO NOT hardcode it back to kinematic.
+        // This allows normal physics objects (like crates) to drop to the ground.
+        // It is up to the target's specific implementation of `EnableInternalLogic`
+        // (e.g. MovingTarget.cs) to decide if it needs to restore `isKinematic = true`.
 
         MovingTarget mt = obj.GetComponentInParent<MovingTarget>();
         if (mt == null) mt = obj.GetComponent<MovingTarget>();
