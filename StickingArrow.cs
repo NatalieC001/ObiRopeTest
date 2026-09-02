@@ -77,15 +77,17 @@ public class StickingArrow : MonoBehaviour
         string hitLayer = LayerMask.LayerToName(collision.gameObject.layer);
 
         // ── Validation Guard ──────────────────────────────────────────────────
-        // Only valid targets (MovingTarget/IArrowTarget) or explicit environment surfaces (Wall/Floor/Ground/Target) 
+        // Only valid targets (MovingTarget/IArrowTarget) or explicit environment surfaces (Wall/Floor/Ground/Target/FloorTarget)
         // should cause the arrow to stick and stop moving. We use ToLower() to catch "ground" or "Ground".
         IArrowTarget target = collision.collider.GetComponentInParent<IArrowTarget>();
+        FloorTarget floorTarget = collision.collider.GetComponentInParent<FloorTarget>();
 
         string hTag = hitTag.ToLower();
         string hLayer = hitLayer.ToLower();
 
         bool isEnvironment = hTag == "wall" || hTag == "floor" || hTag == "ground" || hTag == "target" ||
-                             hLayer == "wall" || hLayer == "floor" || hLayer == "ground" || hLayer == "target";
+                             hLayer == "wall" || hLayer == "floor" || hLayer == "ground" || hLayer == "target" ||
+                             floorTarget != null;
 
         if (target == null && !isEnvironment)
         {
@@ -218,6 +220,14 @@ public class StickingArrow : MonoBehaviour
     private IEnumerator CleanupArrowRoutine(float delay)
     {
         yield return new WaitForSeconds(delay);
+
+        DissolveEffect myDissolve = GetComponentInChildren<DissolveEffect>();
+        if (myDissolve != null && !isDestroying)
+        {
+            myDissolve.TriggerDissolve();
+            yield return new WaitForSeconds(1.5f);
+        }
+
         CleanupArrow();
     }
 
@@ -277,5 +287,3 @@ public class StickingArrow : MonoBehaviour
         }
     }
 }
-
-

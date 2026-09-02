@@ -3,7 +3,7 @@ using UnityEngine;
 /// <summary>
 /// Defines the physical weight and mobility of an object for the Rope System.
 /// The Rope System looks at the mobility of BOTH targets to determine the final Rope State:
-/// 
+///
 /// MATRIX:
 /// - Lightweight + Lightweight = BASH (Both objects can move freely, yank them into each other)
 /// - Lightweight + Heavyweight/Immovable = TETHER (One object is movable, the other is an anchor. Yank the lightweight object to the anchor)

@@ -181,11 +181,35 @@ public class MovingTarget : MonoBehaviour, IArrowTarget
     public void EnableInternalLogic()
     {
         Debug.Log($"Re-enable NavMesh or other scripts here since the creature has escaped tether.");
+
+        ObjectWeight weight = GetComponent<ObjectWeight>();
+        if (weight == null)
+        {
+            Debug.LogWarning($"<color=yellow>[MovingTarget] '{gameObject.name}' is missing an ObjectWeight component. Defaulting behavior.</color>");
+            return;
+        }
+
+        if (weight.mobility == RopeTargetMobility.Lightweight && rb != null)
+        {
+            rb.isKinematic = true;
+        }
     }
 
     public void DisableInternalLogic()
     {
         Debug.Log($"Disable NavMesh or other scripts here while we have captured creature or target.");
+
+        ObjectWeight weight = GetComponent<ObjectWeight>();
+        if (weight == null)
+        {
+            Debug.LogWarning($"<color=yellow>[MovingTarget] '{gameObject.name}' is missing an ObjectWeight component. Defaulting behavior.</color>");
+            return;
+        }
+
+        if (weight.mobility == RopeTargetMobility.Lightweight && rb != null)
+        {
+            rb.isKinematic = false;
+        }
     }
 
     public void GetHit(Transform ropeAnchor)
@@ -261,6 +285,13 @@ public class MovingTarget : MonoBehaviour, IArrowTarget
             DissolveEffect[] dissolveComponents = GetComponentsInChildren<DissolveEffect>();
             foreach (DissolveEffect effect in dissolveComponents)
             {
+                // Ensure we do not dissolve rope arrows that are stuck in this target
+                StickingArrow parentArrow = effect.GetComponentInParent<StickingArrow>();
+                if (parentArrow != null && parentArrow.arrowCategory == ArrowCategory.Rope)
+                {
+                    continue;
+                }
+
                 effect.TriggerDissolve();
             }
 
@@ -277,6 +308,3 @@ public class MovingTarget : MonoBehaviour, IArrowTarget
         }
     }
 }
-
-
-
