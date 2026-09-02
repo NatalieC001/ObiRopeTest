@@ -267,8 +267,8 @@ public class MovingTarget : MonoBehaviour, IArrowTarget
 
                     if (arrow1OnThisTarget || arrow2OnThisTarget)
                     {
-                        // Schedule the rope destruction for next frame to avoid physics callback errors
-                        StartCoroutine(DelayedDestroyRope(pair));
+                        // Schedule the rope destruction with a delay so the player can see the collision and dissolve effect first
+                        StartCoroutine(DelayedDestroyRope(pair, 1.5f));
                         RopeArrowManagerObi7.Instance.activePairs.RemoveAt(i);
                         break;
                     }
@@ -291,9 +291,9 @@ public class MovingTarget : MonoBehaviour, IArrowTarget
         }
     }
 
-    private System.Collections.IEnumerator DelayedDestroyRope(RopeArrowPairOB7 pair)
+    private System.Collections.IEnumerator DelayedDestroyRope(RopeArrowPairOB7 pair, float delay)
     {
-        yield return null; // Wait one frame
+        yield return new WaitForSeconds(delay);
         if (pair != null)
         {
             pair.ForceBreakRope();

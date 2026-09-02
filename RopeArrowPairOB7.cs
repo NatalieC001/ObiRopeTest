@@ -225,13 +225,8 @@ public class RopeArrowPairOB7 : ScriptableObject
             if (infusionTimer <= 0f)
             {
                 IsInfusible = false;
-                if (CurrentState == RopeState.Tether)
-                {
-                    EnableTargetLogic(Arrow1.transform.parent?.gameObject);
-                    EnableTargetLogic(Arrow2.transform.parent?.gameObject);
-                    ForceBreakRope();
-                    return;
-                }
+                // We intentionally do NOT break the rope here anymore.
+                // The tether should remain taut and holding the object, it simply loses its infusibility window.
             }
         }
 
@@ -255,7 +250,7 @@ public class RopeArrowPairOB7 : ScriptableObject
 
         if (CurrentState == RopeState.Bash)
         {
-            float shrinkSpeed = 10f;
+            float shrinkSpeed = 3f; // Reduced from 10f to make reeling animation visible
             float shrinkAmount = shrinkSpeed * deltaTime;
             if (currentLength > 0.5f)
             {
@@ -268,7 +263,7 @@ public class RopeArrowPairOB7 : ScriptableObject
         else if (CurrentState == RopeState.Tether)
         {
             // Actively shrink the rope to yank the lightweight object to the anchor
-            float shrinkSpeed = 5f; // Slightly slower than bash
+            float shrinkSpeed = 2f; // Reduced from 5f to make reeling animation visible
             float shrinkAmount = shrinkSpeed * deltaTime;
             if (currentLength > 0.5f)
             {
