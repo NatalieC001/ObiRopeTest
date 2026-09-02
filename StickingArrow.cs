@@ -162,7 +162,7 @@ public class StickingArrow : MonoBehaviour
             }
 
             // Register the rope arrow with the manager (only once)
-            if (arrowCategory == ArrowCategory.Rope && target != null && !hasBeenRegistered)
+            if (arrowCategory == ArrowCategory.Rope && !hasBeenRegistered)
             {
                 hasBeenRegistered = true;
                 if (RopeArrowManagerObi7.Instance != null)
@@ -425,7 +425,7 @@ public class StickingArrow : MonoBehaviour
 //        transform.SetParent(anchor.transform, true);
 
 
-//        if (arrowCategory == ArrowCategory.Rope && target != null && !hasBeenRegistered)
+//        if (arrowCategory == ArrowCategory.Rope && !hasBeenRegistered)
 //        {
 //            hasBeenRegistered = true;
 //            RopeArrowManagerObi7.Instance.RegisterRopeArrow(this, this.gameObject, impactPoint);
