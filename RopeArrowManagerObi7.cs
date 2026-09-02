@@ -1,4 +1,5 @@
-﻿using System.Collections;
+
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Obi;
@@ -339,16 +340,28 @@ public class RopeArrowManagerObi7 : MonoBehaviour
                 hitMeRb.isKinematic = true;
             }
 
-            // Add the surfer script - this will move it to the correct rope position next frame
+            // Add the surfer script
             ObiRopeSurfer surfer = spawnedHitMe.AddComponent<ObiRopeSurfer>();
             surfer.SetRope(rope);
-            surfer.particleIndex = rope.activeParticleCount / 2;
+
+            // Assign the specific index for the center particle exactly from the blueprint group
+            // This guarantees we are targeting the exact center control point, avoiding timing issues
+            // with activeParticleCount changing dynamically before the rope is fully loaded.
+            if (instanceBlueprint.groups.Count >= 3 && instanceBlueprint.groups[1].particleIndices.Count > 0)
+            {
+                surfer.particleIndex = instanceBlueprint.groups[1].particleIndices[0];
+            }
+            else
+            {
+                // Fallback (this should never hit if the blueprint is standard 3-point)
+                surfer.particleIndex = rope.activeParticleCount / 2;
+            }
         }
 
         Debug.Log("<color=cyan>[RopeManager] Calling pair.CompletePair to finalize logic state.</color>");
 
         // Finalize pair data, handing both winches over to the script that manages the logic
-        pair.CompletePair(secondArrow, rope, cursor1, cursor2, spawnedHitMe, attachment1, attachment2);
+        pair.CompletePair(secondArrow, rope, cursor1, cursor2, spawnedHitMe);
         pair.IsGenerating = false;
 
         Debug.Log("<color=lime>[RopeManager] Rope successfully created, stretched, and bound to targets securely via SnapAttachment API!</color>");
@@ -389,5 +402,6 @@ public class RopeArrowManagerObi7 : MonoBehaviour
         HandleArrowDestroyed(arrow);
     }
 }
+
 
 
