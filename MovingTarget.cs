@@ -178,16 +178,39 @@ public class MovingTarget : MonoBehaviour, IArrowTarget
         }
     }
 
+    // List of known movement scripts to disable when grabbed by a rope
+    private readonly string[] movementScriptNames = new string[]
+    {
+        "CorkscrewMovement",
+        "FigureEightMovement",
+        "FishSwimMovement",
+        "PingPongMovement",
+        "Rotator",
+        "SwoopAndRetreatMovement"
+    };
+
     public void EnableInternalLogic()
     {
         Debug.Log($"Re-enable NavMesh or other scripts here since the creature has escaped tether.");
+        ToggleMovementScripts(true);
     }
-
     public void DisableInternalLogic()
     {
         Debug.Log($"Disable NavMesh or other scripts here while we have captured creature or target.");
+        ToggleMovementScripts(false);
     }
 
+    private void ToggleMovementScripts(bool enable)
+    {
+        foreach (string scriptName in movementScriptNames)
+        {
+            Component script = GetComponent(scriptName);
+            if (script != null && script is MonoBehaviour monoScript)
+            {
+                monoScript.enabled = enable;
+            }
+        }
+    }
     public void GetHit(Transform ropeAnchor)
     {
         TakeDamage(1f, transform.position);

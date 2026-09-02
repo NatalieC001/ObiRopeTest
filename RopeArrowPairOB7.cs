@@ -66,22 +66,32 @@ public class RopeArrowPairOB7 : ScriptableObject
         DetermineState();
     }
 
+    /// <summary>
+    /// Evaluates the targets attached to Arrow1 and Arrow2 to determine the correct RopeState.
+    /// The state logic matrix is:
+    /// - Lightweight + Lightweight = Bash (Both objects can move freely, yank them into each other)
+    /// - Lightweight + Heavyweight/Immovable = Tether (One object is movable, the other is an anchor. Yank the lightweight object to the anchor)
+    /// - Heavyweight/Immovable + Heavyweight/Immovable = Tripwire (Neither object moves significantly. Freeze the rope in place as a trap)
+    /// </summary>
     private void DetermineState()
     {
-        bool t1Movable = IsMovable(Arrow1.transform.parent?.gameObject);
-        bool t2Movable = IsMovable(Arrow2.transform.parent?.gameObject);
+        RopeTargetMobility t1Mobility = GetMobility(Arrow1.transform.parent?.gameObject);
+        RopeTargetMobility t2Mobility = GetMobility(Arrow2.transform.parent?.gameObject);
 
-        if (t1Movable && t2Movable)
+        bool t1Light = t1Mobility == RopeTargetMobility.Lightweight;
+        bool t2Light = t2Mobility == RopeTargetMobility.Lightweight;
+
+        if (t1Light && t2Light)
         {
             CurrentState = RopeState.Bash;
             DisableTargetLogic(Arrow1.transform.parent?.gameObject);
             DisableTargetLogic(Arrow2.transform.parent?.gameObject);
         }
-        else if (t1Movable || t2Movable)
+        else if (t1Light || t2Light)
         {
             CurrentState = RopeState.Tether;
-            if (t1Movable) DisableTargetLogic(Arrow1.transform.parent?.gameObject);
-            if (t2Movable) DisableTargetLogic(Arrow2.transform.parent?.gameObject);
+            if (t1Light) DisableTargetLogic(Arrow1.transform.parent?.gameObject);
+            if (t2Light) DisableTargetLogic(Arrow2.transform.parent?.gameObject);
             IsInfusible = true;
             infusionTimer = MAX_INFUSION_TIME;
         }
@@ -91,6 +101,28 @@ public class RopeArrowPairOB7 : ScriptableObject
             IsInfusible = true;
             infusionTimer = MAX_INFUSION_TIME;
             if (Rope != null && Rope.isLoaded) FreezeRopeParticles();
+        }
+    }
+
+    /// <summary>
+    /// Retrieves the mobility of a given object based on its ObjectWeight component.
+    /// Defaulting to Immovable if no component is found.
+    /// </summary>
+    private RopeTargetMobility GetMobility(GameObject obj)
+    {
+        if (obj == null) return RopeTargetMobility.Immovable;
+
+        ObjectWeight weight = obj.GetComponentInParent<ObjectWeight>();
+        if (weight == null) weight = obj.GetComponent<ObjectWeight>();
+
+        if (weight != null)
+        {
+            return weight.mobility;
+        }
+        else
+        {
+            Debug.LogWarning($"<color=orange>[RopePair] Object '{obj.name}' is missing an ObjectWeight component. Defaulting to Immovable.</color>");
+            return RopeTargetMobility.Immovable;
         }
     }
 
@@ -115,15 +147,16 @@ public class RopeArrowPairOB7 : ScriptableObject
         }
     }
 
-    private bool IsMovable(GameObject obj)
-    {
-        if (obj == null) return false;
-        return obj.CompareTag("Enemy") || obj.GetComponentInParent<MovingTarget>() != null || obj.GetComponent<MovingTarget>() != null;
-    }
-
     private void DisableTargetLogic(GameObject obj)
     {
         if (obj == null) return;
+
+        // When the rope takes over a target, explicitly disable kinematic physics
+        // so the Obi Rope can pull it in. Do not modify physics until this exact moment.
+        Rigidbody rb = obj.GetComponentInParent<Rigidbody>();
+        if (rb == null) rb = obj.GetComponent<Rigidbody>();
+        if (rb != null) rb.isKinematic = false;
+
         MovingTarget mt = obj.GetComponentInParent<MovingTarget>();
         if (mt == null) mt = obj.GetComponent<MovingTarget>();
         if (mt != null) mt.DisableInternalLogic();
@@ -132,7 +165,13 @@ public class RopeArrowPairOB7 : ScriptableObject
     private void EnableTargetLogic(GameObject obj)
     {
         if (obj == null) return;
-        if (!IsMovable(obj)) return;
+        if (GetMobility(obj) != RopeTargetMobility.Lightweight) return;
+
+        // When the rope releases a target, we DO NOT hardcode it back to kinematic.
+        // This allows normal physics objects (like crates) to drop to the ground.
+        // It is up to the target's specific implementation of `EnableInternalLogic`
+        // (e.g. MovingTarget.cs) to decide if it needs to restore `isKinematic = true`.
+
         MovingTarget mt = obj.GetComponentInParent<MovingTarget>();
         if (mt == null) mt = obj.GetComponent<MovingTarget>();
         if (mt != null) mt.EnableInternalLogic();
@@ -228,12 +267,16 @@ public class RopeArrowPairOB7 : ScriptableObject
         }
         else if (CurrentState == RopeState.Tether)
         {
-            float tightness = RopeArrowManagerObi7.Instance != null ? RopeArrowManagerObi7.Instance.lengthMultiplier : 1.0f;
-            float actualDistance = Vector3.Distance(pos1, pos2) * tightness;
-            currentLength = Mathf.Min(actualDistance, maxLength);
-            float halfLength = currentLength / 2f;
-            Cursor1.ChangeLength(halfLength);
-            Cursor2.ChangeLength(halfLength);
+            // Actively shrink the rope to yank the lightweight object to the anchor
+            float shrinkSpeed = 5f; // Slightly slower than bash
+            float shrinkAmount = shrinkSpeed * deltaTime;
+            if (currentLength > 0.5f)
+            {
+                currentLength -= shrinkAmount;
+                float halfLength = currentLength / 2f;
+                Cursor1.ChangeLength(halfLength);
+                Cursor2.ChangeLength(halfLength);
+            }
         }
     }
 
