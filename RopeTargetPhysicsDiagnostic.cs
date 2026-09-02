@@ -19,7 +19,7 @@ using System.Text;
 /// - ObiParticleAttachment configuration (Runtime): Lightweight objects MUST be attached with AttachmentType.Dynamic to be pulled by the rope.
 /// </summary>
 [ExecuteAlways]
-public class RopePhysicsDiagnostic : MonoBehaviour
+public class RopeTargetPhysicsDiagnostic : MonoBehaviour
 {
     [Header("Diagnostic Status")]
     public bool isSetupCorrectly = false;
@@ -29,8 +29,9 @@ public class RopePhysicsDiagnostic : MonoBehaviour
 
     void Update()
     {
-        // Update occasionally in editor so we don't spam, or every frame if requested, but let's just do it cleanly
-        if (!Application.isPlaying && Time.frameCount % 60 != 0) return;
+        // Throttled execution: Update once every 60 frames (~1 sec at 60 FPS) in both Editor and Play Mode
+        // to prevent heavy performance impact from FindObjectsOfType and string allocation.
+        if (Time.frameCount % 60 != 0) return;
 
         RunDiagnostics();
     }
