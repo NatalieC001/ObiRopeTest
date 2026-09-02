@@ -157,20 +157,8 @@ public class MovingTarget : MonoBehaviour, IArrowTarget
 
         if (damage <= 0f && elementType == ElementTypeOB7.Normal)
         {
-            Debug.Log($"<color=cyan>[MovingTarget] 0-damage hit detected! Registering rope arrow.</color>");
-            if (RopeArrowManagerObi7.Instance != null)
-            {
-                Collider[] colliders = Physics.OverlapSphere(impactPoint, 0.5f);
-                foreach (Collider col in colliders)
-                {
-                    StickingArrow ropeArrow = col.GetComponentInParent<StickingArrow>();
-                    if (ropeArrow != null && ropeArrow.arrowCategory == ArrowCategory.Rope)
-                    {
-                        RopeArrowManagerObi7.Instance.RegisterRopeArrow(ropeArrow, this.gameObject, impactPoint);
-                        break;
-                    }
-                }
-            }
+            // Registration is now handled exclusively by StickingArrow.cs to prevent double-registration bugs.
+            Debug.Log($"<color=cyan>[MovingTarget] 0-damage hit detected! Rope Arrow registration is delegated to the arrow itself.</color>");
             return;
         }
 
