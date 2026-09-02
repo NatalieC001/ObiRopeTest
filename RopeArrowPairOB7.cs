@@ -1,6 +1,37 @@
 using UnityEngine;
 using Obi;
 
+/// <summary>
+/// ====================================================================================================
+/// ROPE ARROW PAIR OB7 - CENTRAL PHYSICS ORCHESTRATOR
+/// ====================================================================================================
+///
+/// WHAT THIS CLASS IS:
+/// This class acts as the active "Manager" or "Referee" for a single pair of rope arrows and the
+/// Obi Rope generated between them. Once two arrows are linked, this class takes total control over
+/// the interaction logic and the physics state of the targeted GameObjects.
+///
+/// THE NEW PHYSICS ARCHITECTURE:
+/// In the updated standalone target system (e.g., DestructibleProp.cs), individual targets are no
+/// longer responsible for managing their own Rigidbody states during rope interactions.
+/// Instead, THIS class is responsible for reading their ObjectWeight components, determining the
+/// correct mechanic (Bash, Tether, Tripwire), and actively modifying the target's physics.
+///
+/// HOW IT WORKS UNDER THE HOOD:
+/// 1. Weight Evaluation: It checks `ObjectWeight.Mobility` on both targets (or falls back to legacy tags).
+/// 2. State Determination:
+///    - Lightweight + Lightweight = BASH
+///    - Lightweight + Heavyweight/Immovable = TETHER
+///    - Heavy/Immovable + Heavy/Immovable = TRIPWIRE
+/// 3. Physics Hijacking (The Anti-Whiplash VR System):
+///    If a Lightweight target is about to be pulled (Bash or Tether), this class calls `ApplyBashPhysics()`.
+///    - It sets `isKinematic = false` so the Obi Rope can actually pull the target.
+///    - It temporarily spikes `drag` to 3.0 and `angularDrag` to 2.0.
+///      Why? Because sudden length changes from Obi Rope winches impart massive impulses. Without high drag,
+///      targets would slingshot past the player at lightspeed, ruining VR immersion.
+/// 4. Cleanup: When the rope breaks or the mechanic ends, `RevertBashPhysics()` returns the lightweight
+///    target safely back to its default state (`isKinematic = true`, drag = 0).
+/// </summary>
 [CreateAssetMenu(fileName = "NewRopeArrowPair", menuName = "Rope Arrows/Rope Arrow Pair", order = 1)]
 public class RopeArrowPairOB7 : ScriptableObject
 {
