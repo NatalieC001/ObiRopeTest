@@ -110,7 +110,7 @@ public class RopeTargetPhysicsDiagnostic : MonoBehaviour
         if (Application.isPlaying)
         {
             // Check if there are any ObiParticleAttachments attached to us or if we are the target of one
-            ObiParticleAttachment[] attachments = FindObjectsOfType<ObiParticleAttachment>();
+            ObiParticleAttachment[] attachments = FindObjectsByType<ObiParticleAttachment>(FindObjectsSortMode.None);
             bool isAttached = false;
             foreach (var att in attachments)
             {
