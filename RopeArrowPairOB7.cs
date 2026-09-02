@@ -28,16 +28,26 @@ public class RopeArrowPairOB7 : ScriptableObject
 
     public bool IsComplete => Arrow1 != null && Arrow2 != null;
     public bool IsGenerating { get; set; } = false;
+    public bool IsLocked { get; private set; } = false;
 
     public void Initialize(StickingArrow firstArrow)
     {
         Arrow1 = firstArrow;
         CurrentState = RopeState.Pending;
         IsGenerating = false;
+        IsLocked = false;
     }
 
     public void CompletePair(StickingArrow secondArrow, ObiRope generatedRope, ObiRopeCursor cursor1, ObiRopeCursor cursor2, GameObject spawnedHitMe, ObiParticleAttachment att1, ObiParticleAttachment att2)
     {
+        if (IsLocked)
+        {
+            Debug.LogError("<color=red>[RopePair] CRITICAL: Attempted to modify a locked RopeArrowPair data set. Rejecting modification.</color>");
+            return;
+        }
+
+        IsLocked = true; // Lock this data set permanently to prevent hijacking by other arrows.
+
         Arrow2 = secondArrow;
         Rope = generatedRope;
         Cursor1 = cursor1;
@@ -134,6 +144,11 @@ public class RopeArrowPairOB7 : ScriptableObject
     {
         if (CurrentState == RopeState.Pending)
         {
+            // If it's pending, and its arrow is destroyed, we just break it completely
+            if (destroyedArrow == Arrow1)
+            {
+                ForceBreakRope();
+            }
             return;
         }
 

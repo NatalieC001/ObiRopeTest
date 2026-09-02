@@ -172,9 +172,11 @@ public class RopeArrowManagerObi7 : MonoBehaviour
             // Second arrow hit. Complete the pair!
             Debug.Log("<color=magenta>[RopeManager] Registered as SECOND arrow. Triggering Obi generation Coroutine...</color>");
 
-            // Cache the reference to start the coroutine, but nullify the pending slot immediately
-            // This guarantees Arrow 3 will start a completely fresh pending pair.
+            // Cache the reference to start the coroutine
             RopeArrowPairOB7 pairToGenerate = pendingPair;
+
+            // IMMEDATELY NULLIFY PENDING PAIR.
+            // THIS ENSURES THE VERY NEXT ARROW WILL 100% BE FORCED INTO THE (pendingPair == null) BLOCK
             pendingPair = null;
 
             pairToGenerate.IsGenerating = true;
@@ -193,6 +195,9 @@ public class RopeArrowManagerObi7 : MonoBehaviour
     /// </summary>
     private IEnumerator GenerateRopeForPair(RopeArrowPairOB7 pair, StickingArrow secondArrow)
     {
+        // One final check right at the top of the coroutine.
+        if (pair == null) yield break;
+
         Debug.Log("<color=cyan>[RopeManager] Coroutine Start: Instantiating and Generating Blueprint.</color>");
 
         Transform t1 = pair.Arrow1.tailPoint != null ? pair.Arrow1.tailPoint : pair.Arrow1.transform;
@@ -374,6 +379,7 @@ public class RopeArrowManagerObi7 : MonoBehaviour
     {
         if (pendingPair != null && pendingPair.Arrow1 == arrow)
         {
+            Destroy(pendingPair);
             pendingPair = null;
         }
     }
