@@ -68,22 +68,41 @@ public class RopeArrowPairOB7 : ScriptableObject
         DetermineState();
     }
 
+    private RopeTargetMobility GetTargetMobility(GameObject obj)
+    {
+        if (obj == null) return RopeTargetMobility.Immovable;
+
+        ObjectWeight weightComponent = obj.GetComponentInParent<ObjectWeight>();
+        if (weightComponent == null)
+        {
+            weightComponent = obj.GetComponent<ObjectWeight>();
+        }
+
+        if (weightComponent != null)
+        {
+            return weightComponent.mobility;
+        }
+
+        Debug.LogWarning($"[RopePair] Object '{obj.name}' is missing an ObjectWeight component. Defaulting to Immovable.");
+        return RopeTargetMobility.Immovable;
+    }
+
     private void DetermineState()
     {
-        bool t1Movable = IsMovable(Arrow1.transform.parent?.gameObject);
-        bool t2Movable = IsMovable(Arrow2.transform.parent?.gameObject);
+        RopeTargetMobility t1Mobility = GetTargetMobility(Arrow1.transform.parent?.gameObject);
+        RopeTargetMobility t2Mobility = GetTargetMobility(Arrow2.transform.parent?.gameObject);
 
-        if (t1Movable && t2Movable)
+        if (t1Mobility == RopeTargetMobility.Lightweight && t2Mobility == RopeTargetMobility.Lightweight)
         {
             CurrentState = RopeState.Bash;
             DisableTargetLogic(Arrow1.transform.parent?.gameObject);
             DisableTargetLogic(Arrow2.transform.parent?.gameObject);
         }
-        else if (t1Movable || t2Movable)
+        else if (t1Mobility == RopeTargetMobility.Lightweight || t2Mobility == RopeTargetMobility.Lightweight)
         {
             CurrentState = RopeState.Tether;
-            if (t1Movable) DisableTargetLogic(Arrow1.transform.parent?.gameObject);
-            if (t2Movable) DisableTargetLogic(Arrow2.transform.parent?.gameObject);
+            if (t1Mobility == RopeTargetMobility.Lightweight) DisableTargetLogic(Arrow1.transform.parent?.gameObject);
+            if (t2Mobility == RopeTargetMobility.Lightweight) DisableTargetLogic(Arrow2.transform.parent?.gameObject);
             IsInfusible = true;
             infusionTimer = MAX_INFUSION_TIME;
         }
@@ -117,12 +136,6 @@ public class RopeArrowPairOB7 : ScriptableObject
         }
     }
 
-    private bool IsMovable(GameObject obj)
-    {
-        if (obj == null) return false;
-        return obj.CompareTag("Enemy") || obj.GetComponentInParent<MovingTarget>() != null || obj.GetComponent<MovingTarget>() != null;
-    }
-
     private void DisableTargetLogic(GameObject obj)
     {
         if (obj == null) return;
@@ -134,7 +147,7 @@ public class RopeArrowPairOB7 : ScriptableObject
     private void EnableTargetLogic(GameObject obj)
     {
         if (obj == null) return;
-        if (!IsMovable(obj)) return;
+        if (GetTargetMobility(obj) != RopeTargetMobility.Lightweight) return;
         MovingTarget mt = obj.GetComponentInParent<MovingTarget>();
         if (mt == null) mt = obj.GetComponent<MovingTarget>();
         if (mt != null) mt.EnableInternalLogic();
