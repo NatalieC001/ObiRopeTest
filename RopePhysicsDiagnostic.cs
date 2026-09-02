@@ -5,6 +5,18 @@ using System.Text;
 /// <summary>
 /// Attach this script to any target GameObject to diagnose its physics and Obi setup.
 /// It will log warnings and errors in its inspector to help you figure out why Bash, Tether, or Tripwire might be failing.
+///
+/// SCENE SETUP INSTRUCTIONS:
+/// 1. Attach this script directly to any GameObject in the scene that acts as a target for a Rope Arrow (e.g., Goblins, Crates, Statues).
+/// 2. View the component in the Unity Inspector. The "Diagnostic Report" text area will automatically populate with warnings/errors.
+/// 3. While the game is playing, shoot the object with a rope arrow to trigger the Runtime Obi Checks (verifying Dynamic vs Static attachments).
+/// 4. You can manually refresh the report by right-clicking the component header and selecting "Run Diagnostics Now".
+///
+/// WHAT IT CHECKS:
+/// - Presence of a Collider (needed for arrows to stick).
+/// - Presence and value of ObjectWeight (determines Lightweight vs Heavyweight).
+/// - Rigidbody configuration (Lightweight MUST be non-kinematic to be pulled, Heavyweight/Anchors should be kinematic or very heavy).
+/// - ObiParticleAttachment configuration (Runtime): Lightweight objects MUST be attached with AttachmentType.Dynamic to be pulled by the rope.
 /// </summary>
 [ExecuteAlways]
 public class RopePhysicsDiagnostic : MonoBehaviour
