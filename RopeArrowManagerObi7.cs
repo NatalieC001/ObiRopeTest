@@ -76,7 +76,7 @@ public class RopeArrowManagerObi7 : MonoBehaviour
     }
 
     /// <summary>
-    /// Helper method for external scripts (like Magic Arrows) to find the correct pair 
+    /// Helper method for external scripts (like Magic Arrows) to find the correct pair
     /// when they collide with a specific ObiRope object.
     /// </summary>
     public RopeArrowPairOB7 GetPairForRope(ObiRope targetRope)
@@ -89,14 +89,14 @@ public class RopeArrowManagerObi7 : MonoBehaviour
     }
 
     /// <summary>
-    /// Cleans up destroyed ropes to prevent memory leaks and updates the infusion 
+    /// Cleans up destroyed ropes to prevent memory leaks and updates the infusion
     /// timers and dynamic rope lengths for all active arrow pairs.
     /// </summary>
     private void Update()
     {
         // Clean up any destroyed pairs (e.g. broken tethers or destroyed arrows) to prevent memory leaks,
         // specifically ignoring pairs that are currently waiting in the Obi coroutine to be generated!
-        activePairs.RemoveAll(p => p.Rope == null && p != pendingPair && !p.IsGenerating);
+        activePairs.RemoveAll(p => p == null || (p.Rope == null && p != pendingPair && !p.IsGenerating));
 
         // Update lengths and infusion timers dynamically for all completed pairs
         foreach (var pair in activePairs)
@@ -116,58 +116,69 @@ public class RopeArrowManagerObi7 : MonoBehaviour
     {
         if (pendingPair != null && pendingPair.Arrow1 == destroyedArrow)
         {
+            Destroy(pendingPair);
             pendingPair = null;
         }
 
-        // Find any active pair using this arrow and break the rope
+        // Find any active pair using this arrow and let it handle the detachment physics
         for (int i = activePairs.Count - 1; i >= 0; i--)
         {
             var pair = activePairs[i];
-            if (pair.Arrow1 == destroyedArrow || pair.Arrow2 == destroyedArrow)
+            if (pair != null)
             {
-                // This triggers the cleanup logic (destroying rope, blueprint clone, prefab, etc)
-                pair.ForceBreakRope();
+                if (pair.Arrow1 == destroyedArrow || pair.Arrow2 == destroyedArrow)
+                {
+                    pair.HandleArrowDestroyed(destroyedArrow);
+
+                    // If the pair fully broke itself (both targets lost), it will destroy itself
+                    if (pair == null || (!pair.IsGenerating && pair.Arrow1 == null && pair.Arrow2 == null))
+                    {
+                        activePairs.RemoveAt(i);
+                    }
+                }
+            }
+            else
+            {
                 activePairs.RemoveAt(i);
             }
         }
     }
 
     /// <summary>
-    /// Catches the event when a Rope Arrow hits a valid target. 
+    /// Catches the event when a Rope Arrow hits a valid target.
     /// If it's the first arrow, it waits. If it's the second arrow, it triggers the rope creation.
     /// </summary>
     private void HandleArrowHit(StickingArrow arrow, GameObject hitTargetObject)
     {
         Debug.Log($"<color=magenta>[RopeManager] Received RegisterRopeArrow call from Target: {hitTargetObject.name}. Arrow: {arrow.gameObject.name}</color>");
 
-        // If this arrow is already in a pending pair, clear it
+        // If this arrow is already in a pending pair, ignore it to prevent weird states
         if (pendingPair != null && pendingPair.Arrow1 == arrow)
         {
-            Debug.LogWarning("<color=orange>[RopeManager] Arrow tried to register, but it's already the pending arrow! Clearing pending pair.</color>");
-            pendingPair = null;
+            Debug.LogWarning("<color=orange>[RopeManager] Arrow tried to register, but it is already the FIRST arrow! Ignoring.</color>");
+            return;
         }
 
         if (pendingPair == null)
         {
             // First arrow of a new pair
-            pendingPair = new RopeArrowPairOB7(arrow);
+            pendingPair = ScriptableObject.CreateInstance<RopeArrowPairOB7>();
+            pendingPair.Initialize(arrow);
             activePairs.Add(pendingPair);
             Debug.Log("<color=magenta>[RopeManager] Registered as FIRST arrow. Creating pending pair.</color>");
         }
         else
         {
-            if (pendingPair.Arrow1 == arrow)
-            {
-                Debug.LogWarning("<color=orange>[RopeManager] Arrow tried to register as the SECOND arrow, but it is already the FIRST arrow! Ignoring double-trigger.</color>");
-                return;
-            }
-
             // Second arrow hit. Complete the pair!
             Debug.Log("<color=magenta>[RopeManager] Registered as SECOND arrow. Triggering Obi generation Coroutine...</color>");
 
-            pendingPair.IsGenerating = true;
-            StartCoroutine(GenerateRopeForPair(pendingPair, arrow));
+            // Cache the reference to start the coroutine, but nullify the pending slot immediately
+            // This guarantees Arrow 3 will start a completely fresh pending pair.
+            RopeArrowPairOB7 pairToGenerate = pendingPair;
             pendingPair = null;
+
+            pairToGenerate.IsGenerating = true;
+            StartCoroutine(GenerateRopeForPair(pairToGenerate, arrow));
         }
     }
 
@@ -213,7 +224,7 @@ public class RopeArrowManagerObi7 : MonoBehaviour
         Vector3 startPositionLS = ropeObject.transform.InverseTransformPoint(t1.position);
         Vector3 endPositionLS = ropeObject.transform.InverseTransformPoint(t2.position);
 
-        // Calculate a safe tangent that doesn't bulge massively. 
+        // Calculate a safe tangent that doesn't bulge massively.
         // Instead of a 1-meter normalized vector, we scale it to the distance so the line is tightly strung.
         float distance = Vector3.Distance(startPositionLS, endPositionLS);
         Vector3 tangentLS = Vector3.right * (distance * 0.25f);
@@ -332,7 +343,7 @@ public class RopeArrowManagerObi7 : MonoBehaviour
         Debug.Log("<color=cyan>[RopeManager] Calling pair.CompletePair to finalize logic state.</color>");
 
         // Finalize pair data, handing both winches over to the script that manages the logic
-        pair.CompletePair(secondArrow, rope, cursor1, cursor2, spawnedHitMe);
+        pair.CompletePair(secondArrow, rope, cursor1, cursor2, spawnedHitMe, attachment1, attachment2);
         pair.IsGenerating = false;
 
         Debug.Log("<color=lime>[RopeManager] Rope successfully created, stretched, and bound to targets securely via SnapAttachment API!</color>");
@@ -377,7 +388,7 @@ public class RopeArrowManagerObi7 : MonoBehaviour
 
 
 
-//somewhat better bu Sometimes it creates a little bit too much rope. Sometimes it's fine. The other problem is that the hit me object keeps detaching. 
+//somewhat better bu Sometimes it creates a little bit too much rope. Sometimes it's fine. The other problem is that the hit me object keeps detaching.
 
 //using System.Collections;
 //using System.Collections.Generic;
@@ -448,7 +459,7 @@ public class RopeArrowManagerObi7 : MonoBehaviour
 //    }
 
 //    /// <summary>
-//    /// Helper method for external scripts (like Magic Arrows) to find the correct pair 
+//    /// Helper method for external scripts (like Magic Arrows) to find the correct pair
 //    /// when they collide with a specific ObiRope object.
 //    /// </summary>
 //    public RopeArrowPairOB7 GetPairForRope(ObiRope targetRope)
@@ -461,14 +472,14 @@ public class RopeArrowManagerObi7 : MonoBehaviour
 //    }
 
 //    /// <summary>
-//    /// Cleans up destroyed ropes to prevent memory leaks and updates the infusion 
+//    /// Cleans up destroyed ropes to prevent memory leaks and updates the infusion
 //    /// timers and dynamic rope lengths for all active arrow pairs.
 //    /// </summary>
 //    private void Update()
 //    {
 //        // Clean up any destroyed pairs (e.g. broken tethers or destroyed arrows) to prevent memory leaks,
 //        // specifically ignoring pairs that are currently waiting in the Obi coroutine to be generated!
-//        activePairs.RemoveAll(p => p.Rope == null && p != pendingPair && !p.IsGenerating);
+//        activePairs.RemoveAll(p => p == null || (p.Rope == null && p != pendingPair && !p.IsGenerating));
 
 //        // Update lengths and infusion timers dynamically for all completed pairs
 //        foreach (var pair in activePairs)
@@ -505,7 +516,7 @@ public class RopeArrowManagerObi7 : MonoBehaviour
 //    }
 
 //    /// <summary>
-//    /// Catches the event when a Rope Arrow hits a valid target. 
+//    /// Catches the event when a Rope Arrow hits a valid target.
 //    /// If it's the first arrow, it waits. If it's the second arrow, it triggers the rope creation.
 //    /// </summary>
 //    private void HandleArrowHit(StickingArrow arrow, GameObject hitTargetObject)
@@ -577,7 +588,7 @@ public class RopeArrowManagerObi7 : MonoBehaviour
 //        Vector3 startPositionLS = ropeObject.transform.InverseTransformPoint(t1.position);
 //        Vector3 endPositionLS = ropeObject.transform.InverseTransformPoint(t2.position);
 
-//        // Calculate a safe tangent that doesn't bulge massively. 
+//        // Calculate a safe tangent that doesn't bulge massively.
 //        // Instead of a 1-meter normalized vector, we scale it to the distance so the line is tightly strung.
 //        float distance = Vector3.Distance(startPositionLS, endPositionLS);
 //        Vector3 tangentLS = Vector3.right * (distance * 0.25f);
@@ -693,7 +704,7 @@ public class RopeArrowManagerObi7 : MonoBehaviour
 //        Debug.Log("<color=cyan>[RopeManager] Calling pair.CompletePair to finalize logic state.</color>");
 
 //        // Finalize pair data, handing both winches over to the script that manages the logic
-//        pair.CompletePair(secondArrow, rope, cursor1, cursor2, spawnedHitMe);
+//        pair.CompletePair(secondArrow, rope, cursor1, cursor2, spawnedHitMe, attachment1, attachment2);
 //        pair.IsGenerating = false;
 
 //        Debug.Log("<color=lime>[RopeManager] Rope successfully created, stretched, and bound to targets securely via SnapAttachment API!</color>");
@@ -737,7 +748,7 @@ public class RopeArrowManagerObi7 : MonoBehaviour
 
 ////---------------------------------------------------------------------------------------
 
-//It's still making stick ends. The tension's terrible also. The the hit me objects can float out forever. But it does have a very fun physics ability, which might make a fun game mechanic.  Where the hit me object can be punted across the screen. Umm, taking the ropes with them that maybe the player could use to get to other places So we'll leave it here only for that. It's broken. We can't use it in game otherwise. ? 
+//It's still making stick ends. The tension's terrible also. The the hit me objects can float out forever. But it does have a very fun physics ability, which might make a fun game mechanic.  Where the hit me object can be punted across the screen. Umm, taking the ropes with them that maybe the player could use to get to other places So we'll leave it here only for that. It's broken. We can't use it in game otherwise. ?
 //using System.Collections;
 //using System.Collections.Generic;
 //using UnityEngine;
@@ -803,7 +814,7 @@ public class RopeArrowManagerObi7 : MonoBehaviour
 //    }
 
 //    /// <summary>
-//    /// Helper method for external scripts (like Magic Arrows) to find the correct pair 
+//    /// Helper method for external scripts (like Magic Arrows) to find the correct pair
 //    /// when they collide with a specific ObiRope object.
 //    /// </summary>
 //    public RopeArrowPairOB7 GetPairForRope(ObiRope targetRope)
@@ -816,14 +827,14 @@ public class RopeArrowManagerObi7 : MonoBehaviour
 //    }
 
 //    /// <summary>
-//    /// Cleans up destroyed ropes to prevent memory leaks and updates the infusion 
+//    /// Cleans up destroyed ropes to prevent memory leaks and updates the infusion
 //    /// timers and dynamic rope lengths for all active arrow pairs.
 //    /// </summary>
 //    private void Update()
 //    {
 //        // Clean up any destroyed pairs (e.g. broken tethers or destroyed arrows) to prevent memory leaks,
 //        // specifically ignoring pairs that are currently waiting in the Obi coroutine to be generated!
-//        activePairs.RemoveAll(p => p.Rope == null && p != pendingPair && !p.IsGenerating);
+//        activePairs.RemoveAll(p => p == null || (p.Rope == null && p != pendingPair && !p.IsGenerating));
 
 //        // Update lengths and infusion timers dynamically for all completed pairs
 //        foreach (var pair in activePairs)
@@ -860,7 +871,7 @@ public class RopeArrowManagerObi7 : MonoBehaviour
 //    }
 
 //    /// <summary>
-//    /// Catches the event when a Rope Arrow hits a valid target. 
+//    /// Catches the event when a Rope Arrow hits a valid target.
 //    /// If it's the first arrow, it waits. If it's the second arrow, it triggers the rope creation.
 //    /// </summary>
 //    private void HandleArrowHit(StickingArrow arrow, GameObject hitTargetObject)
@@ -978,7 +989,7 @@ public class RopeArrowManagerObi7 : MonoBehaviour
 //        ropeRenderer.material = ropeMaterial;
 //        if (ropeSection != null) ropeRenderer.section = ropeSection;
 
-//        // 3. Configure the Cursor to stretch/shrink the rope evenly from the ends 
+//        // 3. Configure the Cursor to stretch/shrink the rope evenly from the ends
 //        cursor.cursorMu = 1.0f;
 //        cursor.sourceMu = 1.0f;
 //        cursor.direction = false;
@@ -1137,7 +1148,7 @@ public class RopeArrowManagerObi7 : MonoBehaviour
 //    }
 
 //    /// <summary>
-//    /// Helper method for external scripts (like Magic Arrows) to find the correct pair 
+//    /// Helper method for external scripts (like Magic Arrows) to find the correct pair
 //    /// when they collide with a specific ObiRope object.
 //    /// </summary>
 //    public RopeArrowPairOB7 GetPairForRope(ObiRope targetRope)
@@ -1150,14 +1161,14 @@ public class RopeArrowManagerObi7 : MonoBehaviour
 //    }
 
 //    /// <summary>
-//    /// Cleans up destroyed ropes to prevent memory leaks and updates the infusion 
+//    /// Cleans up destroyed ropes to prevent memory leaks and updates the infusion
 //    /// timers and dynamic rope lengths for all active arrow pairs.
 //    /// </summary>
 //    private void Update()
 //    {
 //        // Clean up any destroyed pairs (e.g. broken tethers or destroyed arrows) to prevent memory leaks,
 //        // specifically ignoring pairs that are currently waiting in the Obi coroutine to be generated!
-//        activePairs.RemoveAll(p => p.Rope == null && p != pendingPair && !p.IsGenerating);
+//        activePairs.RemoveAll(p => p == null || (p.Rope == null && p != pendingPair && !p.IsGenerating));
 
 //        // Update lengths and infusion timers dynamically for all completed pairs
 //        foreach (var pair in activePairs)
@@ -1194,7 +1205,7 @@ public class RopeArrowManagerObi7 : MonoBehaviour
 //    }
 
 //    /// <summary>
-//    /// Catches the event when a Rope Arrow hits a valid target. 
+//    /// Catches the event when a Rope Arrow hits a valid target.
 //    /// If it's the first arrow, it waits. If it's the second arrow, it triggers the rope creation.
 //    /// </summary>
 //    private void HandleArrowHit(StickingArrow arrow, GameObject hitTargetObject)
@@ -1312,7 +1323,7 @@ public class RopeArrowManagerObi7 : MonoBehaviour
 //        ropeRenderer.material = ropeMaterial;
 //        if (ropeSection != null) ropeRenderer.section = ropeSection;
 
-//        // 3. Configure the Cursor to stretch/shrink the rope evenly from the ends 
+//        // 3. Configure the Cursor to stretch/shrink the rope evenly from the ends
 //        cursor.cursorMu = 1.0f;
 //        cursor.sourceMu = 1.0f;
 //        cursor.direction = false;
@@ -1469,7 +1480,7 @@ public class RopeArrowManagerObi7 : MonoBehaviour
 //    }
 
 //    /// <summary>
-//    /// Helper method for external scripts (like Magic Arrows) to find the correct pair 
+//    /// Helper method for external scripts (like Magic Arrows) to find the correct pair
 //    /// when they collide with a specific ObiRope object.
 //    /// </summary>
 //    public RopeArrowPairOB7 GetPairForRope(ObiRope targetRope)
@@ -1482,14 +1493,14 @@ public class RopeArrowManagerObi7 : MonoBehaviour
 //    }
 
 //    /// <summary>
-//    /// Cleans up destroyed ropes to prevent memory leaks and updates the infusion 
+//    /// Cleans up destroyed ropes to prevent memory leaks and updates the infusion
 //    /// timers and dynamic rope lengths for all active arrow pairs.
 //    /// </summary>
 //    private void Update()
 //    {
 //        // Clean up any destroyed pairs (e.g. broken tethers or destroyed arrows) to prevent memory leaks,
 //        // specifically ignoring pairs that are currently waiting in the Obi coroutine to be generated!
-//        activePairs.RemoveAll(p => p.Rope == null && p != pendingPair && !p.IsGenerating);
+//        activePairs.RemoveAll(p => p == null || (p.Rope == null && p != pendingPair && !p.IsGenerating));
 
 //        // Update lengths and infusion timers dynamically for all completed pairs
 //        foreach (var pair in activePairs)
@@ -1526,7 +1537,7 @@ public class RopeArrowManagerObi7 : MonoBehaviour
 //    }
 
 //    /// <summary>
-//    /// Catches the event when a Rope Arrow hits a valid target. 
+//    /// Catches the event when a Rope Arrow hits a valid target.
 //    /// If it's the first arrow, it waits. If it's the second arrow, it triggers the rope creation.
 //    /// </summary>
 //    private void HandleArrowHit(StickingArrow arrow, GameObject hitTargetObject)
@@ -1643,7 +1654,7 @@ public class RopeArrowManagerObi7 : MonoBehaviour
 //        ropeRenderer.material = ropeMaterial;
 //        if (ropeSection != null) ropeRenderer.section = ropeSection;
 
-//        // 3. Configure the Cursor to stretch/shrink the rope evenly from the ends 
+//        // 3. Configure the Cursor to stretch/shrink the rope evenly from the ends
 //        cursor.cursorMu = 1.0f;
 //        cursor.sourceMu = 1.0f;
 //        cursor.direction = false;
