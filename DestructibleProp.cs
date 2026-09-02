@@ -14,16 +14,16 @@ using System.Collections;
 /// ARCHITECTURE & PHYSICS DELEGATION:
 /// Unlike earlier sandbox prototypes, this class is intentionally "dumb" regarding its own complex
 /// physics state changes. It does NOT toggle its own Rigidbody (e.g., turning isKinematic on/off)
-/// when it is hit by a rope. Instead, the central manager (RopeArrowPairOB7) acts as the referee.
-/// The manager reads this object's ObjectWeight, determines the rope state, and dictates when this
-/// prop should fly through the air and when it should freeze.
+/// when it is hit by a rope. Instead, the logic referee (RopeArrowPairOB7) determines the rope state
+/// based on ObjectWeight, and the BashPhysicsManager executes the actual Rigidbody property changes,
+/// dictating when this prop should fly through the air and when it should freeze.
 ///
 /// HOW TO SET THIS UP IN UNITY:
 /// 1. Attach this script to your 3D Model (e.g., a Goblin or Barrel).
 /// 2. ObjectWeight Component (Required): Set Mobility to "Lightweight".
 /// 3. Rigidbody Component (Required):
 ///     - Mass: Keep it relatively low (e.g., 1 to 5) so it snaps quickly when bashed.
-///     - Drag: 0 (The Manager will temporarily spike the drag to 3.0 during a bash to prevent VR whiplash).
+///     - Drag: 0 (The BashPhysicsManager will temporarily spike the drag to 3.0 during a bash to prevent VR whiplash).
 ///     - isKinematic: Check this box (TRUE). The prop should sit still until the manager rips it away.
 ///     - Interpolate: Set to "Interpolate" for smooth VR movement.
 /// 4. Collider Component (Required): A BoxCollider or SphereCollider so arrows can hit it.
@@ -134,9 +134,9 @@ public class DestructibleProp : MonoBehaviour, IArrowTarget
         isDead = true;
         Debug.Log($"<color=red>[DestructibleProp] '{gameObject.name}' destroyed!</color>");
 
-        // Force breaking ropes is currently handled by the sandbox manager iteration in MovingTarget.
-        // For a robust system, the Manager should detect target destruction via event or polling.
-        // To maintain backwards compatibility without rewriting Manager destruction polling yet:
+        // Clean up any ropes explicitly attached to this object when it is destroyed.
+        // This is a standalone destruction handler for the new Bash mechanics that ensures
+        // ropes break cleanly without relying on legacy manager loops from the sandbox tests.
         if (RopeArrowManagerObi7.Instance != null)
         {
             for (int i = RopeArrowManagerObi7.Instance.activePairs.Count - 1; i >= 0; i--)
