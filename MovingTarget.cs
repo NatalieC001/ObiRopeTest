@@ -61,7 +61,15 @@ public class MovingTarget : MonoBehaviour, IArrowTarget
         rb = GetComponent<Rigidbody>();
         if (rb != null)
         {
-            rb.isKinematic = true;
+            ObjectWeight weight = GetComponent<ObjectWeight>();
+            if (weight != null && weight.mobility == RopeTargetMobility.Lightweight)
+            {
+                rb.isKinematic = false;
+            }
+            else
+            {
+                rb.isKinematic = true;
+            }
             rb.interpolation = RigidbodyInterpolation.Interpolate;
         }
 

@@ -77,15 +77,8 @@ public class RopeTargetPhysicsDiagnostic : MonoBehaviour
         Rigidbody rb = GetComponent<Rigidbody>();
         if (rb == null)
         {
-            if (mobility == RopeTargetMobility.Lightweight)
-            {
-                report.AppendLine("❌ ERROR: Target is Lightweight but has NO Rigidbody. ObiRope cannot pull an object without a Rigidbody.");
-                allGood = false;
-            }
-            else
-            {
-                report.AppendLine("✅ No Rigidbody found. This is fine for Immovable targets.");
-            }
+            report.AppendLine("❌ ERROR: No Rigidbody found. All rope targets require a Rigidbody to interact properly with the physics engine (e.g. Kinematic for anchors).");
+            allGood = false;
         }
         else
         {
@@ -109,7 +102,7 @@ public class RopeTargetPhysicsDiagnostic : MonoBehaviour
                 }
                 else
                 {
-                    report.AppendLine("✅ Rigidbody setup looks good for an anchor target.");
+                    report.AppendLine("✅ Rigidbody setup looks good for an anchor target (Kinematic or high mass).");
                 }
             }
         }
