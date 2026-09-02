@@ -53,6 +53,9 @@ public class RopeArrowManagerObi7 : MonoBehaviour
     [Range(0.1f, 2.0f)]
     public float lengthMultiplier = 1.0f;
 
+    [Tooltip("How close (in meters) the lightweight object should be pulled to the anchor during a Tether.")]
+    public float tetherAllowance = 2.0f;
+
     // List of all active pairs
     public List<RopeArrowPairOB7> activePairs = new List<RopeArrowPairOB7>();
 
