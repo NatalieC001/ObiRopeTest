@@ -285,6 +285,13 @@ public class MovingTarget : MonoBehaviour, IArrowTarget
             DissolveEffect[] dissolveComponents = GetComponentsInChildren<DissolveEffect>();
             foreach (DissolveEffect effect in dissolveComponents)
             {
+                // Ensure we do not dissolve rope arrows that are stuck in this target
+                StickingArrow parentArrow = effect.GetComponentInParent<StickingArrow>();
+                if (parentArrow != null && parentArrow.arrowCategory == ArrowCategory.Rope)
+                {
+                    continue;
+                }
+
                 effect.TriggerDissolve();
             }
 
