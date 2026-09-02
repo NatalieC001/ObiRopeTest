@@ -26,10 +26,13 @@ using System.Collections;
 ///     - Drag: 0 (The Manager will temporarily spike the drag to 3.0 during a bash to prevent VR whiplash).
 ///     - isKinematic: Check this box (TRUE). The prop should sit still until the manager rips it away.
 ///     - Interpolate: Set to "Interpolate" for smooth VR movement.
-/// 4. Add a Collider (e.g., BoxCollider or SphereCollider) so arrows can hit it.
+/// 4. Collider Component (Required): A BoxCollider or SphereCollider so arrows can hit it.
+/// 5. AudioSource Component (Required): For playing impact sounds automatically.
 /// </summary>
 [RequireComponent(typeof(ObjectWeight))]
 [RequireComponent(typeof(Rigidbody))]
+[RequireComponent(typeof(Collider))]
+[RequireComponent(typeof(AudioSource))]
 public class DestructibleProp : MonoBehaviour, IArrowTarget
 {
     [Header("Destructible Settings")]
@@ -46,6 +49,7 @@ public class DestructibleProp : MonoBehaviour, IArrowTarget
     public ElementTypeOB7 baseElementType = ElementTypeOB7.Normal;
 
     [Header("Effects")]
+    [Tooltip("If left empty, will automatically grab the required AudioSource on this object.")]
     [SerializeField] private AudioSource impactAudio;
     [SerializeField] private MeshRenderer propRenderer;
 
@@ -56,6 +60,11 @@ public class DestructibleProp : MonoBehaviour, IArrowTarget
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
+        if (impactAudio == null)
+        {
+            impactAudio = GetComponent<AudioSource>();
+        }
+
         currentHealth = maxHealth;
 
         // By default, lightweight bash targets start kinematic so they don't roll around
