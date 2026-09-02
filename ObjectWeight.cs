@@ -30,6 +30,11 @@ public enum RopeTargetMobility
     Immovable
 }
 
+/// <summary>
+/// Attach this script to any GameObject in the scene that can be hit by a Rope Arrow.
+/// This defines how the object will react when connected to another object by a rope.
+/// If an object is hit but does not have this component, it defaults to Immovable.
+/// </summary>
 public class ObjectWeight : MonoBehaviour
 {
     public RopeTargetMobility mobility = RopeTargetMobility.Lightweight;
