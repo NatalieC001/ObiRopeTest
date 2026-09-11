@@ -190,6 +190,6 @@ public class CSVLevelImporter : EditorWindow
     {
         public string introText;
         public string outroText;
-        public Dictionary<string, List<TargetSpawnConfig>> waves;
+        public Dictionary<string, WaveDataSO> waves;
     }
 }
