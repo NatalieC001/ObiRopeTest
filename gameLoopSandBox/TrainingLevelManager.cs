@@ -154,12 +154,21 @@ public class TrainingLevelManager : MonoBehaviour
         WaveDataSO waveData = currentLevelConfig.waves[index];
         Debug.Log($"[TrainingLevelManager] Starting Wave {index + 1}/{currentLevelConfig.waves.Count}. Progression: {waveData.progressionType}");
 
+        // Accessibility Text Pacing: Show intro text, wait for user input or timeout
         if (waveFeedbackText != null)
         {
-            waveFeedbackText.text = $"Wave {index + 1} Starting...";
-            // Clear text after a short moment so it doesn't block the view during combat
-            Invoke(nameof(ClearFeedbackText), 2.5f);
+            string baseText = $"Wave {index + 1}\n{waveData.waveIntroText}";
+            waveFeedbackText.text = $"{baseText}\n<size=50%>(Press Trigger to continue)</size>";
         }
+
+        // Enter waiting state
+        isWaitingForInput = true;
+        waitTimeoutTimer = 0f;
+    }
+
+    private void ActuallyStartWave(int index)
+    {
+        WaveDataSO waveData = currentLevelConfig.waves[index];
 
         activeTargets.Clear();
         activeSpawnCoroutines.Clear();
@@ -358,7 +367,7 @@ public class TrainingLevelManager : MonoBehaviour
 
     private void ClearFeedbackText()
     {
-        if (waveFeedbackText != null && isWaveActive)
+        if (waveFeedbackText != null)
         {
             waveFeedbackText.text = "";
         }
