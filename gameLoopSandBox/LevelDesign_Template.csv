@@ -1,0 +1,12 @@
+LevelName,WaveName,WaveIntroText,WaveOutroText,SpawnDelay,PosX,PosZ,ScaleModifier,SpeedModifier,MovementBehavior,RequiredElement
+Level1_Intro,Wave1,Get your bow ready!,Great job!,0,0,10,1,1,None,Normal
+Level1_Intro,Wave2,Two targets!,Awesome!,0,-5,10,1,1,None,Normal
+Level1_Intro,Wave2,Two targets!,Awesome!,0,5,10,1,1,None,Normal
+Level1_Intro,Wave3,Try a Fire Arrow!,Level Complete!,0,0,15,1.2,1,None,Fire
+Level2_Gallery,Wave1,Moving Targets!,Nice shooting!,0,0,15,1,1,PingPongMovement,Normal
+Level2_Gallery,Wave1,Moving Targets!,Nice shooting!,0,5,20,1,1.5,PingPongMovement,Normal
+Level2_Gallery,Wave2,Watch the flanks!,Wave clear!,0,-10,5,1,1.2,None,Electric
+Level2_Gallery,Wave2,Watch the flanks!,Wave clear!,2,10,5,1,1.2,None,Electric
+Level3_Boss,Wave1,Boss incoming!,You survived!,0,-3,10,1,1,Rotator,Normal
+Level3_Boss,Wave1,Boss incoming!,You survived!,0,3,10,1,1,Rotator,Normal
+Level3_Boss,Wave1,Boss incoming!,You survived!,4,0,25,3,2,SwoopAndRetreatMovement,Fire

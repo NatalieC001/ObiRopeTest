@@ -1,0 +1,183 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using UnityEditor;
+using UnityEngine;
+
+public class CSVLevelImporter : EditorWindow
+{
+    private TextAsset csvFile;
+    private GameObject vanillaTargetPrefab;
+
+    [MenuItem("Archery Range/CSV Level Importer")]
+    public static void ShowWindow()
+    {
+        GetWindow<CSVLevelImporter>("CSV Level Importer");
+    }
+
+    private void OnGUI()
+    {
+        GUILayout.Label("CSV Level Configuration Importer", EditorStyles.boldLabel);
+
+        EditorGUILayout.HelpBox("Select your LevelDesign.csv file and the default Target Prefab to generate ScriptableObjects automatically.", MessageType.Info);
+
+        csvFile = (TextAsset)EditorGUILayout.ObjectField("CSV File", csvFile, typeof(TextAsset), false);
+        vanillaTargetPrefab = (GameObject)EditorGUILayout.ObjectField("Vanilla Target Prefab", vanillaTargetPrefab, typeof(GameObject), false);
+
+        if (GUILayout.Button("Generate Levels & Waves"))
+        {
+            if (csvFile == null)
+            {
+                EditorUtility.DisplayDialog("Error", "Please select a CSV file.", "OK");
+                return;
+            }
+            if (vanillaTargetPrefab == null)
+            {
+                EditorUtility.DisplayDialog("Error", "Please assign the Vanilla Target Prefab.", "OK");
+                return;
+            }
+
+            ParseAndGenerate(csvFile.text);
+        }
+    }
+
+    private void ParseAndGenerate(string csvContent)
+    {
+        // Split by lines (handling both \n and \r\n)
+        string[] lines = csvContent.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        if (lines.Length <= 1) return; // Need at least header and one data row
+
+        // LevelName -> (WaveName -> List of TargetConfigs)
+        Dictionary<string, Dictionary<string, WaveBuilderData>> levelDataMap = new Dictionary<string, Dictionary<string, WaveBuilderData>>();
+
+        // Start reading from row 1 (skipping header)
+        for (int i = 1; i < lines.Length; i++)
+        {
+            string[] cols = lines[i].Split(',');
+            // Expected cols:
+            // 0:LevelName, 1:WaveName, 2:WaveIntroText, 3:WaveOutroText, 4:SpawnDelay, 5:PosX, 6:PosZ,
+            // 7:ScaleModifier, 8:SpeedModifier, 9:MovementBehavior, 10:RequiredElement
+
+            if (cols.Length < 11) continue;
+
+            string levelName = cols[0].Trim();
+            string waveName = cols[1].Trim();
+
+            if (!levelDataMap.ContainsKey(levelName))
+            {
+                levelDataMap[levelName] = new Dictionary<string, WaveBuilderData>();
+            }
+
+            if (!levelDataMap[levelName].ContainsKey(waveName))
+            {
+                levelDataMap[levelName][waveName] = new WaveBuilderData()
+                {
+                    introText = cols[2].Trim(),
+                    outroText = cols[3].Trim(),
+                    targets = new List<TargetSpawnConfig>()
+                };
+            }
+
+            TargetSpawnConfig config = new TargetSpawnConfig();
+
+            float.TryParse(cols[4], out config.spawnDelay);
+
+            float posX, posZ;
+            float.TryParse(cols[5], out posX);
+            float.TryParse(cols[6], out posZ);
+            config.spawnPosition = new Vector3(posX, 0, posZ);
+
+            if (!float.TryParse(cols[7], out config.scaleModifier)) config.scaleModifier = 1f;
+            if (!float.TryParse(cols[8], out config.speedModifier)) config.speedModifier = 1f;
+
+            if (Enum.TryParse(cols[9].Trim(), true, out TargetMovementType moveEnum))
+            {
+                config.movementBehavior = moveEnum;
+            }
+            else
+            {
+                config.movementBehavior = TargetMovementType.None;
+            }
+
+            if (Enum.TryParse(cols[10].Trim(), true, out ElementTypeOB7 elementEnum))
+            {
+                config.requiredArrowElement = elementEnum;
+            }
+            else
+            {
+                config.requiredArrowElement = ElementTypeOB7.Normal;
+            }
+
+            levelDataMap[levelName][waveName].targets.Add(config);
+        }
+
+        GenerateAssets(levelDataMap);
+    }
+
+    private void GenerateAssets(Dictionary<string, Dictionary<string, WaveBuilderData>> levelDataMap)
+    {
+        string rootPath = "Assets/Data";
+        if (!AssetDatabase.IsValidFolder(rootPath)) AssetDatabase.CreateFolder("Assets", "Data");
+
+        string wavesPath = rootPath + "/Waves";
+        if (!AssetDatabase.IsValidFolder(wavesPath)) AssetDatabase.CreateFolder(rootPath, "Waves");
+
+        string levelsPath = rootPath + "/Levels";
+        if (!AssetDatabase.IsValidFolder(levelsPath)) AssetDatabase.CreateFolder(rootPath, "Levels");
+
+        foreach (var levelKvp in levelDataMap)
+        {
+            string levelName = levelKvp.Key;
+
+            // Create Level Config
+            string levelAssetPath = $"{levelsPath}/{levelName}.asset";
+            LevelConfigSO levelConfig = AssetDatabase.LoadAssetAtPath<LevelConfigSO>(levelAssetPath);
+            if (levelConfig == null)
+            {
+                levelConfig = ScriptableObject.CreateInstance<LevelConfigSO>();
+                AssetDatabase.CreateAsset(levelConfig, levelAssetPath);
+            }
+
+            levelConfig.levelName = levelName;
+            levelConfig.vanillaTargetPrefab = vanillaTargetPrefab;
+            levelConfig.waves.Clear();
+
+            foreach (var waveKvp in levelKvp.Value)
+            {
+                string waveName = waveKvp.Key;
+                WaveBuilderData waveDataInfo = waveKvp.Value;
+
+                // Create Wave Config
+                string waveAssetPath = $"{wavesPath}/{levelName}_{waveName}.asset";
+                WaveDataSO waveData = AssetDatabase.LoadAssetAtPath<WaveDataSO>(waveAssetPath);
+                if (waveData == null)
+                {
+                    waveData = ScriptableObject.CreateInstance<WaveDataSO>();
+                    AssetDatabase.CreateAsset(waveData, waveAssetPath);
+                }
+
+                waveData.progressionType = WaveProgressionType.ClearAllTargets;
+                waveData.waveIntroText = waveDataInfo.introText;
+                waveData.waveOutroText = waveDataInfo.outroText;
+                waveData.targets = waveDataInfo.targets;
+
+                EditorUtility.SetDirty(waveData);
+                levelConfig.waves.Add(waveData);
+            }
+
+            EditorUtility.SetDirty(levelConfig);
+        }
+
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+
+        EditorUtility.DisplayDialog("Success", "Levels and Waves generated successfully from CSV!", "OK");
+    }
+
+    private class WaveBuilderData
+    {
+        public string introText;
+        public string outroText;
+        public List<TargetSpawnConfig> targets;
+    }
+}
