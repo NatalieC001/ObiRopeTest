@@ -26,9 +26,14 @@ To ensure accessibility and an easy "at-a-glance" workflow, the entire level pro
 4. Create an Empty GameObject to serve as the physical center of the spawn area (e.g., `SpawnCenterPoint`).
    * **VR Note:** Targets can spawn in 360 degrees around this point depending on the X/Z offsets in the Wave Data. The system automatically ensures they never spawn below the Y-level of this center point and always rotates them upright to face this center point.
 5. Drag `SpawnCenterPoint` into the **Spawn Center** slot on the Manager.
-6. Create a **TextMeshPro - Text** UI element (floating in world space) to act as the Announcer, and drag it into the **Level Feedback Text** slot.
-7. Create a smaller **TextMeshPro - Text** UI element to act as the HUD (e.g., showing "Targets Left"), and drag it into the **HUD Text** slot.
-8. Add a physical object (like a Gong model) to your scene. Attach the `LevelAdvanceGong` script to it and ensure it has a valid Collider. Link your `TrainingLevelManager` to its script slot.
+6. **VR UI Setup (The "Jumbo Tron"):** Standard Screen Space UI causes motion sickness in VR. You must use World Space UI.
+   - Right-click in the Hierarchy and select **UI -> Text - TextMeshPro**.
+   - Select the Canvas that is automatically generated and change its **Render Mode** to **World Space**.
+   - Scale the Canvas down significantly (e.g., `X: 0.01, Y: 0.01, Z: 0.01`) and position it high above the `SpawnCenterPoint` like a floating billboard.
+   - Duplicate the Text element so you have two.
+   - Name the top one "Announcer Text" and drag it into the Manager's **Level Feedback Text** slot.
+   - Name the bottom one "HUD Text" and drag it into the Manager's **HUD Text** slot.
+7. Add a physical object (like a 17th-century Gong model) to your scene. Attach the `LevelAdvanceGong` script to it and ensure it has a valid Collider. Link your `TrainingLevelManager` to its script slot.
 
 ---
 
