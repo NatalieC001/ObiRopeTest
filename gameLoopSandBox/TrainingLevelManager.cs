@@ -69,15 +69,10 @@ public class TrainingLevelManager : MonoBehaviour
         {
             waitTimeoutTimer += Time.deltaTime;
 
-            // Check for manual advance (trigger, primary button, or spacebar for testing)
-            // Note: In VR, replace Input.GetKeyDown with your specific VR input action if necessary.
-            bool manualAdvance = Input.GetKeyDown(KeyCode.Space) || Input.GetButtonDown("Submit") || Input.GetButtonDown("Fire1");
-
-            if (manualAdvance || waitTimeoutTimer >= MAX_WAIT_TIME)
+            // Auto-advance if the player hasn't manually advanced via AdvanceWaveText()
+            if (waitTimeoutTimer >= MAX_WAIT_TIME)
             {
-                isWaitingForInput = false;
-                ClearFeedbackText();
-                ActuallyStartWave(currentWaveIndex);
+                AdvanceWaveText();
             }
             return;
         }
@@ -164,6 +159,20 @@ public class TrainingLevelManager : MonoBehaviour
         // Enter waiting state
         isWaitingForInput = true;
         waitTimeoutTimer = 0f;
+    }
+
+    /// <summary>
+    /// Call this method via UnityEvents (e.g. from an XRI Input Action or physical VR button)
+    /// to let the player manually advance past the wave intro text.
+    /// </summary>
+    public void AdvanceWaveText()
+    {
+        if (isWaitingForInput)
+        {
+            isWaitingForInput = false;
+            ClearFeedbackText();
+            ActuallyStartWave(currentWaveIndex);
+        }
     }
 
     private void ActuallyStartWave(int index)
