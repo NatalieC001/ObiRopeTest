@@ -22,11 +22,18 @@ public class TrainingLevelManager : MonoBehaviour
     [Tooltip("The central point where targets are spawned around. If null, uses the manager's position.")]
     public Transform spawnCenter;
 
+    [Header("Pacing & Timing")]
     [Tooltip("Time to wait in seconds after a wave is cleared before the next wave text appears.")]
     public float delayBetweenWaves = 2.0f;
 
     [Tooltip("Time to wait in seconds after a level is cleared before loading the next level.")]
     public float delayBetweenLevels = 3.0f;
+
+    [Tooltip("Time to display the 'Level Starting' text before starting the first wave.")]
+    public float levelIntroDelay = 3.0f;
+
+    [Tooltip("Max time to wait for a player button press on the Wave Intro text before auto-advancing.")]
+    public float textAutoAdvanceDelay = 5.0f;
 
     [Header("UI Feedback")]
     [Tooltip("Text element to display wave completion and level progress to the player.")]
@@ -48,7 +55,6 @@ public class TrainingLevelManager : MonoBehaviour
 
     private bool isWaitingForInput = false;
     private float waitTimeoutTimer = 0f;
-    private const float MAX_WAIT_TIME = 10f; // 10 seconds auto-advance
 
     private void Start()
     {
@@ -76,7 +82,7 @@ public class TrainingLevelManager : MonoBehaviour
             waitTimeoutTimer += Time.deltaTime;
 
             // Auto-advance if the player hasn't manually advanced via AdvanceWaveText()
-            if (waitTimeoutTimer >= MAX_WAIT_TIME)
+            if (waitTimeoutTimer >= textAutoAdvanceDelay)
             {
                 AdvanceWaveText();
             }
@@ -134,11 +140,13 @@ public class TrainingLevelManager : MonoBehaviour
         if (waveFeedbackText != null)
         {
             waveFeedbackText.text = $"Level: {currentLevelConfig.levelName}\nGet Ready!";
+            Debug.Log($"[TrainingLevelManager] Showing Level Intro Text. Waiting {levelIntroDelay}s before Wave 1.");
         }
 
         if (currentLevelConfig.waves.Count > 0)
         {
-            StartWave(currentWaveIndex);
+            // Delay before starting the very first wave of a level
+            Invoke(nameof(StartNextWaveDelayed), levelIntroDelay);
         }
         else
         {
@@ -164,6 +172,7 @@ public class TrainingLevelManager : MonoBehaviour
         {
             string baseText = $"Wave {index + 1}\n{waveData.waveIntroText}";
             waveFeedbackText.text = $"{baseText}\n<size=50%>(Press Trigger to continue)</size>";
+            Debug.Log($"[TrainingLevelManager] Showing Wave {index + 1} Intro Text. Waiting for manual advance or {textAutoAdvanceDelay}s timeout.");
         }
 
         // Enter waiting state
@@ -349,6 +358,7 @@ public class TrainingLevelManager : MonoBehaviour
         if (waveFeedbackText != null)
         {
             waveFeedbackText.text = $"{currentWave.waveOutroText}";
+            Debug.Log($"[TrainingLevelManager] Showing Wave Outro Text. Waiting {delayBetweenWaves}s before the next wave starts.");
         }
 
         OnWaveCompleted?.Invoke(currentWaveIndex);
@@ -370,6 +380,7 @@ public class TrainingLevelManager : MonoBehaviour
         if (waveFeedbackText != null)
         {
             waveFeedbackText.text = "Level Complete!\nGreat Job!";
+            Debug.Log($"[TrainingLevelManager] Showing Level Outro Text. Waiting {delayBetweenLevels}s before loading the next Level.");
         }
 
         OnLevelCompleted?.Invoke();
