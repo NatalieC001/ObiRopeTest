@@ -87,22 +87,26 @@ public class TrainingLevelManager : MonoBehaviour
 
         WaveDataSO currentWave = currentLevelConfig.waves[currentWaveIndex];
 
-        // Check time-based progression
+        // Clean up list of destroyed targets so we always have an accurate count
+        activeTargets.RemoveAll(t => t == null);
+
+        // Check if player cleared the wave early (applies to BOTH modes)
+        bool allTargetsCleared = activeTargets.Count == 0 && pendingSpawns <= 0;
+
         if (currentWave.progressionType == WaveProgressionType.TimeBased)
         {
             waveTimer += Time.deltaTime;
-            if (waveTimer >= currentWave.waveDuration)
+
+            // TimeBased waves end if time runs out, OR if the player clears everything early
+            if (waveTimer >= currentWave.waveDuration || allTargetsCleared)
             {
                 CompleteCurrentWave();
             }
         }
         else if (currentWave.progressionType == WaveProgressionType.ClearAllTargets)
         {
-            // Clean up list of destroyed targets
-            activeTargets.RemoveAll(t => t == null);
-
             // If all targets are cleared and no more are waiting to spawn, wave is complete
-            if (activeTargets.Count == 0 && pendingSpawns <= 0)
+            if (allTargetsCleared)
             {
                 CompleteCurrentWave();
             }
