@@ -47,35 +47,35 @@ public class CSVLevelImporter : EditorWindow
         string[] lines = csvContent.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
         if (lines.Length <= 1) return; // Need at least header and one data row
 
-        // LevelName -> (WaveName -> List of TargetConfigs)
-        Dictionary<string, Dictionary<string, WaveBuilderData>> levelDataMap = new Dictionary<string, Dictionary<string, WaveBuilderData>>();
+        // LevelName -> LevelBuilderData
+        Dictionary<string, LevelBuilderData> levelDataMap = new Dictionary<string, LevelBuilderData>();
 
         // Start reading from row 1 (skipping header)
         for (int i = 1; i < lines.Length; i++)
         {
             string[] cols = lines[i].Split(',');
             // Expected cols:
-            // 0:LevelName, 1:WaveName, 2:WaveIntroText, 3:WaveOutroText, 4:SpawnDelay, 5:PosX, 6:PosZ,
+            // 0:LevelName, 1:LevelIntroText, 2:LevelOutroText, 3:WaveName, 4:SpawnDelay, 5:PosX, 6:PosZ,
             // 7:ScaleModifier, 8:SpeedModifier, 9:MovementBehavior, 10:RequiredElement
 
             if (cols.Length < 11) continue;
 
             string levelName = cols[0].Trim();
-            string waveName = cols[1].Trim();
+            string waveName = cols[3].Trim();
 
             if (!levelDataMap.ContainsKey(levelName))
             {
-                levelDataMap[levelName] = new Dictionary<string, WaveBuilderData>();
+                levelDataMap[levelName] = new LevelBuilderData()
+                {
+                    introText = cols[1].Trim(),
+                    outroText = cols[2].Trim(),
+                    waves = new Dictionary<string, List<TargetSpawnConfig>>()
+                };
             }
 
-            if (!levelDataMap[levelName].ContainsKey(waveName))
+            if (!levelDataMap[levelName].waves.ContainsKey(waveName))
             {
-                levelDataMap[levelName][waveName] = new WaveBuilderData()
-                {
-                    introText = cols[2].Trim(),
-                    outroText = cols[3].Trim(),
-                    targets = new List<TargetSpawnConfig>()
-                };
+                levelDataMap[levelName].waves[waveName] = new List<TargetSpawnConfig>();
             }
 
             TargetSpawnConfig config = new TargetSpawnConfig();
@@ -108,13 +108,13 @@ public class CSVLevelImporter : EditorWindow
                 config.requiredArrowElement = ElementTypeOB7.Normal;
             }
 
-            levelDataMap[levelName][waveName].targets.Add(config);
+            levelDataMap[levelName].waves[waveName].Add(config);
         }
 
         GenerateAssets(levelDataMap);
     }
 
-    private void GenerateAssets(Dictionary<string, Dictionary<string, WaveBuilderData>> levelDataMap)
+    private void GenerateAssets(Dictionary<string, LevelBuilderData> levelDataMap)
     {
         string rootPath = "Assets/Data";
         if (!AssetDatabase.IsValidFolder(rootPath)) AssetDatabase.CreateFolder("Assets", "Data");
@@ -128,6 +128,7 @@ public class CSVLevelImporter : EditorWindow
         foreach (var levelKvp in levelDataMap)
         {
             string levelName = levelKvp.Key;
+            LevelBuilderData levelDataInfo = levelKvp.Value;
 
             // Create Level Config
             string levelAssetPath = $"{levelsPath}/{levelName}.asset";
@@ -139,13 +140,15 @@ public class CSVLevelImporter : EditorWindow
             }
 
             levelConfig.levelName = levelName;
+            levelConfig.levelIntroText = levelDataInfo.introText;
+            levelConfig.levelOutroText = levelDataInfo.outroText;
             levelConfig.vanillaTargetPrefab = vanillaTargetPrefab;
             levelConfig.waves.Clear();
 
-            foreach (var waveKvp in levelKvp.Value)
+            foreach (var waveKvp in levelDataInfo.waves)
             {
                 string waveName = waveKvp.Key;
-                WaveBuilderData waveDataInfo = waveKvp.Value;
+                List<TargetSpawnConfig> targetsList = waveKvp.Value;
 
                 // Create Wave Config
                 string waveAssetPath = $"{wavesPath}/{levelName}_{waveName}.asset";
@@ -157,9 +160,7 @@ public class CSVLevelImporter : EditorWindow
                 }
 
                 waveData.progressionType = WaveProgressionType.ClearAllTargets;
-                waveData.waveIntroText = waveDataInfo.introText;
-                waveData.waveOutroText = waveDataInfo.outroText;
-                waveData.targets = waveDataInfo.targets;
+                waveData.targets = targetsList;
 
                 EditorUtility.SetDirty(waveData);
                 levelConfig.waves.Add(waveData);
@@ -174,10 +175,10 @@ public class CSVLevelImporter : EditorWindow
         EditorUtility.DisplayDialog("Success", "Levels and Waves generated successfully from CSV!", "OK");
     }
 
-    private class WaveBuilderData
+    private class LevelBuilderData
     {
         public string introText;
         public string outroText;
-        public List<TargetSpawnConfig> targets;
+        public Dictionary<string, List<TargetSpawnConfig>> waves;
     }
 }

@@ -33,7 +33,7 @@ public class TrainingLevelManager : MonoBehaviour
     private float waveTimer = 0f;
 
     // Performance Tracking
-    private float currentWaveStartTime = 0f;
+    private float currentLevelStartTime = 0f;
 
     // Track active spawn coroutines so we can cancel them if the wave ends early
     private List<Coroutine> activeSpawnCoroutines = new List<Coroutine>();
@@ -108,19 +108,20 @@ public class TrainingLevelManager : MonoBehaviour
         currentLevelIndex = levelIndex;
         currentLevelConfig = levelPlaylist[currentLevelIndex];
         currentWaveIndex = 0;
+        currentLevelStartTime = Time.time;
 
         Debug.Log($"[TrainingLevelManager] Starting Level: {currentLevelConfig.levelName}");
 
         if (waveFeedbackText != null)
         {
-            waveFeedbackText.text = $"Level: {currentLevelConfig.levelName}\nGet Ready!";
+            waveFeedbackText.text = $"Level: {currentLevelConfig.levelName}\n{currentLevelConfig.levelIntroText}";
             Debug.Log($"[TrainingLevelManager] Showing Level Intro Text. Waiting 3.0s before Wave 1.");
         }
 
         if (currentLevelConfig.waves.Count > 0)
         {
             // Hardcoded fast progression: wait exactly 3 seconds to read level intro
-            Invoke(nameof(StartNextWaveDelayed), 3.0f);
+            Invoke(nameof(StartFirstWaveDelayed), 3.0f);
         }
         else
         {
@@ -128,6 +129,11 @@ public class TrainingLevelManager : MonoBehaviour
             if (waveFeedbackText != null) waveFeedbackText.text = "Error: Level empty. Skipping...";
             CompleteCurrentLevel();
         }
+    }
+
+    private void StartFirstWaveDelayed()
+    {
+        StartWave(currentWaveIndex);
     }
 
     private void StartWave(int index)
@@ -141,17 +147,16 @@ public class TrainingLevelManager : MonoBehaviour
         WaveDataSO waveData = currentLevelConfig.waves[index];
         Debug.Log($"[TrainingLevelManager] Starting Wave {index + 1}/{currentLevelConfig.waves.Count}. Progression: {waveData.progressionType}");
 
+        // Waves no longer interrupt the action with text or delays!
         if (waveFeedbackText != null)
         {
-            waveFeedbackText.text = $"Wave {index + 1}\n{waveData.waveIntroText}";
-            Invoke(nameof(ClearFeedbackText), 3.0f);
+            waveFeedbackText.text = "";
         }
 
         activeTargets.Clear();
         activeSpawnCoroutines.Clear();
         pendingSpawns = waveData.targets.Count;
         waveTimer = 0f;
-        currentWaveStartTime = Time.time;
         isWaveActive = true;
 
         OnWaveStarted?.Invoke(index);
@@ -302,42 +307,30 @@ public class TrainingLevelManager : MonoBehaviour
         }
         activeTargets.Clear();
 
-        WaveDataSO currentWave = currentLevelConfig.waves[currentWaveIndex];
-
-        float timeTaken = Time.time - currentWaveStartTime;
-
-        Debug.Log($"[TrainingLevelManager] Wave {currentWaveIndex + 1} Completed in {timeTaken:F1}s.");
-        if (waveFeedbackText != null)
-        {
-            waveFeedbackText.text = $"{currentWave.waveOutroText}\n<size=70%>Time: {timeTaken:F1}s</size>";
-            Debug.Log($"[TrainingLevelManager] Showing Wave Outro Text. Waiting 3.0s before the next wave starts.");
-        }
+        Debug.Log($"[TrainingLevelManager] Wave {currentWaveIndex + 1} Completed. Instantly starting next wave.");
 
         OnWaveCompleted?.Invoke(currentWaveIndex);
 
         currentWaveIndex++;
 
-        // Hardcoded fast progression: wait exactly 3 seconds for the player to read the text
-        Invoke(nameof(StartNextWaveDelayed), 3.0f);
-    }
-
-    private void StartNextWaveDelayed()
-    {
+        // Instant, silent momentum. No text, no waiting.
         StartWave(currentWaveIndex);
     }
 
     private void CompleteCurrentLevel()
     {
-        Debug.Log($"[TrainingLevelManager] Level '{currentLevelConfig.levelName}' completed!");
+        float levelTimeTaken = Time.time - currentLevelStartTime;
+        Debug.Log($"[TrainingLevelManager] Level '{currentLevelConfig.levelName}' completed in {levelTimeTaken:F1}s!");
+
         if (waveFeedbackText != null)
         {
-            waveFeedbackText.text = "Level Complete!\nGreat Job!";
+            waveFeedbackText.text = $"{currentLevelConfig.levelOutroText}\n<size=70%>Level Time: {levelTimeTaken:F1}s</size>";
             Debug.Log($"[TrainingLevelManager] Showing Level Outro Text. Waiting 3.0s before loading the next Level.");
         }
 
         OnLevelCompleted?.Invoke();
 
-        // Hardcoded fast progression: wait exactly 3 seconds for the player to read the text
+        // Hardcoded fast progression: wait exactly 3 seconds for the player to read the level completion text
         Invoke(nameof(StartNextLevelDelayed), 3.0f);
     }
 

@@ -11,6 +11,14 @@ public class LevelConfigSO : ScriptableObject
     [Tooltip("The name of the level to display to the player.")]
     public string levelName = "New Archery Level";
 
+    [Tooltip("Text displayed to the player before the level begins (e.g. teaching a mechanic).")]
+    [TextArea(2, 4)]
+    public string levelIntroText = "Get Ready!";
+
+    [Tooltip("Text displayed to the player when the entire level is completed.")]
+    [TextArea(2, 4)]
+    public string levelOutroText = "Level Complete!";
+
     [Tooltip("The prefab to use for spawning targets in this level. Should have a MovingTarget component.")]
     public GameObject vanillaTargetPrefab;
 
