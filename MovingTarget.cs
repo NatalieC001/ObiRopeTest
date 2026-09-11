@@ -107,15 +107,37 @@ public class MovingTarget : MonoBehaviour, IArrowTarget
         }
     }
 
+    public void SetRequiredElement(ElementTypeOB7 type)
+    {
+        CurrentElementType = type;
+
+        if (availableElements == null || availableElements.Length == 0) return;
+
+        // Find the matching configuration to apply the correct Material (which can hold diffuse, normals, etc.)
+        foreach (var config in availableElements)
+        {
+            if (config.elementType == type)
+            {
+                if (config.elementMaterial != null && targetRenderer != null)
+                {
+                    targetRenderer.material = config.elementMaterial;
+                }
+                return;
+            }
+        }
+
+        // Fallback to normal if not found in array
+        if (type == ElementTypeOB7.Normal && targetRenderer != null && originalMaterial != null)
+        {
+            targetRenderer.material = originalMaterial;
+        }
+    }
+
     public void SetRandomElement()
     {
         if (availableElements == null || availableElements.Length == 0)
         {
-            CurrentElementType = ElementTypeOB7.Normal;
-            if (targetRenderer != null && originalMaterial != null)
-            {
-                targetRenderer.material = originalMaterial;
-            }
+            SetRequiredElement(ElementTypeOB7.Normal);
             return;
         }
 
@@ -123,12 +145,7 @@ public class MovingTarget : MonoBehaviour, IArrowTarget
         int randomIndex = Random.Range(0, maxAllowedIndex);
 
         ElementVisualConfig config = availableElements[randomIndex];
-        CurrentElementType = config.elementType;
-
-        if (config.elementMaterial != null && targetRenderer != null)
-        {
-            targetRenderer.material = config.elementMaterial;
-        }
+        SetRequiredElement(config.elementType);
     }
 
     private void OnCollisionEnter(Collision collision)
@@ -277,6 +294,3 @@ public class MovingTarget : MonoBehaviour, IArrowTarget
         }
     }
 }
-
-
-
