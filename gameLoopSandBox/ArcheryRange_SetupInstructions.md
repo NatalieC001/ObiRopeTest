@@ -26,11 +26,22 @@ To ensure accessibility and an easy "at-a-glance" workflow, the entire level pro
 4. Create an Empty GameObject to serve as the physical center of the spawn area (e.g., `SpawnCenterPoint`).
    * **VR Note:** Targets can spawn in 360 degrees around this point depending on the X/Z offsets in the Wave Data. The system automatically ensures they never spawn below the Y-level of this center point and always rotates them upright to face this center point.
 5. Drag `SpawnCenterPoint` into the **Spawn Center** slot on the Manager.
-6. Create a **TextMeshPro - Text** UI element (floating in world space) to act as the wave announcer, and drag it into the **Wave Feedback Text** slot.
+6. Create a **TextMeshPro - Text** UI element (floating in world space) to act as the Announcer, and drag it into the **Level Feedback Text** slot.
+7. Create a smaller **TextMeshPro - Text** UI element to act as the HUD (e.g., showing "Targets Left"), and drag it into the **HUD Text** slot.
+8. Add a physical object (like a Gong model) to your scene. Attach the `LevelAdvanceGong` script to it and ensure it has a valid Collider. Link your `TrainingLevelManager` to its script slot.
 
 ---
 
-## 2. Walkthrough: 8 Level Concepts
+## 2. The Game Loop Flow
+1. **Level Start:** The Announcer text shows the Level's Intro Text. It waits infinitely.
+2. **Ready Up:** The player shoots the Gong. The text disappears and the fast-paced waves begin.
+3. **The Waves:** Waves flow seamlessly into one another instantly with no text interruptions. The HUD text updates in real-time.
+4. **Level Complete:** When all waves finish, the Announcer shows the Level Outro Text and the player's completion time. It waits infinitely.
+5. **Next Level:** The player shoots the Gong, and the cycle repeats for Level 2.
+
+---
+
+## 3. Walkthrough: 8 Level Concepts
 
 Use these 8 concepts to build a progressively challenging archery sandbox!
 

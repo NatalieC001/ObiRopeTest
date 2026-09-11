@@ -23,8 +23,11 @@ public class TrainingLevelManager : MonoBehaviour
     public Transform spawnCenter;
 
     [Header("UI Feedback")]
-    [Tooltip("Text element to display wave completion and level progress to the player.")]
+    [Tooltip("Primary text element (Announcer) to display Level Intro/Outro messages.")]
     public TMP_Text levelFeedbackText;
+
+    [Tooltip("Secondary text element (HUD) to display real-time wave progress (e.g. Targets Left).")]
+    public TMP_Text hudText;
 
     private int currentWaveIndex = 0;
     private int pendingSpawns = 0;
@@ -77,6 +80,12 @@ public class TrainingLevelManager : MonoBehaviour
         {
             waveTimer += Time.deltaTime;
 
+            if (hudText != null)
+            {
+                float timeLeft = Mathf.Max(0, currentWave.waveDuration - waveTimer);
+                hudText.text = $"Wave {currentWaveIndex + 1}/{currentLevelConfig.waves.Count} | Survive: {timeLeft:F1}s";
+            }
+
             // TimeBased waves end if time runs out, OR if the player clears everything early
             if (waveTimer >= currentWave.waveDuration || allTargetsCleared)
             {
@@ -85,6 +94,12 @@ public class TrainingLevelManager : MonoBehaviour
         }
         else if (currentWave.progressionType == WaveProgressionType.ClearAllTargets)
         {
+            if (hudText != null)
+            {
+                int targetsRemaining = activeTargets.Count + pendingSpawns;
+                hudText.text = $"Wave {currentWaveIndex + 1}/{currentLevelConfig.waves.Count} | Targets Left: {targetsRemaining}";
+            }
+
             // If all targets are cleared and no more are waiting to spawn, wave is complete
             if (allTargetsCleared)
             {
@@ -118,22 +133,12 @@ public class TrainingLevelManager : MonoBehaviour
             Debug.Log($"[TrainingLevelManager] Showing Level Intro Text. Waiting 3.0s before Wave 1.");
         }
 
-        if (currentLevelConfig.waves.Count > 0)
-        {
-            // Hardcoded fast progression: wait exactly 3 seconds to read level intro
-            Invoke(nameof(StartFirstWaveDelayed), 3.0f);
-        }
-        else
+        if (currentLevelConfig.waves.Count == 0)
         {
             Debug.LogWarning($"[TrainingLevelManager] Level '{currentLevelConfig.levelName}' has no waves configured.");
             if (levelFeedbackText != null) levelFeedbackText.text = "Error: Level empty. Skipping...";
             CompleteCurrentLevel();
         }
-    }
-
-    private void StartFirstWaveDelayed()
-    {
-        StartWave(currentWaveIndex);
     }
 
     private void StartWave(int index)
@@ -318,17 +323,24 @@ public class TrainingLevelManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Call this method (e.g. from the LevelAdvanceGong) to start the next level in the playlist.
+    /// Call this method (e.g. from the LevelAdvanceGong) to act as the "Ready" trigger.
     /// </summary>
     public void AdvanceToNextLevel()
     {
-        // Don't advance if we are in the middle of an active wave (Gong should ideally only work between levels, but we can enforce it here)
         if (isWaveActive) return;
 
-        currentLevelIndex++;
-
-        // Let StartLevel handle checking if we exceeded the playlist bounds
-        StartLevel(currentLevelIndex);
+        if (currentWaveIndex == 0 && currentLevelConfig != null && currentLevelConfig.waves.Count > 0)
+        {
+            // If we are at the start of a level waiting to begin, shooting the gong starts wave 1
+            if (levelFeedbackText != null) levelFeedbackText.text = "";
+            StartWave(currentWaveIndex);
+        }
+        else
+        {
+            // If we finished a level and shot the gong, go to the next level's Intro
+            currentLevelIndex++;
+            StartLevel(currentLevelIndex);
+        }
     }
 
     private void CompleteCurrentLevel()

@@ -1,17 +1,17 @@
 using UnityEngine;
 
 /// <summary>
-/// A tactile, physical object that advances the Archery Range campaign to the next level when shot.
+/// A tactile, physical object that acts as the "Ready" and "Next Level" button for the Archery Range.
 /// Attach this script to your Gong model and ensure it has a valid Collider and Rigidbody (set to Kinematic).
 /// </summary>
 [RequireComponent(typeof(Collider))]
 [RequireComponent(typeof(AudioSource))]
 public class LevelAdvanceGong : MonoBehaviour, IArrowTarget
 {
-    [Tooltip("Reference to the main level manager to advance the campaign.")]
+    [Tooltip("Reference to the main level manager to trigger the ready state.")]
     public TrainingLevelManager levelManager;
 
-    [Tooltip("Sound to play when the gong is successfully hit to advance the level.")]
+    [Tooltip("Sound to play when the gong is successfully hit.")]
     public AudioClip gongSound;
 
     private AudioSource audioSource;
