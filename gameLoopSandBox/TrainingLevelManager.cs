@@ -66,7 +66,14 @@ public class TrainingLevelManager : MonoBehaviour
 
     private void Update()
     {
-        if (!isWaveActive) return;
+        if (!isWaveActive)
+        {
+            if (hudText != null && !string.IsNullOrEmpty(hudText.text))
+            {
+                hudText.text = "";
+            }
+            return;
+        }
 
         WaveDataSO currentWave = currentLevelConfig.waves[currentWaveIndex];
 
@@ -345,6 +352,9 @@ public class TrainingLevelManager : MonoBehaviour
 
     private void CompleteCurrentLevel()
     {
+        isWaveActive = false; // Stop the HUD from updating
+        if (hudText != null) hudText.text = ""; // Clear the HUD cleanly
+
         float levelTimeTaken = Time.time - currentLevelStartTime;
         Debug.Log($"[TrainingLevelManager] Level '{currentLevelConfig.levelName}' completed in {levelTimeTaken:F1}s! Waiting for player to hit the Gong to advance.");
 
