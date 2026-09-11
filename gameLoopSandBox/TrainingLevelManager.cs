@@ -22,6 +22,12 @@ public class TrainingLevelManager : MonoBehaviour
     [Tooltip("The central point where targets are spawned around. If null, uses the manager's position.")]
     public Transform spawnCenter;
 
+    [Tooltip("Time to wait in seconds after a wave is cleared before the next wave text appears.")]
+    public float delayBetweenWaves = 2.0f;
+
+    [Tooltip("Time to wait in seconds after a level is cleared before loading the next level.")]
+    public float delayBetweenLevels = 3.0f;
+
     [Header("UI Feedback")]
     [Tooltip("Text element to display wave completion and level progress to the player.")]
     public TMP_Text waveFeedbackText;
@@ -345,8 +351,8 @@ public class TrainingLevelManager : MonoBehaviour
 
         currentWaveIndex++;
 
-        // Wait longer (e.g., 4 seconds) to let player read the feedback before starting the next wave
-        Invoke(nameof(StartNextWaveDelayed), 4.0f);
+        // Wait based on user configuration before starting the next wave
+        Invoke(nameof(StartNextWaveDelayed), delayBetweenWaves);
     }
 
     private void StartNextWaveDelayed()
@@ -364,8 +370,8 @@ public class TrainingLevelManager : MonoBehaviour
 
         OnLevelCompleted?.Invoke();
 
-        // Wait 5 seconds, then load the next level in the playlist
-        Invoke(nameof(StartNextLevelDelayed), 5.0f);
+        // Wait based on user configuration before loading the next level
+        Invoke(nameof(StartNextLevelDelayed), delayBetweenLevels);
     }
 
     private void StartNextLevelDelayed()
