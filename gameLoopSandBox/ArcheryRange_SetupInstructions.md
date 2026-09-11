@@ -4,18 +4,20 @@ This document outlines how to set up the data-driven level progression system wi
 
 ## 1. System Setup
 
-### A. Creating the Data Files
-We use ScriptableObjects natively in Unity to avoid parsing CSV files at runtime, which allows you to drag-and-drop prefabs and tweak settings directly in the Inspector.
+### A. Creating the Data Files (Spreadsheet Workflow)
+To ensure accessibility and an easy "at-a-glance" workflow, the entire level progression is driven by a single spreadsheet. **You do not need to manually create ScriptableObjects in the Inspector.**
 
-1. **Wave Data Profiles:**
-   - In the Unity Project window, right-click and select **Create -> Archery Range -> Wave Data**.
-   - Choose the **Progression Type** (`ClearAllTargets` or `TimeBased`).
-   - Add elements to the **Targets** list. For each target, specify the `spawnDelay`, `spawnPosition`, `requiredArrowElement`, `scaleModifier`, `speedModifier`, and the `movementBehavior` using the dropdown (e.g., `PingPongMovement`). Select `None` for a static target.
+1. **Prepare your CSV Spreadsheet:**
+   - Use Google Sheets, Excel, or open `LevelDesign_Template.csv`.
+   - Ensure the columns perfectly match the template (LevelName, WaveName, WaveIntroText, WaveOutroText, SpawnDelay, PosX, PosZ, ScaleModifier, SpeedModifier, MovementBehavior, RequiredElement).
+   - Every row defines exactly one target.
 
-2. **Level Configuration:**
-   - Right-click and select **Create -> Archery Range -> Level Config**.
-   - Assign your **Vanilla Target Prefab** (must have the `MovingTarget` script attached).
-   - Drag and drop your **Wave Data** profiles into the **Waves** list.
+2. **Generate the Game Data:**
+   - In the top Unity menu, click **Archery Range -> CSV Level Importer**.
+   - Drag your `.csv` file into the prompt.
+   - Drag your **Vanilla Target Prefab** (which has the `MovingTarget` component) into the prompt.
+   - Click **Generate Levels & Waves**.
+   - The importer will automatically create or update all `LevelConfigSO` and `WaveDataSO` assets inside `Assets/Data/`.
 
 ### B. Setting Up the Scene
 1. Create an Empty GameObject in the hierarchy named `TrainingLevelManager` and attach the **Training Level Manager** component.
