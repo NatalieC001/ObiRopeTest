@@ -24,7 +24,7 @@ public class TrainingLevelManager : MonoBehaviour
 
     [Header("UI Feedback")]
     [Tooltip("Text element to display wave completion and level progress to the player.")]
-    public TMP_Text waveFeedbackText;
+    public TMP_Text levelFeedbackText;
 
     private int currentWaveIndex = 0;
     private int pendingSpawns = 0;
@@ -57,7 +57,7 @@ public class TrainingLevelManager : MonoBehaviour
         else
         {
             Debug.LogWarning("[TrainingLevelManager] No LevelConfigs assigned to the playlist!");
-            if (waveFeedbackText != null) waveFeedbackText.text = "Error: No levels assigned.";
+            if (levelFeedbackText != null) levelFeedbackText.text = "Error: No levels assigned.";
         }
     }
 
@@ -101,7 +101,7 @@ public class TrainingLevelManager : MonoBehaviour
         if (levelIndex >= levelPlaylist.Count)
         {
             Debug.Log("[TrainingLevelManager] Entire Campaign Completed!");
-            if (waveFeedbackText != null) waveFeedbackText.text = "Campaign Complete!\nThanks for playing!";
+            if (levelFeedbackText != null) levelFeedbackText.text = "Campaign Complete!\nThanks for playing!";
             return;
         }
 
@@ -112,9 +112,9 @@ public class TrainingLevelManager : MonoBehaviour
 
         Debug.Log($"[TrainingLevelManager] Starting Level: {currentLevelConfig.levelName}");
 
-        if (waveFeedbackText != null)
+        if (levelFeedbackText != null)
         {
-            waveFeedbackText.text = $"Level: {currentLevelConfig.levelName}\n{currentLevelConfig.levelIntroText}";
+            levelFeedbackText.text = $"Level: {currentLevelConfig.levelName}\n{currentLevelConfig.levelIntroText}";
             Debug.Log($"[TrainingLevelManager] Showing Level Intro Text. Waiting 3.0s before Wave 1.");
         }
 
@@ -126,7 +126,7 @@ public class TrainingLevelManager : MonoBehaviour
         else
         {
             Debug.LogWarning($"[TrainingLevelManager] Level '{currentLevelConfig.levelName}' has no waves configured.");
-            if (waveFeedbackText != null) waveFeedbackText.text = "Error: Level empty. Skipping...";
+            if (levelFeedbackText != null) levelFeedbackText.text = "Error: Level empty. Skipping...";
             CompleteCurrentLevel();
         }
     }
@@ -148,9 +148,9 @@ public class TrainingLevelManager : MonoBehaviour
         Debug.Log($"[TrainingLevelManager] Starting Wave {index + 1}/{currentLevelConfig.waves.Count}. Progression: {waveData.progressionType}");
 
         // Waves no longer interrupt the action with text or delays!
-        if (waveFeedbackText != null)
+        if (levelFeedbackText != null)
         {
-            waveFeedbackText.text = "";
+            levelFeedbackText.text = "";
         }
 
         activeTargets.Clear();
@@ -317,34 +317,41 @@ public class TrainingLevelManager : MonoBehaviour
         StartWave(currentWaveIndex);
     }
 
+    /// <summary>
+    /// Call this method (e.g. from the LevelAdvanceGong) to start the next level in the playlist.
+    /// </summary>
+    public void AdvanceToNextLevel()
+    {
+        // Don't advance if we are in the middle of an active wave (Gong should ideally only work between levels, but we can enforce it here)
+        if (isWaveActive) return;
+
+        currentLevelIndex++;
+
+        // Let StartLevel handle checking if we exceeded the playlist bounds
+        StartLevel(currentLevelIndex);
+    }
+
     private void CompleteCurrentLevel()
     {
         float levelTimeTaken = Time.time - currentLevelStartTime;
-        Debug.Log($"[TrainingLevelManager] Level '{currentLevelConfig.levelName}' completed in {levelTimeTaken:F1}s!");
+        Debug.Log($"[TrainingLevelManager] Level '{currentLevelConfig.levelName}' completed in {levelTimeTaken:F1}s! Waiting for player to hit the Gong to advance.");
 
-        if (waveFeedbackText != null)
+        if (levelFeedbackText != null)
         {
-            waveFeedbackText.text = $"{currentLevelConfig.levelOutroText}\n<size=70%>Level Time: {levelTimeTaken:F1}s</size>";
-            Debug.Log($"[TrainingLevelManager] Showing Level Outro Text. Waiting 3.0s before loading the next Level.");
+            levelFeedbackText.text = $"{currentLevelConfig.levelOutroText}\n<size=70%>Level Time: {levelTimeTaken:F1}s\nShoot the Gong to continue!</size>";
+            Debug.Log($"[TrainingLevelManager] Showing Level Outro Text. Waiting for Gong trigger.");
         }
 
         OnLevelCompleted?.Invoke();
 
-        // Hardcoded fast progression: wait exactly 3 seconds for the player to read the level completion text
-        Invoke(nameof(StartNextLevelDelayed), 3.0f);
-    }
-
-    private void StartNextLevelDelayed()
-    {
-        currentLevelIndex++;
-        StartLevel(currentLevelIndex);
+        // The manager now waits infinitely. The player must shoot the LevelAdvanceGong to trigger AdvanceToNextLevel()
     }
 
     private void ClearFeedbackText()
     {
-        if (waveFeedbackText != null)
+        if (levelFeedbackText != null)
         {
-            waveFeedbackText.text = "";
+            levelFeedbackText.text = "";
         }
     }
 }

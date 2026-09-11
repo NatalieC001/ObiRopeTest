@@ -55,10 +55,10 @@ public class CSVLevelImporter : EditorWindow
         {
             string[] cols = lines[i].Split(',');
             // Expected cols:
-            // 0:LevelName, 1:LevelIntroText, 2:LevelOutroText, 3:WaveName, 4:SpawnDelay, 5:PosX, 6:PosZ,
-            // 7:ScaleModifier, 8:SpeedModifier, 9:MovementBehavior, 10:RequiredElement
+            // 0:LevelName, 1:LevelIntroText, 2:LevelOutroText, 3:WaveName, 4:ProgressionType, 5:WaveDuration, 6:SpawnDelay,
+            // 7:PosX, 8:PosZ, 9:ScaleModifier, 10:SpeedModifier, 11:MovementBehavior, 12:RequiredElement
 
-            if (cols.Length < 11) continue;
+            if (cols.Length < 13) continue;
 
             string levelName = cols[0].Trim();
             string waveName = cols[3].Trim();
@@ -69,28 +69,38 @@ public class CSVLevelImporter : EditorWindow
                 {
                     introText = cols[1].Trim(),
                     outroText = cols[2].Trim(),
-                    waves = new Dictionary<string, List<TargetSpawnConfig>>()
+                    waves = new Dictionary<string, WaveDataSO>()
                 };
             }
 
             if (!levelDataMap[levelName].waves.ContainsKey(waveName))
             {
-                levelDataMap[levelName].waves[waveName] = new List<TargetSpawnConfig>();
+                WaveDataSO newWaveData = ScriptableObject.CreateInstance<WaveDataSO>();
+
+                if (Enum.TryParse(cols[4].Trim(), true, out WaveProgressionType progEnum))
+                {
+                    newWaveData.progressionType = progEnum;
+                }
+
+                float.TryParse(cols[5], out newWaveData.waveDuration);
+                newWaveData.targets = new List<TargetSpawnConfig>();
+
+                levelDataMap[levelName].waves[waveName] = newWaveData;
             }
 
             TargetSpawnConfig config = new TargetSpawnConfig();
 
-            float.TryParse(cols[4], out config.spawnDelay);
+            float.TryParse(cols[6], out config.spawnDelay);
 
             float posX, posZ;
-            float.TryParse(cols[5], out posX);
-            float.TryParse(cols[6], out posZ);
+            float.TryParse(cols[7], out posX);
+            float.TryParse(cols[8], out posZ);
             config.spawnPosition = new Vector3(posX, 0, posZ);
 
-            if (!float.TryParse(cols[7], out config.scaleModifier)) config.scaleModifier = 1f;
-            if (!float.TryParse(cols[8], out config.speedModifier)) config.speedModifier = 1f;
+            if (!float.TryParse(cols[9], out config.scaleModifier)) config.scaleModifier = 1f;
+            if (!float.TryParse(cols[10], out config.speedModifier)) config.speedModifier = 1f;
 
-            if (Enum.TryParse(cols[9].Trim(), true, out TargetMovementType moveEnum))
+            if (Enum.TryParse(cols[11].Trim(), true, out TargetMovementType moveEnum))
             {
                 config.movementBehavior = moveEnum;
             }
@@ -99,7 +109,7 @@ public class CSVLevelImporter : EditorWindow
                 config.movementBehavior = TargetMovementType.None;
             }
 
-            if (Enum.TryParse(cols[10].Trim(), true, out ElementTypeOB7 elementEnum))
+            if (Enum.TryParse(cols[12].Trim(), true, out ElementTypeOB7 elementEnum))
             {
                 config.requiredArrowElement = elementEnum;
             }
@@ -108,7 +118,7 @@ public class CSVLevelImporter : EditorWindow
                 config.requiredArrowElement = ElementTypeOB7.Normal;
             }
 
-            levelDataMap[levelName].waves[waveName].Add(config);
+            levelDataMap[levelName].waves[waveName].targets.Add(config);
         }
 
         GenerateAssets(levelDataMap);
@@ -148,7 +158,7 @@ public class CSVLevelImporter : EditorWindow
             foreach (var waveKvp in levelDataInfo.waves)
             {
                 string waveName = waveKvp.Key;
-                List<TargetSpawnConfig> targetsList = waveKvp.Value;
+                WaveDataSO parsedWaveData = waveKvp.Value;
 
                 // Create Wave Config
                 string waveAssetPath = $"{wavesPath}/{levelName}_{waveName}.asset";
@@ -159,8 +169,9 @@ public class CSVLevelImporter : EditorWindow
                     AssetDatabase.CreateAsset(waveData, waveAssetPath);
                 }
 
-                waveData.progressionType = WaveProgressionType.ClearAllTargets;
-                waveData.targets = targetsList;
+                waveData.progressionType = parsedWaveData.progressionType;
+                waveData.waveDuration = parsedWaveData.waveDuration;
+                waveData.targets = parsedWaveData.targets;
 
                 EditorUtility.SetDirty(waveData);
                 levelConfig.waves.Add(waveData);

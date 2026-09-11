@@ -1,12 +1,12 @@
-LevelName,LevelIntroText,LevelOutroText,WaveName,SpawnDelay,PosX,PosZ,ScaleModifier,SpeedModifier,MovementBehavior,RequiredElement
-Level1_Intro,Get your bow ready!,Great job!,Wave1,0,0,10,1,1,None,Normal
-Level1_Intro,Get your bow ready!,Great job!,Wave2,0,-5,10,1,1,None,Normal
-Level1_Intro,Get your bow ready!,Great job!,Wave2,0,5,10,1,1,None,Normal
-Level1_Intro,Get your bow ready!,Great job!,Wave3,0,0,15,1.2,1,None,Fire
-Level2_Gallery,Moving Targets!,Nice shooting!,Wave1,0,0,15,1,1,PingPongMovement,Normal
-Level2_Gallery,Moving Targets!,Nice shooting!,Wave1,0,5,20,1,1.5,PingPongMovement,Normal
-Level2_Gallery,Moving Targets!,Nice shooting!,Wave2,0,-10,5,1,1.2,None,Electric
-Level2_Gallery,Moving Targets!,Nice shooting!,Wave2,2,10,5,1,1.2,None,Electric
-Level3_Boss,Boss incoming!,You survived!,Wave1,0,-3,10,1,1,Rotator,Normal
-Level3_Boss,Boss incoming!,You survived!,Wave1,0,3,10,1,1,Rotator,Normal
-Level3_Boss,Boss incoming!,You survived!,Wave1,4,0,25,3,2,SwoopAndRetreatMovement,Fire
+LevelName,LevelIntroText,LevelOutroText,WaveName,ProgressionType,WaveDuration,SpawnDelay,PosX,PosZ,ScaleModifier,SpeedModifier,MovementBehavior,RequiredElement
+Level1_Intro,Get your bow ready!,Great job!,Wave1,ClearAllTargets,0,0,0,10,1,1,None,Normal
+Level1_Intro,Get your bow ready!,Great job!,Wave2,ClearAllTargets,0,0,-5,10,1,1,None,Normal
+Level1_Intro,Get your bow ready!,Great job!,Wave2,ClearAllTargets,0,0,5,10,1,1,None,Normal
+Level1_Intro,Get your bow ready!,Great job!,Wave3,ClearAllTargets,0,0,0,15,1.2,1,None,Fire
+Level2_Gallery,Moving Targets!,Nice shooting!,Wave1,ClearAllTargets,0,0,0,15,1,1,PingPongMovement,Normal
+Level2_Gallery,Moving Targets!,Nice shooting!,Wave1,ClearAllTargets,0,0,5,20,1,1.5,PingPongMovement,Normal
+Level2_Gallery,Moving Targets!,Nice shooting!,Wave2,ClearAllTargets,0,0,-10,5,1,1.2,None,Electric
+Level2_Gallery,Moving Targets!,Nice shooting!,Wave2,ClearAllTargets,0,2,10,5,1,1.2,None,Electric
+Level3_Boss,Boss incoming!,You survived!,Wave1,TimeBased,20,0,-3,10,1,1,Rotator,Normal
+Level3_Boss,Boss incoming!,You survived!,Wave1,TimeBased,20,0,3,10,1,1,Rotator,Normal
+Level3_Boss,Boss incoming!,You survived!,Wave1,TimeBased,20,4,0,25,3,2,SwoopAndRetreatMovement,Fire
