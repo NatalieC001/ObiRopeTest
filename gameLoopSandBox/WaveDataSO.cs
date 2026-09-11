@@ -69,6 +69,13 @@ public class WaveDataSO : ScriptableObject
     [Tooltip("The duration of the wave if ProgressionType is TimeBased. Ignored if ClearAllTargets.")]
     public float waveDuration = 60f;
 
+    [Header("UI Feedback")]
+    [Tooltip("Text displayed to the player before the wave begins.")]
+    public string waveIntroText = "Get Ready!";
+
+    [Tooltip("Text displayed to the player when the wave is completed.")]
+    public string waveOutroText = "Wave Cleared!";
+
     [Header("Target Configurations")]
     [Tooltip("List of targets to spawn in this wave.")]
     public List<TargetSpawnConfig> targets = new List<TargetSpawnConfig>();

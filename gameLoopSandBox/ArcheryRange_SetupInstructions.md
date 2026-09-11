@@ -19,13 +19,14 @@ To ensure accessibility and an easy "at-a-glance" workflow, the entire level pro
    - Click **Generate Levels & Waves**.
    - The importer will automatically create or update all `LevelConfigSO` and `WaveDataSO` assets inside `Assets/Data/`.
 
-### B. Setting Up the Scene
+### B. Setting Up the Scene (The Game Loop)
 1. Create an Empty GameObject in the hierarchy named `TrainingLevelManager` and attach the **Training Level Manager** component.
-2. Drag your Level Config ScriptableObject into the **Current Level Config** slot.
-3. Create an Empty GameObject to serve as the physical center of the spawn area (e.g., `SpawnCenterPoint`).
+2. Open the **Level Playlist** array on the component.
+3. Drag your generated Level Config ScriptableObjects into this array in the exact order you want them played (e.g., Element 0 = Level1_Intro, Element 1 = Level2_Gallery, Element 2 = Level3_Boss). The manager will seamlessly transition between them.
+4. Create an Empty GameObject to serve as the physical center of the spawn area (e.g., `SpawnCenterPoint`).
    * **VR Note:** Targets can spawn in 360 degrees around this point depending on the X/Z offsets in the Wave Data. The system automatically ensures they never spawn below the Y-level of this center point and always rotates them upright to face this center point.
-4. Drag `SpawnCenterPoint` into the **Spawn Center** slot on the Manager.
-5. Create a **TextMeshPro - Text** UI element (floating in world space) to act as the wave announcer, and drag it into the **Wave Feedback Text** slot.
+5. Drag `SpawnCenterPoint` into the **Spawn Center** slot on the Manager.
+6. Create a **TextMeshPro - Text** UI element (floating in world space) to act as the wave announcer, and drag it into the **Wave Feedback Text** slot.
 
 ---
 

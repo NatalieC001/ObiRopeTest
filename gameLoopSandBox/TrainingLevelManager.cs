@@ -11,9 +11,12 @@ using UnityEngine;
 /// </summary>
 public class TrainingLevelManager : MonoBehaviour
 {
-    [Header("Level Configuration")]
-    [Tooltip("The level configuration to run.")]
-    public LevelConfigSO currentLevelConfig;
+    [Header("Campaign Configuration")]
+    [Tooltip("The ordered list of levels to play through. The manager will seamlessly progress from one level to the next.")]
+    public List<LevelConfigSO> levelPlaylist = new List<LevelConfigSO>();
+
+    private int currentLevelIndex = 0;
+    private LevelConfigSO currentLevelConfig;
 
     [Header("Spawn Settings")]
     [Tooltip("The central point where targets are spawned around. If null, uses the manager's position.")]
@@ -37,6 +40,10 @@ public class TrainingLevelManager : MonoBehaviour
     public event Action<int> OnWaveCompleted;
     public event Action OnLevelCompleted;
 
+    private bool isWaitingForInput = false;
+    private float waitTimeoutTimer = 0f;
+    private const float MAX_WAIT_TIME = 10f; // 10 seconds auto-advance
+
     private void Start()
     {
         if (spawnCenter == null)
@@ -44,18 +51,37 @@ public class TrainingLevelManager : MonoBehaviour
             spawnCenter = this.transform;
         }
 
-        if (currentLevelConfig != null)
+        if (levelPlaylist.Count > 0)
         {
-            StartLevel(currentLevelConfig);
+            StartLevel(currentLevelIndex);
         }
         else
         {
-            Debug.LogWarning("[TrainingLevelManager] No LevelConfigSO assigned!");
+            Debug.LogWarning("[TrainingLevelManager] No LevelConfigs assigned to the playlist!");
+            if (waveFeedbackText != null) waveFeedbackText.text = "Error: No levels assigned.";
         }
     }
 
     private void Update()
     {
+        // Handle input waiting state for text pacing
+        if (isWaitingForInput)
+        {
+            waitTimeoutTimer += Time.deltaTime;
+
+            // Check for manual advance (trigger, primary button, or spacebar for testing)
+            // Note: In VR, replace Input.GetKeyDown with your specific VR input action if necessary.
+            bool manualAdvance = Input.GetKeyDown(KeyCode.Space) || Input.GetButtonDown("Submit") || Input.GetButtonDown("Fire1");
+
+            if (manualAdvance || waitTimeoutTimer >= MAX_WAIT_TIME)
+            {
+                isWaitingForInput = false;
+                ClearFeedbackText();
+                ActuallyStartWave(currentWaveIndex);
+            }
+            return;
+        }
+
         if (!isWaveActive) return;
 
         WaveDataSO currentWave = currentLevelConfig.waves[currentWaveIndex];
@@ -83,29 +109,37 @@ public class TrainingLevelManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Starts a new level from the provided configuration.
+    /// Starts a new level from the playlist based on the index.
     /// </summary>
-    public void StartLevel(LevelConfigSO levelConfig)
+    public void StartLevel(int levelIndex)
     {
-        Debug.Log($"[TrainingLevelManager] Starting Level: {levelConfig.levelName}");
-        currentLevelConfig = levelConfig;
+        if (levelIndex >= levelPlaylist.Count)
+        {
+            Debug.Log("[TrainingLevelManager] Entire Campaign Completed!");
+            if (waveFeedbackText != null) waveFeedbackText.text = "Campaign Complete!\nThanks for playing!";
+            return;
+        }
+
+        currentLevelIndex = levelIndex;
+        currentLevelConfig = levelPlaylist[currentLevelIndex];
         currentWaveIndex = 0;
+
+        Debug.Log($"[TrainingLevelManager] Starting Level: {currentLevelConfig.levelName}");
 
         if (waveFeedbackText != null)
         {
-            waveFeedbackText.text = $"Level: {levelConfig.levelName}\nGet Ready!";
+            waveFeedbackText.text = $"Level: {currentLevelConfig.levelName}\nGet Ready!";
         }
 
         if (currentLevelConfig.waves.Count > 0)
         {
-            // Brief delay before the very first wave starts so player can read the level name
-            Invoke(nameof(StartNextWaveDelayed), 3.0f);
+            StartWave(currentWaveIndex);
         }
         else
         {
-            Debug.LogWarning("[TrainingLevelManager] Level has no waves configured.");
-            if (waveFeedbackText != null) waveFeedbackText.text = "Error: No waves found.";
-            OnLevelCompleted?.Invoke();
+            Debug.LogWarning($"[TrainingLevelManager] Level '{currentLevelConfig.levelName}' has no waves configured.");
+            if (waveFeedbackText != null) waveFeedbackText.text = "Error: Level empty. Skipping...";
+            CompleteCurrentLevel();
         }
     }
 
@@ -113,12 +147,7 @@ public class TrainingLevelManager : MonoBehaviour
     {
         if (index >= currentLevelConfig.waves.Count)
         {
-            Debug.Log("[TrainingLevelManager] All waves completed!");
-            if (waveFeedbackText != null)
-            {
-                waveFeedbackText.text = "Level Complete!\nGreat Job!";
-            }
-            OnLevelCompleted?.Invoke();
+            CompleteCurrentLevel();
             return;
         }
 
@@ -286,10 +315,12 @@ public class TrainingLevelManager : MonoBehaviour
         }
         activeTargets.Clear();
 
+        WaveDataSO currentWave = currentLevelConfig.waves[currentWaveIndex];
+
         Debug.Log($"[TrainingLevelManager] Wave {currentWaveIndex + 1} Completed.");
         if (waveFeedbackText != null)
         {
-            waveFeedbackText.text = $"Wave {currentWaveIndex + 1} Cleared!";
+            waveFeedbackText.text = $"{currentWave.waveOutroText}";
         }
 
         OnWaveCompleted?.Invoke(currentWaveIndex);
@@ -303,6 +334,26 @@ public class TrainingLevelManager : MonoBehaviour
     private void StartNextWaveDelayed()
     {
         StartWave(currentWaveIndex);
+    }
+
+    private void CompleteCurrentLevel()
+    {
+        Debug.Log($"[TrainingLevelManager] Level '{currentLevelConfig.levelName}' completed!");
+        if (waveFeedbackText != null)
+        {
+            waveFeedbackText.text = "Level Complete!\nGreat Job!";
+        }
+
+        OnLevelCompleted?.Invoke();
+
+        // Wait 5 seconds, then load the next level in the playlist
+        Invoke(nameof(StartNextLevelDelayed), 5.0f);
+    }
+
+    private void StartNextLevelDelayed()
+    {
+        currentLevelIndex++;
+        StartLevel(currentLevelIndex);
     }
 
     private void ClearFeedbackText()
