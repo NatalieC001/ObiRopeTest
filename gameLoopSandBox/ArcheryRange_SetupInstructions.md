@@ -38,10 +38,10 @@ To ensure accessibility and an easy "at-a-glance" workflow, the entire level pro
 ---
 
 ## 2. The Game Loop Flow
-1. **Level Start:** The Announcer text shows the Level's Intro Text. It waits infinitely.
-2. **Ready Up:** The player shoots the Gong. The text disappears and the fast-paced waves begin.
+1. **Level Start:** The Announcer text shows the Level's Intro Text, explicitly appending instructions to "Shoot the Gong to begin!". It waits infinitely, ensuring the player is never confused or relying on inference.
+2. **Ready Up:** The player shoots the Gong. The text disappears and the fast-paced waves begin instantly.
 3. **The Waves:** Waves flow seamlessly into one another instantly with no text interruptions. The HUD text updates in real-time.
-4. **Level Complete:** When all waves finish, the Announcer shows the Level Outro Text and the player's completion time. It waits infinitely.
+4. **Level Complete:** When all waves finish, the Announcer shows the Level Outro Text, the player's completion time, and explicitly appends instructions to "Shoot the Gong to continue!". It waits infinitely.
 5. **Next Level:** The player shoots the Gong, and the cycle repeats for Level 2.
 
 ---
