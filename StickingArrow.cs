@@ -77,7 +77,7 @@ public class StickingArrow : MonoBehaviour
         string hitLayer = LayerMask.LayerToName(collision.gameObject.layer);
 
         // ── Validation Guard ──────────────────────────────────────────────────
-        // Only valid targets (MovingTarget/IArrowTarget) or explicit environment surfaces (Wall/Floor/Ground/Target) 
+        // Only valid targets (MovingTarget/IArrowTarget) or explicit environment surfaces (Wall/Floor/Ground/Target)
         // should cause the arrow to stick and stop moving. We use ToLower() to catch "ground" or "Ground".
         IArrowTarget target = collision.collider.GetComponentInParent<IArrowTarget>();
 
@@ -102,9 +102,12 @@ public class StickingArrow : MonoBehaviour
         // 1. STOPPING THE ARROW
         if (rb != null)
         {
-            rb.isKinematic = true;
-            rb.linearVelocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
+            if (!rb.isKinematic)
+            {
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+                rb.isKinematic = true;
+            }
         }
 
         if (myCollider != null) myCollider.isTrigger = true;
@@ -277,5 +280,3 @@ public class StickingArrow : MonoBehaviour
         }
     }
 }
-
-
