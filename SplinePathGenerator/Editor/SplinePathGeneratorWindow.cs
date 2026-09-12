@@ -1,0 +1,306 @@
+using UnityEngine;
+using UnityEditor;
+using Dreamteck.Splines;
+using System.Collections.Generic;
+
+/// <summary>
+/// A custom editor window for generating mathematical spline shapes for Dreamteck Splines.
+/// It creates a temporary preview object in the scene and can save it as a prefab.
+/// </summary>
+public class SplinePathGeneratorWindow : EditorWindow
+{
+    public enum ShapeType
+    {
+        Star,
+        RegularPolygon,
+        SimpleCelticKnot,
+        Lissajous,
+        Spiral,
+        Spirograph
+    }
+
+    // --- Shape Settings ---
+    private ShapeType currentShape = ShapeType.Star;
+    private float outerRadius = 5f;
+    private float innerRadius = 2.5f; // Used for stars
+    private int points = 5; // Used for stars, polygons
+    private int resolution = 20; // Used for more complex curves
+
+    // --- Metadata Settings (PathSpawnInfo) ---
+    private GameObject enemyPrefab;
+    private int spawnCount = 1;
+    private float movementSpeed = 5f;
+
+    // --- Preview Object ---
+    private GameObject previewObject;
+    private SplineComputer previewSpline;
+    private PathSpawnInfo previewInfo;
+
+    private const string PREFAB_SAVE_PATH = "Assets/SplinePathGenerator/GeneratedPaths/";
+
+    [MenuItem("Tools/Spline Path Generator")]
+    public static void ShowWindow()
+    {
+        GetWindow<SplinePathGeneratorWindow>("Path Generator");
+    }
+
+    private void OnEnable()
+    {
+        // Subscribe to SceneView to draw gizmos
+        SceneView.duringSceneGui += OnSceneGUI;
+        CreateOrUpdatePreview();
+    }
+
+    private void OnDisable()
+    {
+        SceneView.duringSceneGui -= OnSceneGUI;
+        if (previewObject != null)
+        {
+            DestroyImmediate(previewObject);
+        }
+    }
+
+    private void OnGUI()
+    {
+        GUILayout.Label("Shape Generation Settings", EditorStyles.boldLabel);
+
+        EditorGUI.BeginChangeCheck();
+
+        currentShape = (ShapeType)EditorGUILayout.EnumPopup("Shape Type", currentShape);
+
+        switch (currentShape)
+        {
+            case ShapeType.Star:
+                points = EditorGUILayout.IntSlider("Number of Points", points, 3, 20);
+                outerRadius = EditorGUILayout.FloatField("Outer Radius", outerRadius);
+                innerRadius = EditorGUILayout.FloatField("Inner Radius", innerRadius);
+                break;
+
+            case ShapeType.RegularPolygon:
+                points = EditorGUILayout.IntSlider("Number of Sides", points, 3, 20);
+                outerRadius = EditorGUILayout.FloatField("Radius", outerRadius);
+                break;
+
+            case ShapeType.SimpleCelticKnot:
+                resolution = EditorGUILayout.IntSlider("Resolution", resolution, 20, 100);
+                outerRadius = EditorGUILayout.FloatField("Size", outerRadius);
+                break;
+
+            case ShapeType.Lissajous:
+                points = EditorGUILayout.IntSlider("A (Freq X)", points, 1, 10);
+                resolution = EditorGUILayout.IntSlider("B (Freq Y)", resolution, 1, 10);
+                outerRadius = EditorGUILayout.FloatField("Scale", outerRadius);
+                break;
+
+            case ShapeType.Spiral:
+                resolution = EditorGUILayout.IntSlider("Turns", resolution, 1, 10);
+                outerRadius = EditorGUILayout.FloatField("Max Radius", outerRadius);
+                points = EditorGUILayout.IntSlider("Points per Turn", points, 10, 50);
+                break;
+
+            case ShapeType.Spirograph:
+                outerRadius = EditorGUILayout.FloatField("Outer Circle Radius (R)", outerRadius);
+                innerRadius = EditorGUILayout.FloatField("Inner Circle Radius (r)", innerRadius);
+                points = EditorGUILayout.IntSlider("Pen Offset (d)", points, 1, 20);
+                resolution = EditorGUILayout.IntSlider("Resolution", resolution, 50, 300);
+                break;
+        }
+
+        GUILayout.Space(15);
+        GUILayout.Label("Path Metadata Settings", EditorStyles.boldLabel);
+
+        enemyPrefab = (GameObject)EditorGUILayout.ObjectField("Enemy Prefab", enemyPrefab, typeof(GameObject), false);
+        spawnCount = EditorGUILayout.IntField("Spawn Count", spawnCount);
+        if (spawnCount < 1) spawnCount = 1;
+        movementSpeed = EditorGUILayout.FloatField("Movement Speed", movementSpeed);
+
+        if (EditorGUI.EndChangeCheck())
+        {
+            CreateOrUpdatePreview();
+        }
+
+        GUILayout.Space(20);
+
+        if (GUILayout.Button("Generate and Save Prefab", GUILayout.Height(40)))
+        {
+            SavePrefab();
+        }
+    }
+
+    private void CreateOrUpdatePreview()
+    {
+        if (previewObject == null)
+        {
+            previewObject = new GameObject("Spline_Preview");
+            previewObject.hideFlags = HideFlags.DontSave; // Keep it clean
+            previewSpline = previewObject.AddComponent<SplineComputer>();
+            previewInfo = previewObject.AddComponent<PathSpawnInfo>();
+        }
+
+        // Update Metadata
+        previewInfo.enemyPrefab = enemyPrefab;
+        previewInfo.spawnCount = spawnCount;
+        previewInfo.movementSpeed = movementSpeed;
+
+        // Define if it is closed based on shape
+        bool isClosed = (currentShape != ShapeType.Spiral);
+        previewInfo.isClosed = isClosed;
+
+        // Generate points
+        SplinePoint[] splinePoints = GeneratePoints();
+
+        // Apply to spline
+        previewSpline.type = Spline.Type.BSpline;
+        previewSpline.SetPoints(splinePoints);
+
+        if (isClosed)
+        {
+            previewSpline.Close();
+        }
+        else
+        {
+            previewSpline.Break();
+        }
+
+        // Force scene redraw
+        SceneView.RepaintAll();
+    }
+
+    private SplinePoint[] GeneratePoints()
+    {
+        List<SplinePoint> pointsList = new List<SplinePoint>();
+
+        switch (currentShape)
+        {
+            case ShapeType.Star:
+                for (int i = 0; i < points * 2; i++)
+                {
+                    float radius = (i % 2 == 0) ? outerRadius : innerRadius;
+                    float angle = i * Mathf.PI / points;
+                    Vector3 pos = new Vector3(Mathf.Sin(angle) * radius, 0, Mathf.Cos(angle) * radius);
+                    pointsList.Add(new SplinePoint(pos));
+                }
+                break;
+
+            case ShapeType.RegularPolygon:
+                for (int i = 0; i < points; i++)
+                {
+                    float angle = i * 2 * Mathf.PI / points;
+                    Vector3 pos = new Vector3(Mathf.Sin(angle) * outerRadius, 0, Mathf.Cos(angle) * outerRadius);
+                    pointsList.Add(new SplinePoint(pos));
+                }
+                break;
+
+            case ShapeType.SimpleCelticKnot:
+                // Using a 3-lobed knot (trefoil knot variant projected to 2D)
+                for (int i = 0; i < resolution; i++)
+                {
+                    float t = i * 2 * Mathf.PI / resolution;
+                    float x = Mathf.Sin(t) + 2 * Mathf.Sin(2 * t);
+                    float y = Mathf.Cos(t) - 2 * Mathf.Cos(2 * t);
+                    Vector3 pos = new Vector3(x, 0, y) * (outerRadius / 3f);
+                    pointsList.Add(new SplinePoint(pos));
+                }
+                break;
+
+            case ShapeType.Lissajous:
+                // points = A, resolution = B
+                int lissajousSteps = 50;
+                for (int i = 0; i < lissajousSteps; i++)
+                {
+                    float t = i * 2 * Mathf.PI / lissajousSteps;
+                    float x = Mathf.Sin(points * t);
+                    float y = Mathf.Sin(resolution * t);
+                    Vector3 pos = new Vector3(x, 0, y) * outerRadius;
+                    pointsList.Add(new SplinePoint(pos));
+                }
+                break;
+
+            case ShapeType.Spiral:
+                // resolution = turns, points = points per turn
+                int totalPoints = resolution * points;
+                for (int i = 0; i < totalPoints; i++)
+                {
+                    float t = i / (float)(points); // Turns
+                    float currentRadius = (t / resolution) * outerRadius;
+                    float angle = t * 2 * Mathf.PI;
+                    Vector3 pos = new Vector3(Mathf.Sin(angle) * currentRadius, 0, Mathf.Cos(angle) * currentRadius);
+                    pointsList.Add(new SplinePoint(pos));
+                }
+                break;
+
+            case ShapeType.Spirograph:
+                // R = outerRadius, r = innerRadius, d = points
+                for (int i = 0; i < resolution; i++)
+                {
+                    float t = i * 10 * Mathf.PI / resolution; // Multiplied by 10 to get multiple loops
+                    float R = outerRadius;
+                    float r = innerRadius;
+                    float d = points;
+
+                    float x = (R - r) * Mathf.Cos(t) + d * Mathf.Cos((R - r) / r * t);
+                    float y = (R - r) * Mathf.Sin(t) - d * Mathf.Sin((R - r) / r * t);
+
+                    Vector3 pos = new Vector3(x, 0, y);
+                    pointsList.Add(new SplinePoint(pos));
+                }
+                break;
+        }
+
+        return pointsList.ToArray();
+    }
+
+    private void OnSceneGUI(SceneView sceneView)
+    {
+        if (previewSpline == null || previewInfo == null) return;
+
+        // If the path is open, clearly label START and END
+        if (!previewInfo.isClosed && previewSpline.pointCount > 0)
+        {
+            SplinePoint[] pts = previewSpline.GetPoints();
+
+            // Draw START
+            Vector3 startPos = pts[0].position;
+            Handles.color = Color.green;
+            Handles.Label(startPos + Vector3.up * 0.5f, "START", EditorStyles.boldLabel);
+            Handles.DrawSolidDisc(startPos, Vector3.up, 0.2f);
+
+            // Draw END
+            Vector3 endPos = pts[pts.Length - 1].position;
+            Handles.color = Color.red;
+            Handles.Label(endPos + Vector3.up * 0.5f, "END", EditorStyles.boldLabel);
+            Handles.DrawSolidDisc(endPos, Vector3.up, 0.2f);
+        }
+    }
+
+    private void SavePrefab()
+    {
+        if (previewObject == null) return;
+
+        if (!System.IO.Directory.Exists(PREFAB_SAVE_PATH))
+        {
+            System.IO.Directory.CreateDirectory(PREFAB_SAVE_PATH);
+            AssetDatabase.Refresh();
+        }
+
+        string fileName = $"{currentShape}_Path_{System.DateTime.Now:yyyyMMdd_HHmmss}.prefab";
+        string fullPath = PREFAB_SAVE_PATH + fileName;
+
+        // Remove DontSave flags before saving
+        previewObject.hideFlags = HideFlags.None;
+
+        GameObject prefab = PrefabUtility.SaveAsPrefabAsset(previewObject, fullPath);
+
+        if (prefab != null)
+        {
+            Debug.Log($"[Spline Path Generator] Saved new path prefab at {fullPath}");
+        }
+        else
+        {
+            Debug.LogError("[Spline Path Generator] Failed to save prefab.");
+        }
+
+        // Restore preview flags
+        previewObject.hideFlags = HideFlags.DontSave;
+    }
+}
