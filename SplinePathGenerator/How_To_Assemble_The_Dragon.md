@@ -10,19 +10,31 @@ By the end of this, you will have a slithering dragon that dynamically shrinks a
 
 Before we can build the whole dragon, we need to make the individual pieces: the **Head**, the **Body**, and the **Tail**.
 
-### Step 1: Create a Body Segment
-1. Right-click in your Hierarchy and choose `3D Object -> Cube`. Name it **"Dragon_Body"**.
-2. **The Collider:** Ensure it has a `BoxCollider` (or `MeshCollider`) so the player's arrows can physically hit it.
-3. **The Health Script:** Click `Add Component` and search for **`DragonSegment`**.
+**CRITICAL ARCHITECTURE RULE:** We *never* put scripts directly on 3D meshes. If you put scripts on a Cube, it is incredibly difficult to swap that Cube out for a real Dragon 3D model later. We always use the **"Empty Root"** pattern.
+
+### Step 1: Create the Root Object (The Identity)
+1. Right-click in your Hierarchy and choose `Create Empty`. Name it **"Dragon_Body"**.
+2. **The Physics Anchor:** Click `Add Component` and add a **`Rigidbody`**.
+   * *Crucial:* Check the box for **`Is Kinematic`**. This ensures the segment can be hit by your game's physical arrows, but gravity won't pull it off the spline track!
+3. **The Brain:** Click `Add Component` and search for **`DragonSegment`**.
    * Set the Health (e.g., `100`).
    * Set the Power Contribution (e.g., `10`).
-4. **The Visual Effects:** Click `Add Component` and search for **`DissolveEffect`**. (This existing project script will make the segment burn away smoothly when destroyed).
-5. Drag the **"Dragon_Body"** object from your Hierarchy down into `Assets/SplinePathGenerator/Scripts/Entities/Dragon/Prefabs` to save it as a **Prefab**.
-6. Delete the cube from the scene.
+4. **The Visual Effects:** Click `Add Component` and search for **`DissolveEffect`**.
+5. **The Spline Follower Warning:** When you added the `DragonSegment` script, Unity automatically added a `SplineFollower` component. **Do not worry about the blank "Spline" field.** The Manager fills this in at runtime!
 
-### Step 2: Create the Head and Tail
-Repeat the exact same process above to create a **"Dragon_Head"** prefab and a **"Dragon_Tail"** prefab.
-*(Tip: Make the Head cube slightly larger, and the Tail cube slightly smaller so you can tell them apart while testing!)*
+### Step 2: Add the Visuals and Colliders (The Children)
+Now we add the replaceable parts as children to the Root.
+1. Right-click your **"Dragon_Body"** root object and choose `3D Object -> Cube`. Name this child **"Mesh_Visual"**.
+2. Remove the `BoxCollider` from this child (we want the physics on a separate node, or managed explicitly).
+3. Right-click the Root object again and choose `Create Empty`. Name it **"Collider_Node"**. Add a `BoxCollider` to this and size it to fit the cube.
+4. **Wire it up:** Go back to your Root object. Drag the **"Mesh_Visual"** into the `Target Renderer` slot on your `DissolveEffect` script. Drag the **"Collider_Node"** into any relevant slots on your scripts.
+
+*Why do we do this?* Tomorrow, when your artist gives you a 3D Dragon model, you just delete the "Mesh_Visual" cube, drop the 3D model in as a child, and resize the "Collider_Node". You don't have to touch a single script!
+
+### Step 3: Save the Prefabs
+1. Drag the **"Dragon_Body"** root object from your Hierarchy down into `Assets/SplinePathGenerator/Scripts/Entities/Dragon/Prefabs` to save it as a **Prefab**.
+2. Delete it from the scene.
+3. Repeat this process (or duplicate the prefab and change the names/sizes) to create a **"Dragon_Head"** prefab and a **"Dragon_Tail"** prefab.
 
 ---
 

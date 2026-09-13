@@ -14,6 +14,12 @@ public class DragonSegment : MonoBehaviour
     [Tooltip("The amount of power/energy this specific segment contributes to the boss's total power.")]
     public float powerContribution = 10f;
 
+    [Header("Visuals & Physics")]
+    [Tooltip("Reference to the child mesh renderer (useful for triggering visual effects).")]
+    [SerializeField] private Renderer segmentRenderer;
+    [Tooltip("Reference to the child collider (useful for disabling physics upon death).")]
+    [SerializeField] private Collider segmentCollider;
+
     private SegmentedDragonManager dragonManager;
     private BossCreature bossBrain;
     private SplineFollower follower;
@@ -59,13 +65,20 @@ public class DragonSegment : MonoBehaviour
     {
         Debug.Log($"<color=red>[DragonSegment] Segment {SegmentIndex} Destroyed!</color>");
 
+        // Disable physics immediately so arrows don't keep hitting the dying segment
+        if (segmentCollider != null)
+        {
+            segmentCollider.enabled = false;
+        }
+
         // Notify the brain that this piece is gone so it can close the gap
         if (dragonManager != null)
         {
             dragonManager.OnSegmentDestroyed(this);
         }
 
-        // Trigger explosion/dissolve effects here
+        // Note: Actual dissolve visual effects are handled by DissolveEffect.cs
+        // acting on the segmentRenderer. We just destroy the root object.
         Destroy(gameObject);
     }
 }
