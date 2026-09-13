@@ -15,18 +15,21 @@ public class SplineSwarmManager : MonoBehaviour
     [Tooltip("How often (in seconds) the swarm attempts an attack run.")]
     public float attackInterval = 10f;
 
-    [Tooltip("How long the attack run lasts before the enemies return to the track.")]
-    public float attackDuration = 4f;
-
     [Tooltip("How many enemies are peeled off for a single attack run.")]
     public int swarmSize = 5;
 
+    [Tooltip("How close (in meters) the swarm gets to the player. Keeps them out of your face in VR.")]
+    public float vrComfortDistance = 3.5f;
+
     private Transform playerTransform;
+    private PathSpawnInfo spawnInfo;
     private List<SplineFollower> allEnemies = new List<SplineFollower>();
     private bool isAttacking = false;
 
     private void Start()
     {
+        spawnInfo = GetComponent<PathSpawnInfo>();
+
         // 1. Find the Player (Assumes XR Origin with "Player" tag)
         GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
         if (playerObj != null)
@@ -87,48 +90,65 @@ public class SplineSwarmManager : MonoBehaviour
         List<SplineFollower> attackers = new List<SplineFollower>();
         List<SplineFollower> available = new List<SplineFollower>(allEnemies);
 
+        // Memory Dictionary to remember where they belong on the track!
+        Dictionary<SplineFollower, double> savedPositions = new Dictionary<SplineFollower, double>();
+
         int actualSwarmSize = Mathf.Min(swarmSize, available.Count);
         for (int i = 0; i < actualSwarmSize; i++)
         {
             int randomIndex = Random.Range(0, available.Count);
-            attackers.Add(available[randomIndex]);
+            SplineFollower chosen = available[randomIndex];
+            attackers.Add(chosen);
             available.RemoveAt(randomIndex);
         }
+
+        // Dynamically grab the dive speed from the baked settings
+        float diveDuration = spawnInfo != null ? spawnInfo.attackDuration : 3f;
 
         // 2. Launch the attack
         foreach (var attacker in attackers)
         {
             if (attacker == null) continue;
 
+            // Save their exact spot on the track before peeling off
+            savedPositions[attacker] = attacker.GetPercent();
+
             // Turn off Dreamteck following so we can manually control them
             attacker.follow = false;
 
-            // Tween them towards the player using DOTween
-            Vector3 attackTarget = playerTransform.position;
+            // Calculate the comfortable VR target position
+            Vector3 directionToPlayer = (playerTransform.position - attacker.transform.position).normalized;
+            Vector3 comfortableTargetPos = playerTransform.position - (directionToPlayer * vrComfortDistance);
 
-            // Add a little randomness so they swarm around the player rather than a single point
-            Vector3 randomOffset = new Vector3(Random.Range(-1f, 1f), Random.Range(0f, 2f), Random.Range(-1f, 1f));
-            attackTarget += randomOffset;
+            // Add a little spherical randomness so they swarm the area rather than clumping in one spot
+            Vector3 randomOffset = Random.insideUnitSphere * 1.5f;
+            comfortableTargetPos += randomOffset;
+
+            // Ensure they don't dive into the floor (VR Constraint)
+            if (comfortableTargetPos.y < 0) comfortableTargetPos.y = 0.5f;
 
             // Fly to player
-            attacker.transform.DOMove(attackTarget, attackDuration * 0.5f)
+            attacker.transform.DOMove(comfortableTargetPos, diveDuration * 0.5f)
                 .SetEase(Ease.InOutSine)
-                .SetTarget(attacker.gameObject) // Bind to GameObject in case it dies
-                .SetLink(attacker.gameObject);  // Safely kill tween on destroy
+                .SetTarget(attacker.gameObject)
+                .SetLink(attacker.gameObject);
         }
 
-        // Wait for the attack to happen
-        yield return new WaitForSeconds(attackDuration);
+        // Wait for the attack to happen and linger for a moment
+        yield return new WaitForSeconds(diveDuration);
 
-        // 3. Return surviving attackers to the track
+        // 3. Return surviving attackers exactly to the hole they left
         foreach (var attacker in attackers)
         {
             if (attacker == null || attacker.gameObject == null) continue; // Died during attack
 
-            // Find where they *should* be on the track
-            SplineSample sample = attacker.spline.Evaluate(attacker.GetPercent());
+            // Retrieve their saved memory of where they belong
+            double memoryPercent = savedPositions[attacker];
 
-            // Fly back to track
+            // Calculate where that specific spot currently is in the world
+            SplineSample sample = attacker.spline.Evaluate(memoryPercent);
+
+            // Fly back directly to their saved spot (no shuffling/ghosting through others!)
             attacker.transform.DOMove(sample.position, 2f)
                 .SetEase(Ease.InOutQuad)
                 .SetTarget(attacker.gameObject)
@@ -137,7 +157,8 @@ public class SplineSwarmManager : MonoBehaviour
                 {
                     if (attacker != null)
                     {
-                        // Resume Dreamteck following
+                        // Snap their internal spline tracker to the correct memory percent before resuming
+                        attacker.SetPercent(memoryPercent);
                         attacker.follow = true;
                     }
                 });
@@ -146,39 +167,7 @@ public class SplineSwarmManager : MonoBehaviour
         // Wait for return flight
         yield return new WaitForSeconds(2f);
 
-        // 4. Smoothly redistribute survivors across the shape
-        RedistributeSurvivors();
-
         isAttacking = false;
-    }
-
-    private void RedistributeSurvivors()
-    {
-        RegisterEnemies();
-        if (allEnemies.Count == 0) return;
-
-        double percentStep = 1.0 / allEnemies.Count;
-
-        for (int i = 0; i < allEnemies.Count; i++)
-        {
-            SplineFollower survivor = allEnemies[i];
-            if (survivor == null) continue;
-
-            double targetPercent = percentStep * i;
-            double currentPercent = survivor.GetPercent();
-
-            // We use DOTween DOVirtual to smoothly animate the Dreamteck percent value
-            DOVirtual.Float((float)currentPercent, (float)targetPercent, 2f, (p) =>
-            {
-                if (survivor != null)
-                {
-                    survivor.SetPercent(p);
-                }
-            })
-            .SetEase(Ease.InOutQuad)
-            .SetTarget(survivor.gameObject)
-            .SetLink(survivor.gameObject); // Safely kill tween on destroy
-        }
     }
 
     private void OnDestroy()

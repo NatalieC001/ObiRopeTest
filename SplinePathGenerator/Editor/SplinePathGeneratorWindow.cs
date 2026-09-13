@@ -29,7 +29,8 @@ public class SplinePathGeneratorWindow : EditorWindow
     // --- Metadata Settings (PathSpawnInfo) ---
     private GameObject enemyPrefab;
     private int spawnCount = 1;
-    private float movementSpeed = 5f;
+    private float pathMovementSpeed = 5f;
+    private float attackDuration = 3f;
 
     // --- Preview Object ---
     private GameObject previewRootObject;
@@ -113,7 +114,9 @@ public class SplinePathGeneratorWindow : EditorWindow
         enemyPrefab = (GameObject)EditorGUILayout.ObjectField("Enemy Prefab", enemyPrefab, typeof(GameObject), false);
         spawnCount = EditorGUILayout.IntField("Spawn Count", spawnCount);
         if (spawnCount < 1) spawnCount = 1;
-        movementSpeed = EditorGUILayout.FloatField("Movement Speed", movementSpeed);
+
+        pathMovementSpeed = EditorGUILayout.FloatField("Path Circling Speed", pathMovementSpeed);
+        attackDuration = EditorGUILayout.FloatField("Attack Dive Duration (s)", attackDuration);
 
         if (EditorGUI.EndChangeCheck())
         {
@@ -146,7 +149,8 @@ public class SplinePathGeneratorWindow : EditorWindow
         // Update Metadata
         previewInfo.enemyPrefab = enemyPrefab;
         previewInfo.spawnCount = spawnCount;
-        previewInfo.movementSpeed = movementSpeed;
+        previewInfo.pathMovementSpeed = pathMovementSpeed;
+        previewInfo.attackDuration = attackDuration;
 
         // Define if it is closed based on shape
         bool isClosed = (currentShape != ShapeType.Spiral);
@@ -235,7 +239,7 @@ public class SplinePathGeneratorWindow : EditorWindow
                 }
 
                 follower.spline = previewSpline;
-                follower.followSpeed = movementSpeed;
+                follower.followSpeed = pathMovementSpeed;
                 follower.wrapMode = previewInfo.isClosed ? SplineFollower.Wrap.Loop : SplineFollower.Wrap.Default;
                 follower.SetPercent(percent);
             }

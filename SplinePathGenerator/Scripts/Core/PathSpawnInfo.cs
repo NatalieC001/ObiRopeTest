@@ -16,8 +16,11 @@ public class PathSpawnInfo : MonoBehaviour
     public int spawnCount = 1;
 
     [Header("Movement Settings")]
-    [Tooltip("The intended speed for creatures moving on this path.")]
-    public float movementSpeed = 5f;
+    [Tooltip("How fast the creatures circle around the mathematical shape.")]
+    public float pathMovementSpeed = 5f;
+
+    [Tooltip("How long (in seconds) it takes the swarm to dive at the player. Lower is faster.")]
+    public float attackDuration = 3f;
 
     [Header("Path State")]
     [Tooltip("Is this path open (for attack runs) or closed (for ambient loops)?")]
