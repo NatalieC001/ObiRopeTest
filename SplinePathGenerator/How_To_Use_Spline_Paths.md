@@ -47,8 +47,9 @@ In your Scene view, you will instantly see an invisible track appear! Use the sl
 **Step 3: Set the Rules**
 At the bottom of the window, you will see a section for "Path Metadata Settings". This is where you write down the rules for whoever uses this track later:
 *   **Enemy Prefab:** Drag and drop the actual enemy you want to use here.
-*   **Spawn Count:** Type `5` (because we want 5 enemies).
+*   **Spawn Count:** Type `20` (because we want 20 enemies!).
 *   **Movement Speed:** Type how fast they should go.
+    *   *Secret Trick:* If you want the enemies to hang in the air as a perfectly still, non-moving mathematical shape (like a constellation of stars), **set the Speed to 0!**
 
 **Step 4: Save It!**
 Click the big "Generate and Save Prefab" button.
@@ -58,9 +59,11 @@ Congratulations! You just created a permanent saved file in your `Assets/SplineP
 
 ## 4. What Exactly Did I Just Save?
 
-If you click on the Prefab you just saved, you will see it is just an empty game object with two pieces of code attached:
-1.  **SplineComputer:** This is the Dreamteck code that remembers the literal curve of the track.
-2.  **PathSpawnInfo:** This is a tiny, simple script that just holds the rules you typed in (Spawn Count = 5, Speed = 10, etc.). It has zero logic. It’s basically just a sticky note attached to the track for the game to read later.
+If you click on the Prefab you just saved, you will see it is a fully complete, ready-to-use package!
+It contains:
+1.  **Spline_Curve:** A child object holding the `SplineComputer` (the track).
+2.  **The Enemies:** The tool actually instantiates the enemies and bakes them into the prefab as children! They already have their `SplineFollower` components attached and configured with the speed you requested.
+3.  **PathSpawnInfo:** A sticky note with the rules (just in case the game needs to know how many enemies are inside without counting them).
 
 ---
 
@@ -68,10 +71,12 @@ If you click on the Prefab you just saved, you will see it is just an empty game
 
 Now that you have your track saved, how do you use it?
 
-You hand it to a system that *does* have logic—like a Wave Manager.
-When the Wave Manager says "Start Wave 1!", you tell it to load your Star Prefab. The Manager will look at the `PathSpawnInfo` sticky note, realize it needs to spawn 5 enemies, and attach those enemies to the `SplineComputer` track.
+Because the enemies are already baked inside the prefab, using it is incredibly easy.
+When the `TrainingLevelManager` (or Wave Manager) says "Start Wave 1!", it simply instantiates the Star Prefab. That's it!
 
-*(If you are a programmer looking for the exact code to do this, see the `Enemy_Spline_Integration_Guide.md` file!)*
+The track spawns, and the enemies inside it instantly start moving along the path.
+
+*(If you are a programmer looking for how to modify these paths for boss attack runs, see the `Enemy_Spline_Integration_Guide.md` file!)*
 
 ---
 

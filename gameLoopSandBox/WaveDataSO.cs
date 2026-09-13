@@ -29,7 +29,8 @@ public enum TargetMovementType
     FishSwimMovement,
     PingPongMovement,
     Rotator,
-    SwoopAndRetreatMovement
+    SwoopAndRetreatMovement,
+    SplinePathAsset // Used when the target is actually a massive, pre-baked Spline Prefab with its own enemies.
 }
 
 /// <summary>

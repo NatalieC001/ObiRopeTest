@@ -32,7 +32,8 @@ public class SplinePathGeneratorWindow : EditorWindow
     private float movementSpeed = 5f;
 
     // --- Preview Object ---
-    private GameObject previewObject;
+    private GameObject previewRootObject;
+    private GameObject previewSplineObject;
     private SplineComputer previewSpline;
     private PathSpawnInfo previewInfo;
 
@@ -54,9 +55,9 @@ public class SplinePathGeneratorWindow : EditorWindow
     private void OnDisable()
     {
         SceneView.duringSceneGui -= OnSceneGUI;
-        if (previewObject != null)
+        if (previewRootObject != null)
         {
-            DestroyImmediate(previewObject);
+            DestroyImmediate(previewRootObject);
         }
     }
 
@@ -129,12 +130,17 @@ public class SplinePathGeneratorWindow : EditorWindow
 
     private void CreateOrUpdatePreview()
     {
-        if (previewObject == null)
+        if (previewRootObject == null)
         {
-            previewObject = new GameObject("Spline_Preview");
-            previewObject.hideFlags = HideFlags.DontSave; // Keep it clean
-            previewSpline = previewObject.AddComponent<SplineComputer>();
-            previewInfo = previewObject.AddComponent<PathSpawnInfo>();
+            // The Root Object (Holds Metadata, does NOT hold SplineComputer)
+            previewRootObject = new GameObject("Spline_Preview");
+            previewRootObject.hideFlags = HideFlags.DontSave;
+            previewInfo = previewRootObject.AddComponent<PathSpawnInfo>();
+
+            // The Child Object (Holds SplineComputer)
+            previewSplineObject = new GameObject("Spline_Curve");
+            previewSplineObject.transform.SetParent(previewRootObject.transform);
+            previewSpline = previewSplineObject.AddComponent<SplineComputer>();
         }
 
         // Update Metadata
@@ -162,8 +168,72 @@ public class SplinePathGeneratorWindow : EditorWindow
             previewSpline.Break();
         }
 
+        // Rebuild spline so we can evaluate it immediately
+        previewSpline.RebuildImmediate();
+
+        // Update Baked Enemies
+        UpdateBakedEnemies();
+
         // Force scene redraw
         SceneView.RepaintAll();
+    }
+
+    private void UpdateBakedEnemies()
+    {
+        if (previewRootObject == null || previewSpline == null) return;
+
+        // 1. Clean up existing baked enemies
+        for (int i = previewRootObject.transform.childCount - 1; i >= 0; i--)
+        {
+            Transform child = previewRootObject.transform.GetChild(i);
+            if (child.gameObject != previewSplineObject)
+            {
+                DestroyImmediate(child.gameObject);
+            }
+        }
+
+        // 2. Spawn new enemies if a prefab is set
+        if (enemyPrefab != null && spawnCount > 0)
+        {
+            double percentStep = 1.0 / spawnCount;
+            for (int i = 0; i < spawnCount; i++)
+            {
+                double percent = percentStep * i;
+
+                // Instantiate the enemy safely in the editor
+                GameObject enemyObj = null;
+                if (PrefabUtility.IsPartOfPrefabAsset(enemyPrefab))
+                {
+                    enemyObj = (GameObject)PrefabUtility.InstantiatePrefab(enemyPrefab);
+                }
+                else
+                {
+                    enemyObj = Instantiate(enemyPrefab);
+                }
+
+                if (enemyObj == null) continue;
+
+                enemyObj.transform.SetParent(previewRootObject.transform);
+                enemyObj.name = $"{enemyPrefab.name}_{i}";
+
+                // Evaluate position and rotation on the spline for immediate visual feedback
+                SplineSample sample = previewSpline.Evaluate(percent);
+                enemyObj.transform.position = sample.position;
+                enemyObj.transform.rotation = sample.rotation;
+
+                // Add standard Dreamteck follower component to bake the movement
+                SplineFollower follower = enemyObj.GetComponent<SplineFollower>();
+                if (follower == null)
+                {
+                    follower = enemyObj.AddComponent<SplineFollower>();
+                }
+
+                follower.spline = previewSpline;
+                follower.followSpeed = movementSpeed;
+                follower.wrapMode = previewInfo.isClosed ? SplineFollower.Wrap.Loop : SplineFollower.Wrap.Default;
+                follower.SetPercent(percent);
+            }
+        }
     }
 
     private SplinePoint[] GeneratePoints()
@@ -275,7 +345,7 @@ public class SplinePathGeneratorWindow : EditorWindow
 
     private void SavePrefab()
     {
-        if (previewObject == null) return;
+        if (previewRootObject == null) return;
 
         if (!System.IO.Directory.Exists(PREFAB_SAVE_PATH))
         {
@@ -287,9 +357,9 @@ public class SplinePathGeneratorWindow : EditorWindow
         string fullPath = PREFAB_SAVE_PATH + fileName;
 
         // Remove DontSave flags before saving
-        previewObject.hideFlags = HideFlags.None;
+        previewRootObject.hideFlags = HideFlags.None;
 
-        GameObject prefab = PrefabUtility.SaveAsPrefabAsset(previewObject, fullPath);
+        GameObject prefab = PrefabUtility.SaveAsPrefabAsset(previewRootObject, fullPath);
 
         if (prefab != null)
         {
@@ -301,6 +371,6 @@ public class SplinePathGeneratorWindow : EditorWindow
         }
 
         // Restore preview flags
-        previewObject.hideFlags = HideFlags.DontSave;
+        previewRootObject.hideFlags = HideFlags.DontSave;
     }
 }
