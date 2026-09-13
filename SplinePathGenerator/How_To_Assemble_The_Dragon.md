@@ -87,22 +87,21 @@ Because the Boss is saved as a Prefab in your project folder, it **cannot** save
 
 ## Phase 4: Spawning the Encounter (The Lifecycle)
 
-Here is how you actually bring the boss to life during gameplay. This code usually lives in a Wave Manager or Level Controller:
+Here is how you actually bring the boss to life during gameplay without writing any custom code! Everything is handled by the `TrainingLevelManager` and your CSV sheet.
 
-1. **Instantiate the Boss:** Your script spawns the `Boss_AsianDragon` prefab.
-2. **Instantiate the Minions:** Your script spawns a swarm of minion prefabs.
-3. **Register the Battle:** This is the most critical step! Your script must find the `BossArenaManager` in the scene and pass it the newly spawned entities.
+1. **Assign your Prefabs:** Open `LevelConfigSO` in your Inspector.
+   * Drag your Minion Swarm prefab (created via the Spline Generator) into the `Spline Path Asset Prefab` slot.
+   * Drag your **"Boss_AsianDragon"** prefab into the `Boss Dragon Prefab` slot.
+2. **Setup the CSV:** Open your `LevelDesign_Template.csv`.
+   * Create a wave row. In the `MovementBehavior` column, type `SplinePathAsset` to spawn your minion swarm.
+   * Create a second wave row (or use the same one!). Type `BossDragonAsset` to spawn your dragon.
+3. **The Magic:** When you start the level, the `TrainingLevelManager` reads those strings.
+   * It instantiates the Boss prefab.
+   * It dynamically locates your `BossArenaManager` in the scene.
+   * It gathers up all the spawned minions.
+   * It automatically wires them all together using `RegisterBattleParticipants()`!
 
-```csharp
-// Example Spawning Code
-BossArenaManager arena = FindAnyObjectByType<BossArenaManager>();
-BossCreature spawnedBoss = Instantiate(bossPrefab).GetComponent<BossCreature>();
-
-// Pass the boss and the list of minions to the Arena
-arena.RegisterBattleParticipants(spawnedBoss, activeMinionList);
-```
-
-As soon as `RegisterBattleParticipants` is called:
+As soon as that happens:
 1. The Boss retrieves the environmental splines from the Arena.
 2. The Boss tells the `SegmentedDragonManager` to spawn the visual Head, Body, Legs, and Tail.
 3. The Boss instantly snaps to the `Observation_Spline` and begins Phase 1 (Orchestrating)!

@@ -46,19 +46,22 @@ public class DragonSegment : MonoBehaviour
     /// <summary>
     /// Called when the player shoots this specific segment.
     /// </summary>
-    public void TakeDamage(float amount, Vector3 hitPoint)
+    public void TakeDamage(float amount, Vector3 hitPoint, ElementTypeOB7 arrowType = ElementTypeOB7.Normal)
     {
         // Pass damage up to the brain so the overall boss loses health and can trigger evasions!
         if (bossBrain != null)
         {
-            bossBrain.TakeDamage(amount, hitPoint);
+            // The boss brain calculates actual damage using its own elemental modifiers
+            bossBrain.TakeDamage(amount, hitPoint, arrowType);
         }
 
         // Only track local destruction if this is a breakable middle piece
         if (isDestructiblePart)
         {
+            // Note: Currently, body segments just take raw base damage to pop off.
+            // Elemental logic is managed centrally by the BossBrain above to control the overall health bar.
             health -= amount;
-            Debug.Log($"<color=orange>[DragonSegment] Body Segment {SegmentIndex} took {amount} damage. Local Health: {health}</color>");
+            Debug.Log($"<color=orange>[DragonSegment] Body Segment {SegmentIndex} took {amount} base damage. Local Health: {health}</color>");
 
             if (health <= 0)
             {
@@ -67,7 +70,7 @@ public class DragonSegment : MonoBehaviour
         }
         else
         {
-            Debug.Log($"<color=yellow>[DragonSegment] Permanent piece {SegmentIndex} hit! Relayed {amount} damage to Boss Brain.</color>");
+            Debug.Log($"<color=yellow>[DragonSegment] Permanent piece {SegmentIndex} hit! Relayed {amount} base damage to Boss Brain.</color>");
         }
     }
 

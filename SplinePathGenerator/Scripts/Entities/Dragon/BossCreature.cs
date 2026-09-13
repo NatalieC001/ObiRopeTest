@@ -8,9 +8,21 @@ using UnityEngine;
 [RequireComponent(typeof(TacticalBossSplineManager))]
 public class BossCreature : MonoBehaviour
 {
+    [System.Serializable]
+    public struct ElementalModifier
+    {
+        public ElementTypeOB7 arrowType;
+        [Tooltip("1.0 = normal damage. 2.0 = double damage (weakness). 0.0 = immune. -1.0 = heals the boss!")]
+        public float damageMultiplier;
+    }
+
     [Header("Boss Stats")]
     public float maxHealth = 500f;
     private float currentHealth;
+
+    [Header("Elemental Resistances")]
+    [Tooltip("If an arrow type isn't listed here, it deals standard 1.0x damage.")]
+    public ElementalModifier[] elementalModifiers;
 
     [Tooltip("The boss will attempt to jump to an escape route if taking rapid damage.")]
     public float evasionDamageThreshold = 50f;
@@ -36,12 +48,14 @@ public class BossCreature : MonoBehaviour
     private float currentStamina;
 
     private TacticalBossSplineManager tacticalManager;
+    private CreatureStatusEffects statusEffects;
     private float recentDamageAccumulator = 0f;
     private float damageDecayTimer = 0f;
 
     private void Awake()
     {
         tacticalManager = GetComponent<TacticalBossSplineManager>();
+        statusEffects = GetComponent<CreatureStatusEffects>();
         currentHealth = maxHealth;
         currentStamina = maxStamina;
     }
@@ -133,10 +147,46 @@ public class BossCreature : MonoBehaviour
     /// <summary>
     /// Called when the player shoots the boss.
     /// </summary>
-    public void TakeDamage(float amount, Vector3 hitPoint)
+    public void TakeDamage(float baseAmount, Vector3 hitPoint, ElementTypeOB7 arrowType = ElementTypeOB7.Normal)
     {
-        currentHealth -= amount;
-        Debug.Log($"<color=orange>[BossCreature] Took {amount} damage! Remaining Health: {currentHealth}</color>");
+        // 0. Trigger Status Effects (Slows, Freezes)
+        if (statusEffects != null)
+        {
+            statusEffects.ApplyElementalEffect(arrowType);
+        }
+
+        // 1. Calculate actual damage based on elemental weaknesses/resistances
+        float actualDamage = baseAmount;
+        if (elementalModifiers != null)
+        {
+            foreach (var mod in elementalModifiers)
+            {
+                if (mod.arrowType == arrowType)
+                {
+                    actualDamage *= mod.damageMultiplier;
+                    break;
+                }
+            }
+        }
+
+        // 1.5 Apply Brittle modifier if frozen by previous ice arrows
+        if (statusEffects != null && statusEffects.IsBrittle && actualDamage > 0)
+        {
+            Debug.Log($"<color=cyan>[BossCreature] Boss Brittle shattered! Damage doubled.</color>");
+            actualDamage *= 2.0f;
+        }
+
+        // 2. Apply damage or healing
+        if (actualDamage < 0)
+        {
+            currentHealth -= actualDamage;
+            if (currentHealth > maxHealth) currentHealth = maxHealth;
+            Debug.Log($"<color=green>[BossCreature] Absorbed {arrowType} magic! HEALED for {-actualDamage}. Current Health: {currentHealth}</color>");
+            return;
+        }
+
+        currentHealth -= actualDamage;
+        Debug.Log($"<color=orange>[BossCreature] Hit by {arrowType} arrow! Took {actualDamage} damage. Remaining Health: {currentHealth}</color>");
 
         if (currentHealth <= 0)
         {
@@ -154,7 +204,7 @@ public class BossCreature : MonoBehaviour
         // Tactical Decision Logic: Evaluate if we need to evade (only if engaged or exhausted)
         if (currentPhase != BossPhase.Orchestrator)
         {
-            EvaluateThreat(amount);
+            EvaluateThreat(actualDamage);
         }
     }
 
