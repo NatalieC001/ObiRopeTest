@@ -12,16 +12,16 @@ using System.Collections;
 [RequireComponent(typeof(SplineFollower))]
 public class TacticalBossSplineManager : MonoBehaviour
 {
-    [Header("Environmental Splines")]
-    [Tooltip("Drag and drop the SplineComputer components from your scene (e.g., PillarWrap_Spline) here.")]
-    public SplineComputer[] tacticalEscapeRoutes;
-
     [Header("Boss Settings")]
     [Tooltip("How long the boss stays on an escape route before attacking.")]
     public float timeOnRoute = 5f;
 
     [Tooltip("How long it takes to smoothly hop from one route to another.")]
     public float hopDuration = 1.5f;
+
+    // These are injected at runtime by BossArenaManager to avoid Prefab serialization issues
+    private SplineComputer observationSpline;
+    private SplineComputer[] tacticalEscapeRoutes;
 
     private SplineFollower bossFollower;
     private Transform playerTransform;
@@ -38,8 +38,33 @@ public class TacticalBossSplineManager : MonoBehaviour
         {
             playerTransform = playerObj.transform;
         }
+    }
 
-        if (tacticalEscapeRoutes.Length > 0)
+    /// <summary>
+    /// Injected by BossCreature/BossArenaManager at spawn.
+    /// Sends the boss immediately to the observation deck.
+    /// </summary>
+    public void InitializeRoutes(SplineComputer observation, SplineComputer[] escapes)
+    {
+        observationSpline = observation;
+        tacticalEscapeRoutes = escapes;
+
+        if (observationSpline != null)
+        {
+            bossFollower.follow = false;
+            transform.position = observationSpline.Evaluate(0).position;
+            bossFollower.spline = observationSpline;
+            bossFollower.SetPercent(0);
+            bossFollower.follow = true;
+        }
+    }
+
+    /// <summary>
+    /// Begins the Phase 2 combat hopping sequence.
+    /// </summary>
+    public void StartEvasionRoutine()
+    {
+        if (tacticalEscapeRoutes != null && tacticalEscapeRoutes.Length > 0)
         {
             StartCoroutine(TacticalRoutine());
         }

@@ -15,6 +15,15 @@ public class BossCreature : MonoBehaviour
     [Tooltip("The boss will attempt to jump to an escape route if taking rapid damage.")]
     public float evasionDamageThreshold = 50f;
 
+    public enum BossPhase
+    {
+        Orchestrator, // Watching minions, taking no action
+        Engaged       // Actively fighting and evading
+    }
+
+    [Header("Battle State")]
+    public BossPhase currentPhase = BossPhase.Orchestrator;
+
     private TacticalBossSplineManager tacticalManager;
     private float recentDamageAccumulator = 0f;
     private float damageDecayTimer = 0f;
@@ -23,6 +32,25 @@ public class BossCreature : MonoBehaviour
     {
         tacticalManager = GetComponent<TacticalBossSplineManager>();
         currentHealth = maxHealth;
+    }
+
+    /// <summary>
+    /// Called by the BossArenaManager when the boss is spawned.
+    /// Injects the scene's environmental splines.
+    /// </summary>
+    public void InitializeArena(BossArenaManager arena)
+    {
+        currentPhase = BossPhase.Orchestrator;
+        tacticalManager.InitializeRoutes(arena.observationSpline, arena.tacticalEscapeRoutes);
+    }
+
+    /// <summary>
+    /// Called by the Arena Manager when all minions are dead.
+    /// </summary>
+    public void EngagePlayer()
+    {
+        currentPhase = BossPhase.Engaged;
+        tacticalManager.StartEvasionRoutine();
     }
 
     private void Update()
@@ -52,6 +80,13 @@ public class BossCreature : MonoBehaviour
         {
             Die();
             return;
+        }
+
+        // If the boss is hit while orchestrating, maybe it engages early!
+        if (currentPhase == BossPhase.Orchestrator)
+        {
+            Debug.Log("<color=red>[BossCreature] You dared to shoot the boss while it was watching? It attacks early!</color>");
+            EngagePlayer();
         }
 
         // Tactical Decision Logic: Evaluate if we need to evade

@@ -114,7 +114,8 @@ Use this on major enemies. A Boss is smart enough to evaluate threats.
 *   It commands the `TacticalBossSplineManager` to execute an evasive maneuver.
 
 **How to set up a Tactical Boss with Environmental Splines:**
-1. In your Unity Scene, use the Dreamteck tools to hand-draw splines around your environment (like wrapping around columns or drawing escape routes through the sky).
-2. Attach the `BossCreature.cs` script to your Boss prefab (this will automatically attach the `TacticalBossSplineManager`).
-3. In the Inspector for the Manager, drag and drop the `SplineComputer` components you drew in the scene into the `tacticalEscapeRoutes` array.
-4. During battle, if you shoot the boss too quickly, its brain will trigger `EvadeToEscapeRoute()`, causing it to dynamically hop onto a pillar or escape route to dodge your attacks!
+1. Create an empty GameObject in your Boss Scene and attach the `BossArenaManager.cs` script.
+2. Hand-draw splines around your environment (like wrapping around columns or an observation deck out of reach) using Dreamteck tools.
+3. Drag those splines from the scene into the `observationSpline` and `tacticalEscapeRoutes` slots on your new `BossArenaManager`.
+4. When your wave spawner creates the Boss and its minions, ensure it passes them to `BossArenaManager.RegisterBattleParticipants()`.
+5. The Boss will wait on the observation deck until all minions are dead. If the player shoots the boss early, or if the minions die, the boss enters Phase 2 and begins hopping between the tactical escape routes to fight!
