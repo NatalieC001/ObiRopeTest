@@ -14,16 +14,14 @@ The tool creates a Prefab containing two things:
 ## 2. Reading the Data in Your Game
 Because the enemies are now **baked directly into the prefab** by the Editor Tool, you do not need to write complex logic to spawn them at runtime.
 
-If you have a script that spawns a wave of enemies (e.g., `TrainingLevelManager`), you simply Instantiate the generated Prefab.
+The spawning is driven entirely by your `LevelDesign_Template.csv` spreadsheet and the `TargetMovementType` column.
 
-```csharp
-public void SpawnWaveFromPath(GameObject pathPrefab)
-{
-    // The prefab already contains the SplineComputer, the Enemy clones,
-    // and the configured SplineFollower components!
-    Instantiate(pathPrefab, spawnPosition, Quaternion.identity);
-}
-```
+1.  Open your `LevelConfigSO` in the Unity Inspector.
+2.  Assign your baked Swarm prefab to the `Spline Path Asset Prefab` slot.
+3.  Assign your Asian Dragon prefab to the `Boss Dragon Prefab` slot.
+4.  In your CSV file, use `SplinePathAsset` to spawn a swarm wave, and use `BossDragonAsset` to spawn the boss.
+
+The `TrainingLevelManager` will automatically read these enum strings, grab the correct prefab from the config, instantiate it, and automatically register it with the `BossArenaManager` if it's a boss!
 
 ---
 

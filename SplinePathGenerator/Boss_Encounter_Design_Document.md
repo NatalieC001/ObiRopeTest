@@ -2,17 +2,45 @@
 
 This document outlines the strategic narrative and mechanical flow of the advanced boss encounters. It serves as the blueprint for how the `BossArenaManager`, `BossCreature`, and `SplineSwarmManager` interact to create a thrilling VR combat experience.
 
-## 1. The Setup (The Scene)
-*   **The Player:** Stands stationary on a Watchtower (VR constrained).
-*   **The Environment:** The sky is filled with hand-drawn Dreamteck splines.
-*   **The Crystal:** In the center of the sky is a massive crystal. Around it is a specific spline path.
-*   **The Minions:** Smaller geometric swarms that protect the boss and crystal.
+## 1. The Ingredients List (What You Need to Build)
 
-### The Boss (Segmented Asian Dragon)
-Because the boss needs to slither fluidly through VR splines, it is designed as a **Segmented Creature**:
-*   **Anatomy:** The dragon consists of a Head, a dynamically generated number of Body segments (some with legs/claws to animate), and a Tail.
-*   **The Mechanic:** The player does not just shoot a single health bar. They must shoot away individual body segments.
-*   **Dynamic Shrinking:** When a middle segment is destroyed, the dragon's overall power decreases. The remaining segments behind the destroyed piece smoothly slither forward along the spline to close the gap, physically shrinking the boss as the fight progresses.
+To make this encounter work, we combine objects that live permanently in the Level Scene with Prefabs that are spawned dynamically by the Wave Manager.
+
+Here is the exact hierarchy and list of ingredients you need to set up:
+
+### A. The Scene Ingredients (Permanent Objects)
+These objects live in your Unity Hierarchy for the Boss Level at all times.
+*   **The Watchtower:** The physical platform the VR Player stands on.
+*   **The Crystal (Visuals):** A massive crystal model floating in the sky.
+*   **The Boss Arena Manager (Empty Object):** The master controller.
+    *   **Observation Spline (Child):** A `SplineComputer` drawn in a tight loop around the Crystal.
+    *   **Escape Spline 1 (Child):** A `SplineComputer` drawn wrapping around a left pillar.
+    *   **Escape Spline 2 (Child):** A `SplineComputer` drawn diving through a cloud.
+
+### B. The Spawnable Ingredients (Prefabs in your Project Folder)
+These are created beforehand and stored in `Assets/SplinePathGenerator/Scripts/Entities/Dragon/Prefabs`. They do NOT exist in the scene until the Wave Manager spawns them.
+
+*   **1. The Minion Swarm Prefab:**
+    *   Created using the *Spline Path Generator Window*.
+    *   Contains the geometric track (e.g., a Star) and baked-in minions.
+    *   Automatically has the `SplineSwarmManager.cs` attached.
+*   **2. The Boss Dragon Prefab:**
+    *   An empty root object holding `BossCreature.cs`, `TacticalBossSplineManager.cs`, and `SegmentedDragonManager.cs`.
+    *   It expects you to assign the anatomy prefabs (below) into its Inspector slots.
+*   **3. The Anatomy Prefabs (The Dragon's Body Parts):**
+    *   **Dragon_Head** (Empty Root with `DragonSegment.cs` -> Child Mesh + Collider).
+    *   **Dragon_FrontLegs**
+    *   **Dragon_Body** (Destructible!)
+    *   **Dragon_BackLegs**
+    *   **Dragon_Tail**
+
+### How They Connect at Runtime
+When the Wave Manager says "Begin Boss Wave!":
+1. It spawns the **Minion Swarm Prefab** into the air.
+2. It spawns the **Boss Dragon Prefab**.
+3. It hands both of these prefabs over to the **Boss Arena Manager** that is sitting in the scene.
+4. The **Boss Arena Manager** hands its *Observation Spline* and *Escape Splines* to the Dragon.
+5. The Dragon uses those scene splines to spawn its Anatomy Prefabs (Head, Body, Tail) and the fight begins!
 
 ---
 
@@ -44,7 +72,30 @@ Triggered when the Dragon finishes the escape route and returns to the Observati
 
 ---
 
-## 3. Code Objectives to Achieve This
+## 3. Encounter Design Pacing (How to build waves in the CSV)
+
+Because the system is driven entirely by your `LevelDesign_Template.csv` spreadsheet, you have incredible flexibility in how you pace the arrival of the Boss and its minions.
+
+In your `LevelConfigSO`, you assign your baked Minion prefab to `SplinePathAssetPrefab` and your Boss prefab to `BossDragonPrefab`. Then, in the CSV, you simply trigger them using the Movement Behavior column.
+
+### Scenario A: The Observer (Classic Setup)
+You want the Boss to watch the player struggle against the minions, stepping in only when the minions are failing.
+*   **The CSV:** Create a single Wave (e.g., Wave 1). Add two rows to this wave. Set row 1 to `SplinePathAsset` and row 2 to `BossDragonAsset`.
+*   **The Result:** Both spawn instantly. The Minions begin swarming, and the Boss immediately snaps to the Observation Spline to watch the fight.
+
+### Scenario B: The Surprise Arrival
+You want the player to think they are just fighting a normal wave of geometric shapes. Then, suddenly, a dragon appears!
+*   **The CSV:** Make Wave 1 spawn a `SplinePathAsset`. Set the Wave Progression to `TimeBased` (e.g., 20 seconds). Make Wave 2 spawn the `BossDragonAsset`.
+*   **The Result:** The player fights standard minions for 20 seconds. Then, Wave 2 triggers, the Dragon spawns, snaps to the arena, and realizes the minions are already dying—causing it to immediately engage!
+
+### Scenario C: Dual Boss Reinforcements
+You want to overwhelm the player in the final level.
+*   **The CSV:** Spawn a `BossDragonAsset` in Wave 1. Spawn a *second* `BossDragonAsset` in Wave 2.
+*   **The Result:** Because the `BossArenaManager` handles all participants dynamically, spawning a second dragon will simply add it to the fight. You can have one dragon fighting on the tactical escape routes while the other charges on the observation spline!
+
+---
+
+## 4. Code Objectives to Achieve This
 
 To make this encounter work, our scripts must achieve the following:
 

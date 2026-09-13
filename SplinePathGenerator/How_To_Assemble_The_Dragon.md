@@ -95,7 +95,7 @@ Here is how you actually bring the boss to life during gameplay. This code usual
 
 ```csharp
 // Example Spawning Code
-BossArenaManager arena = FindObjectOfType<BossArenaManager>();
+BossArenaManager arena = FindAnyObjectByType<BossArenaManager>();
 BossCreature spawnedBoss = Instantiate(bossPrefab).GetComponent<BossCreature>();
 
 // Pass the boss and the list of minions to the Arena
