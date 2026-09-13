@@ -96,3 +96,15 @@ follower.SetPercent(0); // Start at the beginning (boss pos)
 ```
 
 The boss will now ride the custom mathematical shape, beginning exactly where it is currently standing, and ending exactly where the player was standing when the attack began.
+
+---
+
+## 4. Advanced Boss Tactics (Environmental Splines)
+
+While standard enemies use the Swarm logic built into the prefabs, advanced bosses can use hand-drawn environmental splines (e.g., escaping by spiraling up a pillar) using the `TacticalBossSplineManager`.
+
+**How to set up a Tactical Boss:**
+1. In your Unity Scene, use the Dreamteck tools to hand-draw splines around your environment (like wrapping around columns or drawing escape routes through the sky).
+2. Attach the `TacticalBossSplineManager` script to your Boss prefab.
+3. In the Inspector for the Boss, drag and drop the `SplineComputer` components you drew in the scene into the `tacticalEscapeRoutes` array.
+4. The Boss will now automatically and smoothly hop between these environmental features during battle to evade the player!

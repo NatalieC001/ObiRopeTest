@@ -64,6 +64,7 @@ It contains:
 1.  **Spline_Curve:** A child object holding the `SplineComputer` (the track).
 2.  **The Enemies:** The tool actually instantiates the enemies and bakes them into the prefab as children! They already have their `SplineFollower` components attached and configured with the speed you requested.
 3.  **PathSpawnInfo:** A sticky note with the rules (just in case the game needs to know how many enemies are inside without counting them).
+4.  **SplineSwarmManager:** A special behavior script that automatically peels small groups of these enemies off the track, dives at the player in an attack run, and smoothly redistributes the survivors back onto the track using DOTween!
 
 ---
 

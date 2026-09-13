@@ -152,6 +152,12 @@ public class SplinePathGeneratorWindow : EditorWindow
         bool isClosed = (currentShape != ShapeType.Spiral);
         previewInfo.isClosed = isClosed;
 
+        // Auto-attach Swarm Manager for standard baked paths
+        if (previewRootObject.GetComponent<SplineSwarmManager>() == null)
+        {
+            previewRootObject.AddComponent<SplineSwarmManager>();
+        }
+
         // Generate points
         SplinePoint[] splinePoints = GeneratePoints();
 
