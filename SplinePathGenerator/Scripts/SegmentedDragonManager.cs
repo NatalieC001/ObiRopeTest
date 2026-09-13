@@ -30,12 +30,14 @@ public class SegmentedDragonManager : MonoBehaviour
 
     // The Dreamteck follower component for the Head. The rest of the body follows this.
     private SplineFollower headFollower;
+    private BossCreature bossBrain;
 
     public void InitializeDragon(SplineComputer track)
     {
         bossSpline = track;
         totalBossPower = 0f;
         activeSegments.Clear();
+        bossBrain = GetComponent<BossCreature>();
 
         // 1. Spawn Head
         SpawnSegment(headPrefab, 0, track);
@@ -70,10 +72,25 @@ public class SegmentedDragonManager : MonoBehaviour
         DragonSegment segment = segmentObj.GetComponent<DragonSegment>();
         if (segment == null) segment = segmentObj.AddComponent<DragonSegment>();
 
-        segment.Initialize(this, index);
+        segment.Initialize(this, bossBrain, index);
         activeSegments.Add(segment);
 
         totalBossPower += segment.powerContribution;
+    }
+
+    /// <summary>
+    /// Updates the target spline for all active segments (e.g. when the boss evades to a new track).
+    /// </summary>
+    public void SwitchToNewSpline(SplineComputer newTrack)
+    {
+        bossSpline = newTrack;
+        foreach (var segment in activeSegments)
+        {
+            if (segment != null && segment.Follower != null)
+            {
+                segment.Follower.spline = newTrack;
+            }
+        }
     }
 
     // Controls whether the Update loop forces rigid spacing. Disabled briefly when closing a gap.
@@ -159,9 +176,24 @@ public class SegmentedDragonManager : MonoBehaviour
     public void OnSegmentDestroyed(DragonSegment destroyedSegment)
     {
         totalBossPower -= destroyedSegment.powerContribution;
+
+        bool wasHead = (activeSegments.IndexOf(destroyedSegment) == 0);
         activeSegments.Remove(destroyedSegment);
 
         Debug.Log($"<color=magenta>[SegmentedDragonManager] A segment fell! Boss power reduced to {totalBossPower}. Closing gap!</color>");
+
+        if (activeSegments.Count == 0)
+        {
+            // The whole dragon is dead!
+            headFollower = null;
+            return;
+        }
+
+        if (wasHead)
+        {
+            // Promote the next body segment in line to be the new lead tracker
+            headFollower = activeSegments[0].Follower;
+        }
 
         // Re-index remaining segments so they know their new place in line
         for (int i = 0; i < activeSegments.Count; i++)

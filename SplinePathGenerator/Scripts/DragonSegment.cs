@@ -15,6 +15,7 @@ public class DragonSegment : MonoBehaviour
     public float powerContribution = 10f;
 
     private SegmentedDragonManager dragonManager;
+    private BossCreature bossBrain;
     private SplineFollower follower;
 
     // The index of this segment in the manager's list (Head = 0)
@@ -26,9 +27,10 @@ public class DragonSegment : MonoBehaviour
         follower = GetComponent<SplineFollower>();
     }
 
-    public void Initialize(SegmentedDragonManager manager, int index)
+    public void Initialize(SegmentedDragonManager manager, BossCreature brain, int index)
     {
         dragonManager = manager;
+        bossBrain = brain;
         SegmentIndex = index;
     }
 
@@ -38,6 +40,12 @@ public class DragonSegment : MonoBehaviour
     public void TakeDamage(float amount, Vector3 hitPoint)
     {
         health -= amount;
+
+        // Pass damage up to the brain so it can trigger evasions!
+        if (bossBrain != null)
+        {
+            bossBrain.TakeDamage(amount, hitPoint);
+        }
 
         Debug.Log($"<color=orange>[DragonSegment] Segment {SegmentIndex} took {amount} damage. Health: {health}</color>");
 

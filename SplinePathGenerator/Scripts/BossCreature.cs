@@ -51,6 +51,13 @@ public class BossCreature : MonoBehaviour
     {
         currentPhase = BossPhase.Orchestrator;
         tacticalManager.InitializeRoutes(arena.observationSpline, arena.tacticalEscapeRoutes);
+
+        // Also ensure the visual dragon body is spawned and attached to the starting track
+        SegmentedDragonManager dragonBody = GetComponent<SegmentedDragonManager>();
+        if (dragonBody != null)
+        {
+            dragonBody.InitializeDragon(arena.observationSpline);
+        }
     }
 
     /// <summary>

@@ -24,11 +24,13 @@ public class TacticalBossSplineManager : MonoBehaviour
     private SplineComputer[] tacticalEscapeRoutes;
 
     private SplineFollower bossFollower;
+    private SegmentedDragonManager bodyManager;
     private Transform playerTransform;
 
     private void Awake()
     {
         bossFollower = GetComponent<SplineFollower>();
+        bodyManager = GetComponent<SegmentedDragonManager>();
     }
 
     private void Start()
@@ -56,6 +58,11 @@ public class TacticalBossSplineManager : MonoBehaviour
             bossFollower.spline = observationSpline;
             bossFollower.SetPercent(0);
             bossFollower.follow = true;
+
+            if (bodyManager != null)
+            {
+                bodyManager.SwitchToNewSpline(observationSpline);
+            }
         }
     }
 
@@ -135,6 +142,12 @@ public class TacticalBossSplineManager : MonoBehaviour
         bossFollower.spline = targetRoute;
         bossFollower.SetPercent(0);
         bossFollower.follow = true;
+
+        // Ensure the visual body segments switch to the new track too!
+        if (bodyManager != null)
+        {
+            bodyManager.SwitchToNewSpline(targetRoute);
+        }
     }
 
     private void OnDestroy()
