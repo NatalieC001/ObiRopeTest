@@ -24,6 +24,9 @@ public class SplineSwarmManager : MonoBehaviour
     private Transform playerTransform;
     private PathSpawnInfo spawnInfo;
     private List<SplineFollower> allEnemies = new List<SplineFollower>();
+    private Dictionary<SplineFollower, int> enemyFormationIndices = new Dictionary<SplineFollower, int>();
+    private SplineFollower virtualAnchor;
+
     private bool isAttacking = false;
 
     private void Start()
@@ -41,8 +44,8 @@ public class SplineSwarmManager : MonoBehaviour
             Debug.LogWarning("[SplineSwarmManager] Player not found! Ensure the XR Origin is tagged 'Player'.");
         }
 
-        // 2. Register all baked enemies
-        RegisterEnemies();
+        // 2. Register all baked enemies and build the Virtual Anchor
+        RegisterEnemiesAndBuildAnchor();
 
         // 3. Start the attack cycle
         if (allEnemies.Count > 0 && playerTransform != null)
@@ -51,17 +54,54 @@ public class SplineSwarmManager : MonoBehaviour
         }
     }
 
-    private void RegisterEnemies()
+    private void RegisterEnemiesAndBuildAnchor()
     {
         allEnemies.Clear();
+        enemyFormationIndices.Clear();
+
         // Assuming this script sits on the root prefab, find all followers in children
         SplineFollower[] followers = GetComponentsInChildren<SplineFollower>();
+
+        int currentIndex = 0;
         foreach (var follower in followers)
         {
-            // Only add them if they are alive (not destroyed)
-            if (follower != null && follower.gameObject != null)
+            // Only add them if they are alive (not destroyed) and not our hidden anchor
+            if (follower != null && follower.gameObject != null && follower.gameObject.name != "Swarm_Virtual_Anchor")
             {
                 allEnemies.Add(follower);
+                enemyFormationIndices[follower] = currentIndex;
+                currentIndex++;
+            }
+        }
+
+        // Create the Virtual Anchor if it doesn't exist
+        if (virtualAnchor == null && allEnemies.Count > 0)
+        {
+            GameObject anchorObj = new GameObject("Swarm_Virtual_Anchor");
+            anchorObj.transform.SetParent(this.transform);
+
+            virtualAnchor = anchorObj.AddComponent<SplineFollower>();
+            virtualAnchor.spline = allEnemies[0].spline;
+            virtualAnchor.wrapMode = SplineFollower.Wrap.Loop;
+
+            // Sync its speed with the swarm
+            virtualAnchor.followSpeed = spawnInfo != null ? spawnInfo.pathMovementSpeed : 5f;
+
+            // The anchor sits exactly at 0% (the front of the formation)
+            virtualAnchor.SetPercent(0);
+            virtualAnchor.follow = true;
+        }
+    }
+
+    private void CleanDeadEnemies()
+    {
+        // Remove nulls but preserve the array structure so indices don't shift!
+        // This is why we don't clear and rebuild the list during combat.
+        for (int i = allEnemies.Count - 1; i >= 0; i--)
+        {
+            if (allEnemies[i] == null || allEnemies[i].gameObject == null)
+            {
+                allEnemies.RemoveAt(i);
             }
         }
     }
@@ -72,8 +112,8 @@ public class SplineSwarmManager : MonoBehaviour
         {
             yield return new WaitForSeconds(attackInterval);
 
-            // Clean list of dead enemies
-            RegisterEnemies();
+            // Clean list of dead enemies without shifting assigned formation indices
+            CleanDeadEnemies();
 
             if (allEnemies.Count > 0 && !isAttacking)
             {
@@ -89,9 +129,6 @@ public class SplineSwarmManager : MonoBehaviour
         // 1. Select the attackers (randomly pick up to 'swarmSize' alive enemies)
         List<SplineFollower> attackers = new List<SplineFollower>();
         List<SplineFollower> available = new List<SplineFollower>(allEnemies);
-
-        // Memory Dictionary to remember where they belong on the track!
-        Dictionary<SplineFollower, double> savedPositions = new Dictionary<SplineFollower, double>();
 
         int actualSwarmSize = Mathf.Min(swarmSize, available.Count);
         for (int i = 0; i < actualSwarmSize; i++)
@@ -109,9 +146,6 @@ public class SplineSwarmManager : MonoBehaviour
         foreach (var attacker in attackers)
         {
             if (attacker == null) continue;
-
-            // Save their exact spot on the track before peeling off
-            savedPositions[attacker] = attacker.GetPercent();
 
             // Turn off Dreamteck following so we can manually control them
             attacker.follow = false;
@@ -137,28 +171,43 @@ public class SplineSwarmManager : MonoBehaviour
         // Wait for the attack to happen and linger for a moment
         yield return new WaitForSeconds(diveDuration);
 
-        // 3. Return surviving attackers exactly to the hole they left
+        // 3. Return surviving attackers exactly to the hole they left in the moving formation
         foreach (var attacker in attackers)
         {
             if (attacker == null || attacker.gameObject == null) continue; // Died during attack
 
-            // Retrieve their saved memory of where they belong
-            double memoryPercent = savedPositions[attacker];
+            // Calculate where their neighborhood hole is CURRENTLY located
+            int myIndex = enemyFormationIndices[attacker];
+            int totalOriginalSwarm = enemyFormationIndices.Count;
 
-            // Calculate where that specific spot currently is in the world
-            SplineSample sample = attacker.spline.Evaluate(memoryPercent);
+            // The step spacing originally used when spawning
+            double percentStep = 1.0 / totalOriginalSwarm;
 
-            // Fly back directly to their saved spot (no shuffling/ghosting through others!)
+            // Add their exact index spacing to the Virtual Anchor's current moving position
+            double currentAnchorPercent = virtualAnchor.GetPercent();
+            double expectedPercent = currentAnchorPercent + (percentStep * myIndex);
+
+            // Wrap around if over 1.0
+            if (expectedPercent > 1.0) expectedPercent -= 1.0;
+
+            // Find where that exact moving spot is in 3D space right now
+            SplineSample sample = virtualAnchor.spline.Evaluate(expectedPercent);
+
+            // Fly directly into that gap!
             attacker.transform.DOMove(sample.position, 2f)
                 .SetEase(Ease.InOutQuad)
                 .SetTarget(attacker.gameObject)
-                .SetLink(attacker.gameObject) // Safely kill tween on destroy
+                .SetLink(attacker.gameObject)
                 .OnComplete(() =>
                 {
                     if (attacker != null)
                     {
-                        // Snap their internal spline tracker to the correct memory percent before resuming
-                        attacker.SetPercent(memoryPercent);
+                        // Re-sync with the anchor's exact offset so they seamlessly rejoin the circling flow
+                        double finalAnchorPercent = virtualAnchor.GetPercent();
+                        double finalExpectedPercent = finalAnchorPercent + (percentStep * myIndex);
+                        if (finalExpectedPercent > 1.0) finalExpectedPercent -= 1.0;
+
+                        attacker.SetPercent(finalExpectedPercent);
                         attacker.follow = true;
                     }
                 });
