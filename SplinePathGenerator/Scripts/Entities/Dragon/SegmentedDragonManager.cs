@@ -12,10 +12,15 @@ public class SegmentedDragonManager : MonoBehaviour
 {
     [Header("Dragon Anatomy Prefabs")]
     public GameObject headPrefab;
+    [Tooltip("Optional: Inserted between Head and Body.")]
+    public GameObject frontLegsPrefab;
     public GameObject bodyPrefab;
+    [Tooltip("Optional: Inserted between Body and Tail.")]
+    public GameObject backLegsPrefab;
     public GameObject tailPrefab;
 
     [Header("Structure")]
+    [Tooltip("How many plain body segments to insert between the legs.")]
     public int numberOfBodySegments = 8;
 
     [Tooltip("The physical distance between each segment along the spline.")]
@@ -39,20 +44,38 @@ public class SegmentedDragonManager : MonoBehaviour
         activeSegments.Clear();
         bossBrain = GetComponent<BossCreature>();
 
-        // 1. Spawn Head
-        SpawnSegment(headPrefab, 0, track);
-        headFollower = activeSegments[0].Follower;
+        int currentIndex = 0;
 
-        // 2. Spawn Body
-        for (int i = 1; i <= numberOfBodySegments; i++)
+        // 1. Spawn Head
+        SpawnSegment(headPrefab, currentIndex, track);
+        headFollower = activeSegments[0].Follower;
+        currentIndex++;
+
+        // 2. Spawn Front Legs (if assigned)
+        if (frontLegsPrefab != null)
         {
-            SpawnSegment(bodyPrefab, i, track);
+            SpawnSegment(frontLegsPrefab, currentIndex, track);
+            currentIndex++;
         }
 
-        // 3. Spawn Tail
-        SpawnSegment(tailPrefab, numberOfBodySegments + 1, track);
+        // 3. Spawn Body
+        for (int i = 0; i < numberOfBodySegments; i++)
+        {
+            SpawnSegment(bodyPrefab, currentIndex, track);
+            currentIndex++;
+        }
 
-        // 4. Force initial positioning
+        // 4. Spawn Back Legs (if assigned)
+        if (backLegsPrefab != null)
+        {
+            SpawnSegment(backLegsPrefab, currentIndex, track);
+            currentIndex++;
+        }
+
+        // 5. Spawn Tail
+        SpawnSegment(tailPrefab, currentIndex, track);
+
+        // 6. Force initial positioning
         UpdateSegmentSpacing(false);
     }
 
@@ -206,5 +229,22 @@ public class SegmentedDragonManager : MonoBehaviour
 
         // Animate the remaining segments forward to close the gap left by the missing piece
         UpdateSegmentSpacing(true);
+    }
+
+    /// <summary>
+    /// Called by BossCreature when the overall health reaches 0.
+    /// Commands all remaining permanent pieces (Head, Legs, Tail) to die.
+    /// </summary>
+    public void TriggerTotalDeath()
+    {
+        Debug.Log("<color=red>[SegmentedDragonManager] The entire dragon is collapsing!</color>");
+        foreach (var segment in activeSegments)
+        {
+            if (segment != null)
+            {
+                segment.TriggerTotalDeath();
+            }
+        }
+        activeSegments.Clear();
     }
 }

@@ -158,7 +158,14 @@ public class BossCreature : MonoBehaviour
         // Stop movement
         tacticalManager.enabled = false;
 
-        // Add death animations/dissolves here
+        // Command all indestructible pieces (Head, Legs, Tail) to dissolve
+        SegmentedDragonManager dragonBody = GetComponent<SegmentedDragonManager>();
+        if (dragonBody != null)
+        {
+            dragonBody.TriggerTotalDeath();
+        }
+
+        // Clean up the main boss entity
         Destroy(gameObject, 1f);
     }
 }

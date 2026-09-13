@@ -9,6 +9,9 @@ using Dreamteck.Splines;
 public class DragonSegment : MonoBehaviour
 {
     [Header("Segment Stats")]
+    [Tooltip("Can this individual piece be destroyed mid-fight? (Check True for body segments, False for Head/Legs/Tail).")]
+    public bool isDestructiblePart = true;
+
     public float health = 100f;
 
     [Tooltip("The amount of power/energy this specific segment contributes to the boss's total power.")]
@@ -45,19 +48,26 @@ public class DragonSegment : MonoBehaviour
     /// </summary>
     public void TakeDamage(float amount, Vector3 hitPoint)
     {
-        health -= amount;
-
-        // Pass damage up to the brain so it can trigger evasions!
+        // Pass damage up to the brain so the overall boss loses health and can trigger evasions!
         if (bossBrain != null)
         {
             bossBrain.TakeDamage(amount, hitPoint);
         }
 
-        Debug.Log($"<color=orange>[DragonSegment] Segment {SegmentIndex} took {amount} damage. Health: {health}</color>");
-
-        if (health <= 0)
+        // Only track local destruction if this is a breakable middle piece
+        if (isDestructiblePart)
         {
-            Die();
+            health -= amount;
+            Debug.Log($"<color=orange>[DragonSegment] Body Segment {SegmentIndex} took {amount} damage. Local Health: {health}</color>");
+
+            if (health <= 0)
+            {
+                Die();
+            }
+        }
+        else
+        {
+            Debug.Log($"<color=yellow>[DragonSegment] Permanent piece {SegmentIndex} hit! Relayed {amount} damage to Boss Brain.</color>");
         }
     }
 
@@ -71,7 +81,7 @@ public class DragonSegment : MonoBehaviour
             segmentCollider.enabled = false;
         }
 
-        // Notify the brain that this piece is gone so it can close the gap
+        // Notify the body manager that this piece is gone so it can close the gap
         if (dragonManager != null)
         {
             dragonManager.OnSegmentDestroyed(this);
@@ -79,6 +89,22 @@ public class DragonSegment : MonoBehaviour
 
         // Note: Actual dissolve visual effects are handled by DissolveEffect.cs
         // acting on the segmentRenderer. We just destroy the root object.
+        Destroy(gameObject);
+    }
+
+    /// <summary>
+    /// Called by the SegmentedDragonManager when the entire boss is defeated.
+    /// Forces permanent pieces (Head, Legs, Tail) to finally dissolve.
+    /// </summary>
+    public void TriggerTotalDeath()
+    {
+        if (segmentCollider != null)
+        {
+            segmentCollider.enabled = false;
+        }
+
+        // You can trigger the DissolveEffect.cs directly here if you have a reference to it,
+        // otherwise Destroy(gameObject) will clean it up.
         Destroy(gameObject);
     }
 }

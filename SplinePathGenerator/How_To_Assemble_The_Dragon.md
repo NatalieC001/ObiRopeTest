@@ -31,10 +31,15 @@ Now we add the replaceable parts as children to the Root.
 
 *Why do we do this?* Tomorrow, when your artist gives you a 3D Dragon model, you just delete the "Mesh_Visual" cube, drop the 3D model in as a child, and resize the "Collider_Node". You don't have to touch a single script!
 
-### Step 3: Save the Prefabs
+### Step 3: Configure Destructibility
+It would be very gory (and mechanically broken) if the player could destroy the Dragon's Head or Legs while the body was still alive! We want players to shoot the body segments to shrink the dragon's power, but we want the Head, Legs, and Tail to be permanent until the final boss dies.
+1. On your **"Dragon_Body"** prefab, ensure the `Is Destructible Part` checkbox on the `DragonSegment` script is **Checked (True)**.
+2. For your Head, Legs, and Tail prefabs, you must **Uncheck (False)** this box. When the player shoots the head, the damage will still hurt the overall Boss Health Bar, but the Head itself won't be destroyed mid-fight!
+
+### Step 4: Save the Prefabs
 1. Drag the **"Dragon_Body"** root object from your Hierarchy down into `Assets/SplinePathGenerator/Scripts/Entities/Dragon/Prefabs` to save it as a **Prefab**.
 2. Delete it from the scene.
-3. Repeat this process (or duplicate the prefab and change the names/sizes) to create a **"Dragon_Head"** prefab and a **"Dragon_Tail"** prefab.
+3. Repeat this process to create your **"Dragon_Head"**, **"Dragon_FrontLegs"**, **"Dragon_BackLegs"**, and **"Dragon_Tail"** prefabs (Remembering to uncheck `Is Destructible Part` for these!).
 
 ---
 
@@ -46,13 +51,61 @@ Now we will create the "Brain" and "Skeleton" that controls the pieces we just m
 2. **The Brain:** Click `Add Component` and add **`BossCreature`**.
    * *Note: This will automatically attach the `TacticalBossSplineManager` for you!*
 3. **The Skeleton:** Click `Add Component` and add **`SegmentedDragonManager`**.
-4. Look at the `SegmentedDragonManager` in the Inspector. You will see three empty slots for the anatomy:
+4. Look at the `SegmentedDragonManager` in the Inspector. You will see slots for the anatomy:
    * Drag your **Dragon_Head** prefab into the `Head Prefab` slot.
+   * Drag your **Dragon_FrontLegs** prefab into the `Front Legs Prefab` slot.
    * Drag your **Dragon_Body** prefab into the `Body Prefab` slot.
+   * Drag your **Dragon_BackLegs** prefab into the `Back Legs Prefab` slot.
    * Drag your **Dragon_Tail** prefab into the `Tail Prefab` slot.
-5. Set `Number Of Body Segments` to something fun (like `8`).
+5. Set `Number Of Body Segments` to something fun (like `8`). This dictates how many standard body pieces exist *between* the front and back legs.
 6. Set `Segment Spacing` to control how far apart the cubes float (e.g., `1.5`).
 7. **Save the Boss:** Drag the "Boss_AsianDragon" object down into your `Entities/Dragon/Prefabs` folder to save the complete boss asset!
+8. Delete it from the scene (it should only exist as a prefab waiting to be spawned).
+
+---
+
+## Phase 3: Setting Up The Boss Arena (The Scene Environment)
+
+Because the Boss is saved as a Prefab in your project folder, it **cannot** save direct references to objects that exist in your specific level (like a pillar to wrap around). We use a Scene Manager to hold these environment pieces.
+
+1. Open your Boss Level scene.
+2. Right-click the Hierarchy and choose **Create Empty**. Name it **"BossArenaManager"**.
+3. Add the **`BossArenaManager`** script to this object.
+4. **Draw the Observation Spline:**
+   * Create an Empty GameObject and name it **"Observation_Spline"**.
+   * Add a `SplineComputer` component to it and draw a circular path high in the sky. (This is where the boss waits/charges during Phase 1).
+5. **Draw the Escape Routes:**
+   * *Important Rule:* In Dreamteck, **One SplineComputer = One Track**. To have multiple escape routes, you need multiple objects!
+   * Create an Empty GameObject, name it **"Escape_Route_1"**, add a `SplineComputer`, and draw a path wrapping around a pillar.
+   * Create another Empty GameObject, name it **"Escape_Route_2"**, add a `SplineComputer`, and draw a path diving through a cloud.
+6. **Wire it to the Arena Manager:**
+   * Click on your **"BossArenaManager"**.
+   * Drag the "Observation_Spline" object into the `Observation Spline` slot.
+   * Drag your "Escape_Route_1" and "Escape_Route_2" objects into the `Tactical Escape Routes` array.
+
+---
+
+## Phase 4: Spawning the Encounter (The Lifecycle)
+
+Here is how you actually bring the boss to life during gameplay. This code usually lives in a Wave Manager or Level Controller:
+
+1. **Instantiate the Boss:** Your script spawns the `Boss_AsianDragon` prefab.
+2. **Instantiate the Minions:** Your script spawns a swarm of minion prefabs.
+3. **Register the Battle:** This is the most critical step! Your script must find the `BossArenaManager` in the scene and pass it the newly spawned entities.
+
+```csharp
+// Example Spawning Code
+BossArenaManager arena = FindObjectOfType<BossArenaManager>();
+BossCreature spawnedBoss = Instantiate(bossPrefab).GetComponent<BossCreature>();
+
+// Pass the boss and the list of minions to the Arena
+arena.RegisterBattleParticipants(spawnedBoss, activeMinionList);
+```
+
+As soon as `RegisterBattleParticipants` is called:
+1. The Boss retrieves the environmental splines from the Arena.
+2. The Boss tells the `SegmentedDragonManager` to spawn the visual Head, Body, Legs, and Tail.
+3. The Boss instantly snaps to the `Observation_Spline` and begins Phase 1 (Orchestrating)!
 
 ---
 
