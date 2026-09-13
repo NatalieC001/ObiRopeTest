@@ -30,7 +30,8 @@ public enum TargetMovementType
     PingPongMovement,
     Rotator,
     SwoopAndRetreatMovement,
-    SplinePathAsset // Used when the target is actually a massive, pre-baked Spline Prefab with its own enemies.
+    SplinePathAsset, // Used for standard baked Swarm prefabs
+    BossDragonAsset  // Used specifically to trigger the Boss Dragon encounter
 }
 
 /// <summary>

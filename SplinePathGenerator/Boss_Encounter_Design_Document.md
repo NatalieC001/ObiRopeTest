@@ -31,10 +31,16 @@ Triggered when the player destroys a significant portion of the minions (e.g., 7
 *   **Player Strategy:** The player must frantically dodge/block the massive dragon sweeping over the watchtower while firing arrows into its vulnerable underbelly.
 
 ### Phase 3: Exhaustion & Evasion (Vulnerability)
-Triggered when the Boss runs out of Stamina from attacking.
-*   **Boss Action:** The Dragon breaks off the attack. It uses the `TacticalBossSplineManager` to desperately slither through environmental escape routes (wrapping around pillars, diving through clouds) to avoid player fire.
-*   **The Goal:** The Dragon is trying to make it back to the Crystal Spline to restart Phase 1 and recharge.
-*   **Player Strategy:** *This is the critical damage window.* The Dragon is exhausted and unshielded. The player must use specific **Elemental Arrows** to counter the Dragon's elemental type as it flees through the environment, wearing its massive health pool down.
+Triggered when the Boss runs out of Stamina from attacking (or takes massive burst damage mid-fight).
+*   **Boss Action:** The Dragon breaks off the attack. It uses the `TacticalBossSplineManager` to desperately slither through an environmental escape route (wrapping around a pillar, diving through clouds) to avoid player fire.
+*   **The Goal:** The Dragon rides the escape route until it reaches the very end. At the end, it leaps back to the Observation Spline.
+*   **Player Strategy:** *This is the critical damage window.* The Dragon is exhausted and fleeing. The player must use specific **Elemental Arrows** to counter the Dragon's elemental type as it flees through the environment, wearing its massive health pool down.
+
+### Phase 4: Recharging
+Triggered when the Dragon finishes the escape route and returns to the Observation Spline.
+*   **Boss Action:** The Dragon slithers along the Observation Spline out of reach. Its Stamina bar begins to fill back up.
+*   **Critical Mechanic:** *The boss regains Stamina, but it NEVER regains Health.* This prevents the fight from stalling infinitely.
+*   **The Loop:** Once Stamina hits 100%, the boss dives back in to re-engage the player (returning to Phase 2).
 
 ---
 

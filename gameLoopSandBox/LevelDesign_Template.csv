@@ -12,3 +12,4 @@ Level3_Boss,Boss incoming!,You survived!,Wave1,TimeBased,20,0,3,10,1,1,Rotator,N
 Level3_Boss,Boss incoming!,You survived!,Wave1,TimeBased,20,4,0,25,3,2,SwoopAndRetreatMovement,Fire
 Level4_Splines,Beautiful Shapes!,Perfect!,Wave1,TimeBased,20,0,0,15,1,0,SplinePathAsset,Normal
 Level4_Splines,Beautiful Shapes!,Perfect!,Wave2,ClearAllTargets,0,0,0,15,1,1,SplinePathAsset,Normal
+Level5_Dragon,The Dragon Awakens!,You slayed it!,Wave1,ClearAllTargets,0,0,0,10,1,1,BossDragonAsset,Normal

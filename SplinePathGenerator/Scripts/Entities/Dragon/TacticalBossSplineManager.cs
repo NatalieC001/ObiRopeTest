@@ -67,13 +67,14 @@ public class TacticalBossSplineManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Begins the Phase 2 combat hopping sequence.
+    /// Begins the Phase 3 evasion sequence. Hops to an escape route and rides it to the end.
     /// </summary>
     public void StartEvasionRoutine()
     {
         if (tacticalEscapeRoutes != null && tacticalEscapeRoutes.Length > 0)
         {
-            StartCoroutine(TacticalRoutine());
+            StopAllCoroutines();
+            StartCoroutine(EvasionAndRechargeRoutine());
         }
         else
         {
@@ -81,72 +82,72 @@ public class TacticalBossSplineManager : MonoBehaviour
         }
     }
 
-    private IEnumerator TacticalRoutine()
-    {
-        while (true)
-        {
-            // 1. Ride the current environmental spline
-            yield return new WaitForSeconds(timeOnRoute);
-
-            // 2. Perform a tactical hop to a new escape route
-            yield return StartCoroutine(HopToRandomRouteRoutine());
-
-            // 3. (Optional) Dive attack logic can go here.
-            // For now, it focuses on the tactical evasion around environment pieces.
-        }
-    }
-
     /// <summary>
-    /// Called externally by the BossCreature brain when it feels threatened and needs to evade immediately.
+    /// Called externally by the BossCreature brain when it feels threatened during Phase 2.
+    /// Acts exactly like the exhaustion evasion, but triggered by burst damage.
     /// </summary>
     public void EvadeToEscapeRoute()
     {
-        // Stop the ambient routine and force an immediate hop
-        StopAllCoroutines();
-        StartCoroutine(HopToRandomRouteRoutine());
-
-        // Restart ambient routine after evasion
-        StartCoroutine(RestartRoutineAfterHop());
+        StartEvasionRoutine();
     }
 
-    private IEnumerator RestartRoutineAfterHop()
+    private IEnumerator EvasionAndRechargeRoutine()
     {
-        yield return new WaitForSeconds(hopDuration);
-        StartCoroutine(TacticalRoutine());
-    }
-
-    private IEnumerator HopToRandomRouteRoutine()
-    {
-        if (tacticalEscapeRoutes.Length == 0) yield break;
-
-        // Pick a route we aren't currently on
+        // 1. Pick a random escape route
         SplineComputer targetRoute = tacticalEscapeRoutes[Random.Range(0, tacticalEscapeRoutes.Length)];
         if (targetRoute == bossFollower.spline && tacticalEscapeRoutes.Length > 1)
         {
-            // Simple retry to get a different one
             targetRoute = tacticalEscapeRoutes[(System.Array.IndexOf(tacticalEscapeRoutes, targetRoute) + 1) % tacticalEscapeRoutes.Length];
         }
 
-        // Disable following so we can manually tween to the new track
+        // 2. Disable following and tween through the air to the start of the escape route
         bossFollower.follow = false;
-
-        // Get the starting point of the new route
         SplineSample startSample = targetRoute.Evaluate(0);
 
-        // Smoothly tween the boss to the new environmental spline
         yield return transform.DOMove(startSample.position, hopDuration)
             .SetEase(Ease.InOutQuad)
             .WaitForCompletion();
 
-        // Attach to the new route and resume moving
+        // 3. Attach to the escape route and ride it
         bossFollower.spline = targetRoute;
+        bossFollower.wrapMode = SplineFollower.Wrap.Default; // Crucial: Don't loop, stop at the end!
         bossFollower.SetPercent(0);
         bossFollower.follow = true;
 
-        // Ensure the visual body segments switch to the new track too!
         if (bodyManager != null)
         {
             bodyManager.SwitchToNewSpline(targetRoute);
+        }
+
+        // 4. Wait until the boss reaches the end of the escape route (Percent >= ~0.99)
+        while (bossFollower.GetPercent() < 0.99f)
+        {
+            yield return null;
+        }
+
+        // 5. Finished the escape route! Now tween back to the Observation Spline to recharge
+        bossFollower.follow = false;
+        SplineSample obsStartSample = observationSpline.Evaluate(0);
+
+        yield return transform.DOMove(obsStartSample.position, hopDuration)
+            .SetEase(Ease.InOutQuad)
+            .WaitForCompletion();
+
+        // 6. Attach to observation spline, set to loop, and notify brain
+        bossFollower.spline = observationSpline;
+        bossFollower.wrapMode = SplineFollower.Wrap.Loop;
+        bossFollower.SetPercent(0);
+        bossFollower.follow = true;
+
+        if (bodyManager != null)
+        {
+            bodyManager.SwitchToNewSpline(observationSpline);
+        }
+
+        BossCreature brain = GetComponent<BossCreature>();
+        if (brain != null)
+        {
+            brain.BeginRecharging();
         }
     }
 

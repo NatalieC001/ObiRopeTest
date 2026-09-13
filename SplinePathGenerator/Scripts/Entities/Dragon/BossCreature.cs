@@ -19,7 +19,8 @@ public class BossCreature : MonoBehaviour
     {
         Orchestrator, // Watching minions, charging on Crystal
         Engaged,      // Actively fighting the player
-        Exhausted     // Fleeing through environment to recharge
+        Exhausted,    // Fleeing through environment to recharge
+        Recharging    // Back on Observation spline, regaining stamina
     }
 
     [Header("Battle State")]
@@ -30,6 +31,8 @@ public class BossCreature : MonoBehaviour
     public float maxStamina = 100f;
     [Tooltip("How fast stamina drains while attacking.")]
     public float staminaDrainRate = 10f;
+    [Tooltip("How fast stamina recovers while on the observation spline.")]
+    public float staminaRechargeRate = 15f;
     private float currentStamina;
 
     private TacticalBossSplineManager tacticalManager;
@@ -83,6 +86,17 @@ public class BossCreature : MonoBehaviour
                 EnterExhaustedPhase();
             }
         }
+        else if (currentPhase == BossPhase.Recharging)
+        {
+            // Regain stamina. Note: Health never heals to prevent infinite fights!
+            currentStamina += staminaRechargeRate * Time.deltaTime;
+            if (currentStamina >= maxStamina)
+            {
+                currentStamina = maxStamina;
+                Debug.Log("<color=green>[BossCreature] Stamina full! Diving back in to attack!</color>");
+                EngagePlayer();
+            }
+        }
 
         // Decay the damage accumulator over time so the boss only evades
         // burst damage, not slow, consistent pokes.
@@ -104,6 +118,16 @@ public class BossCreature : MonoBehaviour
 
         // Command the manager to flee through environmental splines
         tacticalManager.StartEvasionRoutine();
+    }
+
+    /// <summary>
+    /// Called by the Tactical Manager when the boss finishes an escape route
+    /// and returns to the observation deck.
+    /// </summary>
+    public void BeginRecharging()
+    {
+        currentPhase = BossPhase.Recharging;
+        Debug.Log("<color=cyan>[BossCreature] Phase 4: Recharging stamina on the observation deck!</color>");
     }
 
     /// <summary>

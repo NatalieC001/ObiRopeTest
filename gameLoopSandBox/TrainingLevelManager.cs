@@ -195,12 +195,6 @@ public class TrainingLevelManager : MonoBehaviour
 
     private void SpawnTarget(TargetSpawnConfig config)
     {
-        if (currentLevelConfig.vanillaTargetPrefab == null)
-        {
-            Debug.LogError("[TrainingLevelManager] Vanilla Target Prefab is not set in LevelConfigSO!");
-            return;
-        }
-
         Vector3 spawnPos = spawnCenter.position + config.spawnPosition;
 
         // VR Constraint: Ensure target never spawns below the ground (Y < 0 relative to center)
@@ -217,6 +211,20 @@ public class TrainingLevelManager : MonoBehaviour
         if (directionToCenter.sqrMagnitude > 0.001f)
         {
             spawnRot = Quaternion.LookRotation(directionToCenter);
+        }
+
+        // Handle Specialized Asset Spawning (Spline Paths / Bosses)
+        if (config.movementBehavior == TargetMovementType.SplinePathAsset || config.movementBehavior == TargetMovementType.BossDragonAsset)
+        {
+            SpawnComplexAsset(config, spawnPos, spawnRot);
+            return;
+        }
+
+        // Standard Vanilla Target Spawning
+        if (currentLevelConfig.vanillaTargetPrefab == null)
+        {
+            Debug.LogError("[TrainingLevelManager] Vanilla Target Prefab is not set in LevelConfigSO!");
+            return;
         }
 
         GameObject newTarget = Instantiate(currentLevelConfig.vanillaTargetPrefab, spawnPos, spawnRot);
@@ -270,6 +278,46 @@ public class TrainingLevelManager : MonoBehaviour
         }
 
         activeTargets.Add(newTarget);
+    }
+
+    /// <summary>
+    /// Handles spawning pre-baked prefabs like Swarms and Bosses, and automatically wires them to the BossArenaManager.
+    /// </summary>
+    private void SpawnComplexAsset(TargetSpawnConfig config, Vector3 spawnPos, Quaternion spawnRot)
+    {
+        GameObject prefabToSpawn = config.movementBehavior == TargetMovementType.BossDragonAsset ? currentLevelConfig.bossDragonPrefab : currentLevelConfig.splinePathAssetPrefab;
+
+        if (prefabToSpawn == null)
+        {
+            Debug.LogError($"[TrainingLevelManager] Missing prefab for {config.movementBehavior} in LevelConfigSO!");
+            return;
+        }
+
+        GameObject complexTarget = Instantiate(prefabToSpawn, spawnPos, spawnRot);
+        activeTargets.Add(complexTarget);
+
+        // If this is the Boss Dragon encounter, we need to wire it up!
+        if (config.movementBehavior == TargetMovementType.BossDragonAsset)
+        {
+            BossArenaManager arenaManager = FindAnyObjectByType<BossArenaManager>();
+            if (arenaManager != null)
+            {
+                BossCreature boss = complexTarget.GetComponent<BossCreature>();
+
+                // For this prototype logic, we just find all StandardCreatures spawned so far this wave
+                List<StandardCreature> minions = new List<StandardCreature>(FindObjectsByType<StandardCreature>(FindObjectsSortMode.None));
+
+                if (boss != null)
+                {
+                    arenaManager.RegisterBattleParticipants(boss, minions);
+                    Debug.Log("[TrainingLevelManager] Successfully registered Boss Dragon with the BossArenaManager!");
+                }
+            }
+            else
+            {
+                Debug.LogError("[TrainingLevelManager] Boss spawned, but no BossArenaManager found in the scene to wire it to!");
+            }
+        }
     }
 
     /// <summary>
