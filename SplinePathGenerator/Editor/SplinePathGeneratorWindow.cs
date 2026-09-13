@@ -246,6 +246,8 @@ public class SplinePathGeneratorWindow : EditorWindow
     {
         List<SplinePoint> pointsList = new List<SplinePoint>();
 
+        // Note: We generate points on the XY plane (vertical) rather than XZ plane (flat).
+        // This ensures the shapes stand perfectly upright, facing the player when spawned.
         switch (currentShape)
         {
             case ShapeType.Star:
@@ -253,7 +255,7 @@ public class SplinePathGeneratorWindow : EditorWindow
                 {
                     float radius = (i % 2 == 0) ? outerRadius : innerRadius;
                     float angle = i * Mathf.PI / points;
-                    Vector3 pos = new Vector3(Mathf.Sin(angle) * radius, 0, Mathf.Cos(angle) * radius);
+                    Vector3 pos = new Vector3(Mathf.Sin(angle) * radius, Mathf.Cos(angle) * radius, 0);
                     pointsList.Add(new SplinePoint(pos));
                 }
                 break;
@@ -262,7 +264,7 @@ public class SplinePathGeneratorWindow : EditorWindow
                 for (int i = 0; i < points; i++)
                 {
                     float angle = i * 2 * Mathf.PI / points;
-                    Vector3 pos = new Vector3(Mathf.Sin(angle) * outerRadius, 0, Mathf.Cos(angle) * outerRadius);
+                    Vector3 pos = new Vector3(Mathf.Sin(angle) * outerRadius, Mathf.Cos(angle) * outerRadius, 0);
                     pointsList.Add(new SplinePoint(pos));
                 }
                 break;
@@ -274,7 +276,7 @@ public class SplinePathGeneratorWindow : EditorWindow
                     float t = i * 2 * Mathf.PI / resolution;
                     float x = Mathf.Sin(t) + 2 * Mathf.Sin(2 * t);
                     float y = Mathf.Cos(t) - 2 * Mathf.Cos(2 * t);
-                    Vector3 pos = new Vector3(x, 0, y) * (outerRadius / 3f);
+                    Vector3 pos = new Vector3(x, y, 0) * (outerRadius / 3f);
                     pointsList.Add(new SplinePoint(pos));
                 }
                 break;
@@ -287,7 +289,7 @@ public class SplinePathGeneratorWindow : EditorWindow
                     float t = i * 2 * Mathf.PI / lissajousSteps;
                     float x = Mathf.Sin(points * t);
                     float y = Mathf.Sin(resolution * t);
-                    Vector3 pos = new Vector3(x, 0, y) * outerRadius;
+                    Vector3 pos = new Vector3(x, y, 0) * outerRadius;
                     pointsList.Add(new SplinePoint(pos));
                 }
                 break;
@@ -300,7 +302,7 @@ public class SplinePathGeneratorWindow : EditorWindow
                     float t = i / (float)(points); // Turns
                     float currentRadius = (t / resolution) * outerRadius;
                     float angle = t * 2 * Mathf.PI;
-                    Vector3 pos = new Vector3(Mathf.Sin(angle) * currentRadius, 0, Mathf.Cos(angle) * currentRadius);
+                    Vector3 pos = new Vector3(Mathf.Sin(angle) * currentRadius, Mathf.Cos(angle) * currentRadius, 0);
                     pointsList.Add(new SplinePoint(pos));
                 }
                 break;
@@ -317,7 +319,7 @@ public class SplinePathGeneratorWindow : EditorWindow
                     float x = (R - r) * Mathf.Cos(t) + d * Mathf.Cos((R - r) / r * t);
                     float y = (R - r) * Mathf.Sin(t) - d * Mathf.Sin((R - r) / r * t);
 
-                    Vector3 pos = new Vector3(x, 0, y);
+                    Vector3 pos = new Vector3(x, y, 0);
                     pointsList.Add(new SplinePoint(pos));
                 }
                 break;
