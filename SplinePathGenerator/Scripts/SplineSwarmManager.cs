@@ -113,7 +113,8 @@ public class SplineSwarmManager : MonoBehaviour
             // Fly to player
             attacker.transform.DOMove(attackTarget, attackDuration * 0.5f)
                 .SetEase(Ease.InOutSine)
-                .SetTarget(attacker.gameObject); // Bind to GameObject in case it dies
+                .SetTarget(attacker.gameObject) // Bind to GameObject in case it dies
+                .SetLink(attacker.gameObject);  // Safely kill tween on destroy
         }
 
         // Wait for the attack to happen
@@ -131,6 +132,7 @@ public class SplineSwarmManager : MonoBehaviour
             attacker.transform.DOMove(sample.position, 2f)
                 .SetEase(Ease.InOutQuad)
                 .SetTarget(attacker.gameObject)
+                .SetLink(attacker.gameObject) // Safely kill tween on destroy
                 .OnComplete(() =>
                 {
                     if (attacker != null)
@@ -174,7 +176,8 @@ public class SplineSwarmManager : MonoBehaviour
                 }
             })
             .SetEase(Ease.InOutQuad)
-            .SetTarget(survivor.gameObject);
+            .SetTarget(survivor.gameObject)
+            .SetLink(survivor.gameObject); // Safely kill tween on destroy
         }
     }
 

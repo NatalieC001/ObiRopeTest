@@ -17,12 +17,20 @@ public class BossCreature : MonoBehaviour
 
     public enum BossPhase
     {
-        Orchestrator, // Watching minions, taking no action
-        Engaged       // Actively fighting and evading
+        Orchestrator, // Watching minions, charging on Crystal
+        Engaged,      // Actively fighting the player
+        Exhausted     // Fleeing through environment to recharge
     }
 
     [Header("Battle State")]
     public BossPhase currentPhase = BossPhase.Orchestrator;
+
+    [Header("Energy System")]
+    [Tooltip("How much stamina the boss has for attacking before it must retreat.")]
+    public float maxStamina = 100f;
+    [Tooltip("How fast stamina drains while attacking.")]
+    public float staminaDrainRate = 10f;
+    private float currentStamina;
 
     private TacticalBossSplineManager tacticalManager;
     private float recentDamageAccumulator = 0f;
@@ -32,6 +40,7 @@ public class BossCreature : MonoBehaviour
     {
         tacticalManager = GetComponent<TacticalBossSplineManager>();
         currentHealth = maxHealth;
+        currentStamina = maxStamina;
     }
 
     /// <summary>
@@ -45,16 +54,29 @@ public class BossCreature : MonoBehaviour
     }
 
     /// <summary>
-    /// Called by the Arena Manager when all minions are dead.
+    /// Called by the Arena Manager when minions drop below threshold.
     /// </summary>
     public void EngagePlayer()
     {
         currentPhase = BossPhase.Engaged;
-        tacticalManager.StartEvasionRoutine();
+        // In a full implementation, this would point the dragon directly at the watchtower.
+        // For now, it enters the combat state.
+        Debug.Log("<color=magenta>[BossCreature] Phase 2: Dragon attacking player!</color>");
     }
 
     private void Update()
     {
+        // Handle Phase 2 Stamina Drain
+        if (currentPhase == BossPhase.Engaged)
+        {
+            currentStamina -= staminaDrainRate * Time.deltaTime;
+            if (currentStamina <= 0)
+            {
+                currentStamina = 0;
+                EnterExhaustedPhase();
+            }
+        }
+
         // Decay the damage accumulator over time so the boss only evades
         // burst damage, not slow, consistent pokes.
         if (recentDamageAccumulator > 0)
@@ -66,6 +88,15 @@ public class BossCreature : MonoBehaviour
                 damageDecayTimer = 0f;
             }
         }
+    }
+
+    private void EnterExhaustedPhase()
+    {
+        currentPhase = BossPhase.Exhausted;
+        Debug.Log("<color=cyan>[BossCreature] Phase 3: Dragon is exhausted! Fleeing to recharge!</color>");
+
+        // Command the manager to flee through environmental splines
+        tacticalManager.StartEvasionRoutine();
     }
 
     /// <summary>
@@ -89,8 +120,11 @@ public class BossCreature : MonoBehaviour
             EngagePlayer();
         }
 
-        // Tactical Decision Logic: Evaluate if we need to evade
-        EvaluateThreat(amount);
+        // Tactical Decision Logic: Evaluate if we need to evade (only if engaged or exhausted)
+        if (currentPhase != BossPhase.Orchestrator)
+        {
+            EvaluateThreat(amount);
+        }
     }
 
     private void EvaluateThreat(float damageTaken)

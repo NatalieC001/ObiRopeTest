@@ -16,10 +16,16 @@ public class BossArenaManager : MonoBehaviour
     [Tooltip("The splines the boss uses to evade attacks during Phase 2.")]
     public SplineComputer[] tacticalEscapeRoutes;
 
+    [Header("Battle Rules")]
+    [Tooltip("The percentage of minions remaining that triggers the boss to panic and attack (e.g., 0.3 = 30%).")]
+    [Range(0f, 1f)]
+    public float panicEngagementThreshold = 0.3f;
+
     [Header("Battle State")]
     public BossCreature activeBoss;
     public List<StandardCreature> activeMinions = new List<StandardCreature>();
 
+    private int startingMinionCount;
     private bool bossEngaged = false;
 
     private void Update()
@@ -30,8 +36,11 @@ public class BossArenaManager : MonoBehaviour
             // Clean up the minion list (remove dead ones)
             activeMinions.RemoveAll(m => m == null);
 
-            // If all minions are defeated, the boss enters the fight!
-            if (activeMinions.Count == 0)
+            // Calculate remaining percentage
+            float currentPercentage = startingMinionCount > 0 ? (float)activeMinions.Count / startingMinionCount : 0f;
+
+            // If minions drop below the threshold, the boss panics and enters the fight!
+            if (currentPercentage <= panicEngagementThreshold)
             {
                 TriggerBossEngagement();
             }
@@ -45,6 +54,7 @@ public class BossArenaManager : MonoBehaviour
     {
         activeBoss = boss;
         activeMinions = minions;
+        startingMinionCount = activeMinions.Count;
         bossEngaged = false;
 
         // Give the boss the environmental splines from the scene
