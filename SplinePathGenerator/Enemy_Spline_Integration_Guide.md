@@ -99,12 +99,22 @@ The boss will now ride the custom mathematical shape, beginning exactly where it
 
 ---
 
-## 4. Advanced Boss Tactics (Environmental Splines)
+## 4. Understanding Creature Brains (Standard vs. Boss)
 
-While standard enemies use the Swarm logic built into the prefabs, advanced bosses can use hand-drawn environmental splines (e.g., escaping by spiraling up a pillar) using the `TacticalBossSplineManager`.
+To support this new dynamic spline system, we have two distinct "brain" scripts you can put on your enemies:
 
-**How to set up a Tactical Boss:**
+### A. `StandardCreature.cs`
+Use this on your basic grunts (the prefabs you plug into the Path Generator Tool).
+*   It handles basic health and elemental types.
+*   It is designed to be pushed around by the `SplineSwarmManager`.
+
+### B. `BossCreature.cs` (The Tactical Brain)
+Use this on major enemies. A Boss is smart enough to evaluate threats.
+*   It monitors its health. If the player shoots it too fast (burst damage), the Boss gets angry!
+*   It commands the `TacticalBossSplineManager` to execute an evasive maneuver.
+
+**How to set up a Tactical Boss with Environmental Splines:**
 1. In your Unity Scene, use the Dreamteck tools to hand-draw splines around your environment (like wrapping around columns or drawing escape routes through the sky).
-2. Attach the `TacticalBossSplineManager` script to your Boss prefab.
-3. In the Inspector for the Boss, drag and drop the `SplineComputer` components you drew in the scene into the `tacticalEscapeRoutes` array.
-4. The Boss will now automatically and smoothly hop between these environmental features during battle to evade the player!
+2. Attach the `BossCreature.cs` script to your Boss prefab (this will automatically attach the `TacticalBossSplineManager`).
+3. In the Inspector for the Manager, drag and drop the `SplineComputer` components you drew in the scene into the `tacticalEscapeRoutes` array.
+4. During battle, if you shoot the boss too quickly, its brain will trigger `EvadeToEscapeRoute()`, causing it to dynamically hop onto a pillar or escape route to dodge your attacks!

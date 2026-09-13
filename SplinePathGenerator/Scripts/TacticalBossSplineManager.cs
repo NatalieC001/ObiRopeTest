@@ -57,14 +57,33 @@ public class TacticalBossSplineManager : MonoBehaviour
             yield return new WaitForSeconds(timeOnRoute);
 
             // 2. Perform a tactical hop to a new escape route
-            yield return StartCoroutine(HopToRandomRoute());
+            yield return StartCoroutine(HopToRandomRouteRoutine());
 
             // 3. (Optional) Dive attack logic can go here.
             // For now, it focuses on the tactical evasion around environment pieces.
         }
     }
 
-    private IEnumerator HopToRandomRoute()
+    /// <summary>
+    /// Called externally by the BossCreature brain when it feels threatened and needs to evade immediately.
+    /// </summary>
+    public void EvadeToEscapeRoute()
+    {
+        // Stop the ambient routine and force an immediate hop
+        StopAllCoroutines();
+        StartCoroutine(HopToRandomRouteRoutine());
+
+        // Restart ambient routine after evasion
+        StartCoroutine(RestartRoutineAfterHop());
+    }
+
+    private IEnumerator RestartRoutineAfterHop()
+    {
+        yield return new WaitForSeconds(hopDuration);
+        StartCoroutine(TacticalRoutine());
+    }
+
+    private IEnumerator HopToRandomRouteRoutine()
     {
         if (tacticalEscapeRoutes.Length == 0) yield break;
 
