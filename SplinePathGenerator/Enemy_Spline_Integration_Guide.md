@@ -101,6 +101,19 @@ The boss will now ride the custom mathematical shape, beginning exactly where it
 
 ## 4. Understanding Creature Brains (Standard vs. Boss)
 
+To support this new dynamic spline system (and lay the groundwork for future NavMesh or Hybrid enemy types), the code is organized into distinct **Entities**.
+
+## Folder Structure
+All entity logic is cleanly separated in `SplinePathGenerator/Scripts/Entities/`:
+*   `/Minions/`: Contains simple grunt logic and Swarm behaviors.
+*   `/Dragon/`: Contains advanced boss logic, anatomy managers, and tactical evasion.
+
+As you add new types of enemies (e.g., NavMesh Walkers), simply create a new folder under `Entities/` to hold their specific brains and movement managers.
+
+---
+
+## 5. Understanding Creature Brains (Standard vs. Boss)
+
 To support this new dynamic spline system, we have two distinct "brain" scripts you can put on your enemies:
 
 ### A. `StandardCreature.cs`
@@ -114,7 +127,7 @@ Use this on major enemies. A Boss is smart enough to evaluate threats.
 *   It commands the `TacticalBossSplineManager` to execute an evasive maneuver.
 
 **How to set up a Tactical Boss with Environmental Splines:**
-1. Create an empty GameObject in your Boss Scene and attach the `BossArenaManager.cs` script.
+1. Open the Boss Scene. Create an empty GameObject and attach the `BossArenaManager.cs` script.
 2. Hand-draw splines around your environment (like wrapping around columns or an observation deck out of reach) using Dreamteck tools.
 3. Drag those splines from the scene into the `observationSpline` and `tacticalEscapeRoutes` slots on your new `BossArenaManager`.
 4. When your wave spawner creates the Boss and its minions, ensure it passes them to `BossArenaManager.RegisterBattleParticipants()`.

@@ -17,7 +17,7 @@ Before we can build the whole dragon, we need to make the individual pieces: the
    * Set the Health (e.g., `100`).
    * Set the Power Contribution (e.g., `10`).
 4. **The Visual Effects:** Click `Add Component` and search for **`DissolveEffect`**. (This existing project script will make the segment burn away smoothly when destroyed).
-5. Drag the **"Dragon_Body"** object from your Hierarchy down into your Project folder to save it as a **Prefab**.
+5. Drag the **"Dragon_Body"** object from your Hierarchy down into `Assets/SplinePathGenerator/Scripts/Entities/Dragon/Prefabs` to save it as a **Prefab**.
 6. Delete the cube from the scene.
 
 ### Step 2: Create the Head and Tail
@@ -40,6 +40,7 @@ Now we will create the "Brain" and "Skeleton" that controls the pieces we just m
    * Drag your **Dragon_Tail** prefab into the `Tail Prefab` slot.
 5. Set `Number Of Body Segments` to something fun (like `8`).
 6. Set `Segment Spacing` to control how far apart the cubes float (e.g., `1.5`).
+7. **Save the Boss:** Drag the "Boss_AsianDragon" object down into your `Entities/Dragon/Prefabs` folder to save the complete boss asset!
 
 ---
 
