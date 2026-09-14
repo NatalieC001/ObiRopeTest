@@ -37,6 +37,16 @@ public class SegmentedDragonManager : MonoBehaviour
     private SplineFollower headFollower;
     private BossCreature bossBrain;
 
+    // --- BREADCRUMB SLITHERING SYSTEM ---
+    private struct PositionData
+    {
+        public Vector3 position;
+        public Quaternion rotation;
+        public float distanceTraveled; // Total distance head had traveled when recording this
+    }
+    private List<PositionData> positionHistory = new List<PositionData>();
+    private float headTotalDistance = 0f;
+
     public void InitializeDragon(SplineComputer track)
     {
         bossSpline = track;
@@ -49,7 +59,15 @@ public class SegmentedDragonManager : MonoBehaviour
         // 1. Spawn Head
         SpawnSegment(headPrefab, currentIndex, track);
         headFollower = activeSegments[0].Follower;
+        headFollower.follow = true; // Only head actively follows the spline!
         currentIndex++;
+
+        // Initialize history with starting position
+        positionHistory.Add(new PositionData {
+            position = headFollower.transform.position,
+            rotation = headFollower.transform.rotation,
+            distanceTraveled = 0f
+        });
 
         // 2. Spawn Front Legs (if assigned)
         if (frontLegsPrefab != null)
@@ -75,8 +93,14 @@ public class SegmentedDragonManager : MonoBehaviour
         // 5. Spawn Tail
         SpawnSegment(tailPrefab, currentIndex, track);
 
-        // 6. Force initial positioning
-        UpdateSegmentSpacing(false, 1f);
+        // Clear follower components from body segments - they will be driven entirely by the History buffer!
+        for (int i = 1; i < activeSegments.Count; i++)
+        {
+            if (activeSegments[i].Follower != null)
+            {
+                activeSegments[i].Follower.enabled = false;
+            }
+        }
     }
 
     private void SpawnSegment(GameObject prefab, int index, SplineComputer track)
@@ -88,9 +112,6 @@ public class SegmentedDragonManager : MonoBehaviour
 
         SplineFollower follower = segmentObj.GetComponent<SplineFollower>();
         if (follower == null) follower = segmentObj.AddComponent<SplineFollower>();
-
-        follower.spline = track;
-        follower.wrapMode = SplineFollower.Wrap.Loop;
 
         DragonSegment segment = segmentObj.GetComponent<DragonSegment>();
         if (segment == null) segment = segmentObj.AddComponent<DragonSegment>();
@@ -107,13 +128,7 @@ public class SegmentedDragonManager : MonoBehaviour
     public void SwitchToNewSpline(SplineComputer newTrack)
     {
         bossSpline = newTrack;
-        foreach (var segment in activeSegments)
-        {
-            if (segment != null && segment.Follower != null)
-            {
-                segment.Follower.spline = newTrack;
-            }
-        }
+        if (headFollower != null) headFollower.spline = newTrack;
     }
 
     // Controls whether the Update loop forces rigid spacing. Disabled briefly when closing a gap.
@@ -121,22 +136,41 @@ public class SegmentedDragonManager : MonoBehaviour
     private float gapCloseTimer = 0f;
     private float gapCloseDuration = 1f;
 
-    // A dictionary to store the start distance offsets of each segment when a gap close begins
-    // Offset is tracked rather than absolute position, so they can dynamically follow the moving head
-    private Dictionary<DragonSegment, float> gapStartOffsets = new Dictionary<DragonSegment, float>();
-    private bool isAirborne = false;
+    // When gap closing, segments blend from an inflated spacing value down to the normal spacing value
+    private Dictionary<DragonSegment, float> currentSpacings = new Dictionary<DragonSegment, float>();
 
-
-    private void Update()
+    private void LateUpdate()
     {
-        if (isAirborne)
-        {
-            // Do nothing, we are being physically dragged by DOTween!
-            return;
-        }
-
         if (activeSegments.Count == 0 || headFollower == null) return;
 
+        // 1. Update the Head's Breadcrumb History
+        Vector3 currentHeadPos = activeSegments[0].transform.position;
+        if (positionHistory.Count == 0) return;
+        PositionData lastData = positionHistory[0]; // newest is at index 0
+
+        float distMovedSinceLastFrame = Vector3.Distance(currentHeadPos, lastData.position);
+
+        // Only record a new breadcrumb if the head has actually moved a tiny bit
+        if (distMovedSinceLastFrame > 0.05f)
+        {
+            headTotalDistance += distMovedSinceLastFrame;
+
+            positionHistory.Insert(0, new PositionData {
+                position = currentHeadPos,
+                rotation = activeSegments[0].transform.rotation,
+                distanceTraveled = headTotalDistance
+            });
+
+            // Prune history buffer so it doesn't grow infinitely.
+            // We only need enough history to cover the tail.
+            float maxNeededHistoryDistance = segmentSpacing * activeSegments.Count * 2f;
+            if (headTotalDistance - positionHistory[positionHistory.Count - 1].distanceTraveled > maxNeededHistoryDistance)
+            {
+                positionHistory.RemoveAt(positionHistory.Count - 1);
+            }
+        }
+
+        // 2. Handle Gap Closing Animation Timers
         if (isClosingGap)
         {
             gapCloseTimer += Time.deltaTime;
@@ -155,85 +189,54 @@ public class SegmentedDragonManager : MonoBehaviour
         }
         else
         {
-            // Keep segments trailing rigidly behind the head based on distance
-            UpdateSegmentSpacing(false, 1f);
+            UpdateSegmentSpacing(false, 1f); // Follow rigidly
         }
     }
 
-    /// <summary>
-    /// Forces all segments behind the head to fall into line.
-    /// If animateSmoothly is true, it blends between their stored start offset and their new target offset.
-    /// </summary>
     private void UpdateSegmentSpacing(bool animateSmoothly, float lerpT)
     {
-        if (activeSegments.Count == 0 || headFollower == null || bossSpline == null) return;
-
-        double totalSplineLength = bossSpline.CalculateLength();
-        double headDistance = totalSplineLength * headFollower.GetPercent();
-
+        // 3. Move the Body Segments along the history buffer
         for (int i = 1; i < activeSegments.Count; i++)
         {
             DragonSegment segment = activeSegments[i];
 
-            // The new required spacing offset behind the head
-            float targetOffset = segmentSpacing * i;
-
-            float currentOffsetToApply = targetOffset;
-
-            // If we are animating, smoothly transition from their old offset to their new offset
-            if (animateSmoothly && gapStartOffsets.ContainsKey(segment))
+            float requiredDistanceBehindHead = segmentSpacing * i;
+            if (animateSmoothly && currentSpacings.ContainsKey(segment))
             {
-                float startOffset = gapStartOffsets[segment];
-                currentOffsetToApply = Mathf.Lerp(startOffset, targetOffset, lerpT);
+                // Smoothly close the gap
+                requiredDistanceBehindHead = Mathf.Lerp(currentSpacings[segment], segmentSpacing * i, lerpT);
             }
 
-            // Apply the offset behind the actively moving head
-            double currentDistance = headDistance - currentOffsetToApply;
+            float targetDistanceInHistory = headTotalDistance - requiredDistanceBehindHead;
 
-            // Handle looping if the target goes below 0 length
-            if (currentDistance < 0)
+            // Find the two breadcrumbs this distance falls between
+            for (int j = 0; j < positionHistory.Count - 1; j++)
             {
-                currentDistance += totalSplineLength;
-            }
+                PositionData newer = positionHistory[j];
+                PositionData older = positionHistory[j + 1];
 
-            segment.Follower.SetPercent(currentDistance / totalSplineLength);
+                if (targetDistanceInHistory <= newer.distanceTraveled && targetDistanceInHistory >= older.distanceTraveled)
+                {
+                    // Interpolate between these two breadcrumbs
+                    float range = newer.distanceTraveled - older.distanceTraveled;
+                    float t = (newer.distanceTraveled - targetDistanceInHistory) / range; // 0 = at newer, 1 = at older
+
+                    segment.transform.position = Vector3.Lerp(newer.position, older.position, t);
+                    segment.transform.rotation = Quaternion.Slerp(newer.rotation, older.rotation, t);
+                    break;
+                }
+            }
         }
     }
 
     public void PauseSplineFollow()
     {
-        isAirborne = true;
-        foreach (var segment in activeSegments)
-        {
-            if (segment.Follower != null) segment.Follower.follow = false;
-        }
+        if (headFollower != null) headFollower.follow = false;
     }
 
     public void ResumeSplineFollow()
     {
-        isAirborne = false;
-        foreach (var segment in activeSegments)
-        {
-            if (segment.Follower != null) segment.Follower.follow = true;
-        }
-    }
-
-    public void ForceAirborneFollow(Vector3 headTargetPos)
-    {
-        // Simple drag follow logic for airborne transitions
-        for (int i = 1; i < activeSegments.Count; i++)
-        {
-            Vector3 targetPos = activeSegments[i-1].transform.position - (activeSegments[i-1].transform.forward * segmentSpacing);
-            activeSegments[i].transform.position = Vector3.Lerp(activeSegments[i].transform.position, targetPos, Time.deltaTime * 10f);
-        }
-    }
-
-    public void OrientSegmentsToTarget(Vector3 lookPos)
-    {
-        if (activeSegments.Count > 0)
-        {
-            activeSegments[0].transform.LookAt(lookPos);
-        }
+        if (headFollower != null) headFollower.follow = true;
     }
 
     /// <summary>
@@ -257,36 +260,31 @@ public class SegmentedDragonManager : MonoBehaviour
 
         if (wasHead)
         {
-            // Promote the next body segment in line to be the new lead tracker
+            // NOTE: Under breadcrumb logic, destroying the literal head is complex.
+            // Normally the head is invincible (`isDestructiblePart = false`).
             headFollower = activeSegments[0].Follower;
+            headFollower.enabled = true;
+            headFollower.follow = true;
         }
 
-        // Re-index remaining segments so they know their new place in line
-        // AND store their current physical offset from the head to use as the starting point for the tween
-        gapStartOffsets.Clear();
-
-        double totalSplineLength = bossSpline.CalculateLength();
-        double headDist = totalSplineLength * headFollower.GetPercent();
-
+        currentSpacings.Clear();
         for (int i = 0; i < activeSegments.Count; i++)
         {
             activeSegments[i].SegmentIndex = i;
 
-            // Calculate how far back this segment currently is from the head
-            double segDist = totalSplineLength * activeSegments[i].Follower.GetPercent();
-
-            // Handle looping seam calculations
-            double offsetDist = headDist - segDist;
-            if (offsetDist < -totalSplineLength / 2) // If segment is near 100% and head is near 0%
+            // Temporarily store how far back they physically are right now
+            float currentDistBehindHead = headTotalDistance;
+            var match = positionHistory.Find(p => Vector3.Distance(p.position, activeSegments[i].transform.position) < 1f);
+            if (match.distanceTraveled > 0)
             {
-                offsetDist += totalSplineLength;
+                currentDistBehindHead = headTotalDistance - match.distanceTraveled;
             }
-            else if (offsetDist > totalSplineLength / 2)
+            else
             {
-                offsetDist -= totalSplineLength;
+                currentDistBehindHead = (i + 1) * segmentSpacing; // Was further back
             }
 
-            gapStartOffsets[activeSegments[i]] = (float)offsetDist;
+            currentSpacings[activeSegments[i]] = currentDistBehindHead;
         }
 
         // Pause standard rigidly-spaced updates and begin the smooth gap close

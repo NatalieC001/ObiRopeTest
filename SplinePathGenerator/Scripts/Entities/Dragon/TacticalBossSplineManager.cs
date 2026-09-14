@@ -27,6 +27,8 @@ public class TacticalBossSplineManager : MonoBehaviour
     private SegmentedDragonManager bodyManager;
     private Transform playerTransform;
 
+    private SplineComputer temporaryBridgeSpline;
+
     private void Awake()
     {
         bossFollower = GetComponent<SplineFollower>();
@@ -95,6 +97,44 @@ public class TacticalBossSplineManager : MonoBehaviour
         StartEvasionRoutine();
     }
 
+    private void GenerateBridgeSpline(Vector3 startPos, Vector3 startForward, Vector3 endPos, Vector3 endForward)
+    {
+        if (temporaryBridgeSpline == null)
+        {
+            GameObject bridgeObj = new GameObject("TemporaryBridgeSpline");
+            temporaryBridgeSpline = bridgeObj.AddComponent<SplineComputer>();
+            temporaryBridgeSpline.space = SplineComputer.Space.World;
+        }
+
+        // Calculate a nice S-curve or arc using bezier tangents
+        float distance = Vector3.Distance(startPos, endPos);
+        float tangentLength = distance * 0.4f; // Adjust for smoother/sharper curves
+
+        SplinePoint[] points = new SplinePoint[2];
+
+        // Start point
+        points[0] = new SplinePoint();
+        points[0].position = startPos;
+        points[0].normal = Vector3.up;
+        points[0].size = 1f;
+        points[0].color = Color.white;
+        points[0].tangent = startPos + (startForward * tangentLength);
+        points[0].tangent2 = startPos - (startForward * tangentLength);
+
+        // End point
+        points[1] = new SplinePoint();
+        points[1].position = endPos;
+        points[1].normal = Vector3.up;
+        points[1].size = 1f;
+        points[1].color = Color.white;
+        points[1].tangent = endPos - (endForward * tangentLength); // Tangent coming into the point
+        points[1].tangent2 = endPos + (endForward * tangentLength);
+
+        temporaryBridgeSpline.SetPoints(points);
+        temporaryBridgeSpline.type = Spline.Type.Bezier;
+        temporaryBridgeSpline.RebuildImmediate();
+    }
+
     private IEnumerator EvasionAndRechargeRoutine()
     {
         // 1. Pick a random escape route
@@ -104,71 +144,71 @@ public class TacticalBossSplineManager : MonoBehaviour
             targetRoute = tacticalEscapeRoutes[(System.Array.IndexOf(tacticalEscapeRoutes, targetRoute) + 1) % tacticalEscapeRoutes.Length];
         }
 
-        // 2. Disable following and tween through the air to the start of the escape route
+        // 2. Generate a bridge from our current position on the observation track to the start of the escape track
+        SplineSample currentSample = bossFollower.spline.Evaluate(bossFollower.GetPercent());
+        SplineSample targetStartSample = targetRoute.Evaluate(0);
+
+        GenerateBridgeSpline(currentSample.position, currentSample.forward, targetStartSample.position, targetStartSample.forward);
+
+        // 3. Mount the bridge and ride it!
         bossFollower.follow = false;
-        SplineSample startSample = targetRoute.Evaluate(0);
-
-        if (bodyManager != null) bodyManager.PauseSplineFollow();
-        if (bodyManager != null) bodyManager.OrientSegmentsToTarget(startSample.position);
-        yield return transform.DOMove(startSample.position, hopDuration)
-            .SetEase(Ease.InOutQuad)
-            .OnUpdate(() => { if (bodyManager != null) bodyManager.ForceAirborneFollow(transform.position); })
-            .WaitForCompletion();
-
-            .SetEase(Ease.InOutQuad)
-            .WaitForCompletion();
-
-        // 3. Attach to the escape route and ride it
-        bossFollower.spline = targetRoute;
-        if (bodyManager != null)
-        {
-            bodyManager.ResumeSplineFollow();
-            bodyManager.SwitchToNewSpline(targetRoute);
-        }
-
+        bossFollower.spline = temporaryBridgeSpline;
+        bossFollower.wrapMode = SplineFollower.Wrap.Default;
         bossFollower.SetPercent(0);
         bossFollower.follow = true;
 
-        if (bodyManager != null)
-        {
-            bodyManager.SwitchToNewSpline(targetRoute);
-        }
+        if (bodyManager != null) bodyManager.SwitchToNewSpline(temporaryBridgeSpline);
 
-        // 4. Wait until the boss reaches the end of the escape route (Percent >= ~0.99)
+        // Wait until we cross the bridge
         while (bossFollower.GetPercent() < 0.99f)
-        if (bodyManager != null) bodyManager.PauseSplineFollow();
-        if (bodyManager != null) bodyManager.OrientSegmentsToTarget(obsStartSample.position);
-        yield return transform.DOMove(obsStartSample.position, hopDuration)
-            .SetEase(Ease.InOutQuad)
-            .OnUpdate(() => { if (bodyManager != null) bodyManager.ForceAirborneFollow(transform.position); })
-            .WaitForCompletion();
-
+        {
             yield return null;
         }
 
-        // 5. Finished the escape route! Now tween back to the Observation Spline to recharge
+        // 4. We arrived at the escape route! Merge seamlessly onto it.
         bossFollower.follow = false;
-        if (bodyManager != null)
+        bossFollower.spline = targetRoute;
+        bossFollower.wrapMode = SplineFollower.Wrap.Default;
+        bossFollower.SetPercent(0);
+        bossFollower.follow = true;
+
+        if (bodyManager != null) bodyManager.SwitchToNewSpline(targetRoute);
+
+        // Wait until the boss reaches the end of the escape route (Percent >= ~0.99)
+        while (bossFollower.GetPercent() < 0.99f)
         {
-            bodyManager.ResumeSplineFollow();
-            bodyManager.SwitchToNewSpline(observationSpline);
+            yield return null;
         }
 
+        // 5. Finished the escape route! Build another bridge back to the Observation deck
+        currentSample = bossFollower.spline.Evaluate(bossFollower.GetPercent());
+        targetStartSample = observationSpline.Evaluate(0);
 
-        yield return transform.DOMove(obsStartSample.position, hopDuration)
-            .SetEase(Ease.InOutQuad)
-            .WaitForCompletion();
+        GenerateBridgeSpline(currentSample.position, currentSample.forward, targetStartSample.position, targetStartSample.forward);
 
-        // 6. Attach to observation spline, set to loop, and notify brain
+        // Mount the return bridge
+        bossFollower.follow = false;
+        bossFollower.spline = temporaryBridgeSpline;
+        bossFollower.wrapMode = SplineFollower.Wrap.Default;
+        bossFollower.SetPercent(0);
+        bossFollower.follow = true;
+
+        if (bodyManager != null) bodyManager.SwitchToNewSpline(temporaryBridgeSpline);
+
+        // Wait until we cross the return bridge
+        while (bossFollower.GetPercent() < 0.99f)
+        {
+            yield return null;
+        }
+
+        // 6. Attach back to observation spline, set to loop, and notify brain
+        bossFollower.follow = false;
         bossFollower.spline = observationSpline;
         bossFollower.wrapMode = SplineFollower.Wrap.Loop;
         bossFollower.SetPercent(0);
         bossFollower.follow = true;
 
-        if (bodyManager != null)
-        {
-            bodyManager.SwitchToNewSpline(observationSpline);
-        }
+        if (bodyManager != null) bodyManager.SwitchToNewSpline(observationSpline);
 
         BossCreature brain = GetComponent<BossCreature>();
         if (brain != null)
@@ -180,5 +220,9 @@ public class TacticalBossSplineManager : MonoBehaviour
     private void OnDestroy()
     {
         transform.DOKill();
+        if (temporaryBridgeSpline != null)
+        {
+            Destroy(temporaryBridgeSpline.gameObject);
+        }
     }
 }
