@@ -30,7 +30,7 @@ public class SplinePathGeneratorWindow : EditorWindow
     private GameObject enemyPrefab;
     private int spawnCount = 1;
     private float pathMovementSpeed = 5f;
-    private float attackDuration = 3f;
+    private float attackWalkTime = 3f;
 
     // --- Preview Object ---
     private GameObject previewRootObject;
@@ -116,7 +116,7 @@ public class SplinePathGeneratorWindow : EditorWindow
         if (spawnCount < 1) spawnCount = 1;
 
         pathMovementSpeed = EditorGUILayout.FloatField("Path Circling Speed", pathMovementSpeed);
-        attackDuration = EditorGUILayout.FloatField("Attack Dive Duration (s)", attackDuration);
+        attackWalkTime = EditorGUILayout.FloatField("Attack Walk Time (s)", attackWalkTime);
 
         if (EditorGUI.EndChangeCheck())
         {
@@ -150,7 +150,7 @@ public class SplinePathGeneratorWindow : EditorWindow
         previewInfo.enemyPrefab = enemyPrefab;
         previewInfo.spawnCount = spawnCount;
         previewInfo.pathMovementSpeed = pathMovementSpeed;
-        previewInfo.attackDuration = attackDuration;
+        previewInfo.attackWalkTime = attackWalkTime;
 
         // Define if it is closed based on shape
         bool isClosed = (currentShape != ShapeType.Spiral);

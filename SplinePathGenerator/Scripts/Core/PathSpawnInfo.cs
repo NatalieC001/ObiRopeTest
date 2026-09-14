@@ -19,8 +19,8 @@ public class PathSpawnInfo : MonoBehaviour
     [Tooltip("How fast the creatures circle around the mathematical shape.")]
     public float pathMovementSpeed = 5f;
 
-    [Tooltip("How long (in seconds) it takes the swarm to dive at the player. Lower is faster.")]
-    public float attackDuration = 3f;
+    [Tooltip("How long (in seconds) it takes to travel from the track to the player during an attack (and back).")]
+    public float attackWalkTime = 3f;
 
     [Header("Path State")]
     [Tooltip("Is this path open (for attack runs) or closed (for ambient loops)?")]

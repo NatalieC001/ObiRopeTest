@@ -139,84 +139,105 @@ public class SplineSwarmManager : MonoBehaviour
             available.RemoveAt(randomIndex);
         }
 
-        // Dynamically grab the dive speed from the baked settings
-        float diveDuration = spawnInfo != null ? spawnInfo.attackDuration : 3f;
+        // Dynamically grab the walk time from the baked settings
+        float walkTime = spawnInfo != null ? spawnInfo.attackWalkTime : 3f;
 
-        // 2. Launch the attack
+        // Start all individual attacker routines
+        int activeAttackers = attackers.Count;
         foreach (var attacker in attackers)
         {
-            if (attacker == null) continue;
-
-            // Turn off Dreamteck following so we can manually control them
-            attacker.follow = false;
-
-            // Calculate the comfortable VR target position
-            Vector3 directionToPlayer = (playerTransform.position - attacker.transform.position).normalized;
-            Vector3 comfortableTargetPos = playerTransform.position - (directionToPlayer * vrComfortDistance);
-
-            // Add a little spherical randomness so they swarm the area rather than clumping in one spot
-            Vector3 randomOffset = Random.insideUnitSphere * 1.5f;
-            comfortableTargetPos += randomOffset;
-
-            // Ensure they don't dive into the floor (VR Constraint)
-            if (comfortableTargetPos.y < 0) comfortableTargetPos.y = 0.5f;
-
-            // Fly to player
-            attacker.transform.DOMove(comfortableTargetPos, diveDuration * 0.5f)
-                .SetEase(Ease.InOutSine)
-                .SetTarget(attacker.gameObject)
-                .SetLink(attacker.gameObject);
+            if (attacker != null)
+            {
+                StartCoroutine(ExecuteIndividualAttackRun(attacker, walkTime, () => { activeAttackers--; }));
+            }
+            else
+            {
+                activeAttackers--;
+            }
         }
 
-        // Wait for the attack to happen and linger for a moment
-        yield return new WaitForSeconds(diveDuration);
-
-        // 3. Return surviving attackers exactly to the hole they left in the moving formation
-        foreach (var attacker in attackers)
+        // Wait until all attackers have completed their round trip or died
+        while (activeAttackers > 0)
         {
-            if (attacker == null || attacker.gameObject == null) continue; // Died during attack
-
-            // Calculate where their neighborhood hole is CURRENTLY located
-            int myIndex = enemyFormationIndices[attacker];
-            int totalOriginalSwarm = enemyFormationIndices.Count;
-
-            // The step spacing originally used when spawning
-            double percentStep = 1.0 / totalOriginalSwarm;
-
-            // Add their exact index spacing to the Virtual Anchor's current moving position
-            double currentAnchorPercent = virtualAnchor.GetPercent();
-            double expectedPercent = currentAnchorPercent + (percentStep * myIndex);
-
-            // Wrap around if over 1.0
-            if (expectedPercent > 1.0) expectedPercent -= 1.0;
-
-            // Find where that exact moving spot is in 3D space right now
-            SplineSample sample = virtualAnchor.spline.Evaluate(expectedPercent);
-
-            // Fly directly into that gap!
-            attacker.transform.DOMove(sample.position, 2f)
-                .SetEase(Ease.InOutQuad)
-                .SetTarget(attacker.gameObject)
-                .SetLink(attacker.gameObject)
-                .OnComplete(() =>
-                {
-                    if (attacker != null)
-                    {
-                        // Re-sync with the anchor's exact offset so they seamlessly rejoin the circling flow
-                        double finalAnchorPercent = virtualAnchor.GetPercent();
-                        double finalExpectedPercent = finalAnchorPercent + (percentStep * myIndex);
-                        if (finalExpectedPercent > 1.0) finalExpectedPercent -= 1.0;
-
-                        attacker.SetPercent(finalExpectedPercent);
-                        attacker.follow = true;
-                    }
-                });
+            yield return null;
         }
-
-        // Wait for return flight
-        yield return new WaitForSeconds(2f);
 
         isAttacking = false;
+    }
+
+    private IEnumerator ExecuteIndividualAttackRun(SplineFollower attacker, float walkTime, System.Action onComplete)
+    {
+        // 1. Calculate target destination near player (VR Comfort Distance)
+        Vector3 directionToPlayer = (playerTransform.position - attacker.transform.position).normalized;
+        Vector3 comfortableTargetPos = playerTransform.position - (directionToPlayer * vrComfortDistance);
+        comfortableTargetPos += Random.insideUnitSphere * 1.5f;
+        if (comfortableTargetPos.y < 0) comfortableTargetPos.y = 0.5f;
+
+        // 2. Detach from spline and fly towards player
+        attacker.follow = false;
+
+        bool reachedPlayer = false;
+        attacker.transform.DOMove(comfortableTargetPos, walkTime)
+            .SetEase(Ease.InOutSine)
+            .SetTarget(attacker.gameObject)
+            .SetLink(attacker.gameObject)
+            .OnComplete(() => reachedPlayer = true);
+
+        // Wait for arrival (or death)
+        while (!reachedPlayer && attacker != null && attacker.gameObject != null)
+        {
+            yield return null;
+        }
+
+        // If it died mid-flight, exit early
+        if (attacker == null || attacker.gameObject == null)
+        {
+            onComplete?.Invoke();
+            yield break;
+        }
+
+        // 3. Immediately begin return journey (Dynamic Homing)
+        // Instead of moving to a static point, we continuously update our target position
+        // to chase our exact designated hole in the moving spline formation.
+        float elapsedTime = 0f;
+        Vector3 startReturnPos = attacker.transform.position;
+
+        int myIndex = enemyFormationIndices[attacker];
+        double percentStep = 1.0 / enemyFormationIndices.Count;
+
+        while (elapsedTime < walkTime && attacker != null && attacker.gameObject != null)
+        {
+            elapsedTime += Time.deltaTime;
+            float t = elapsedTime / walkTime;
+
+            // Ease out quad for smooth slowdown as it approaches the track
+            t = t * (2 - t);
+
+            // Mathematically calculate EXACTLY where our hole is right now on this frame
+            double currentAnchorPercent = virtualAnchor.GetPercent();
+            double expectedPercent = currentAnchorPercent + (percentStep * myIndex);
+            if (expectedPercent > 1.0) expectedPercent -= 1.0;
+
+            SplineSample currentMovingHole = virtualAnchor.spline.Evaluate(expectedPercent);
+
+            // Interpolate position
+            attacker.transform.position = Vector3.Lerp(startReturnPos, currentMovingHole.position, t);
+
+            yield return null;
+        }
+
+        // 4. Snap and re-engage SplineFollower
+        if (attacker != null && attacker.gameObject != null)
+        {
+            double finalAnchorPercent = virtualAnchor.GetPercent();
+            double finalExpectedPercent = finalAnchorPercent + (percentStep * myIndex);
+            if (finalExpectedPercent > 1.0) finalExpectedPercent -= 1.0;
+
+            attacker.SetPercent(finalExpectedPercent);
+            attacker.follow = true;
+        }
+
+        onComplete?.Invoke();
     }
 
     private void OnDestroy()
