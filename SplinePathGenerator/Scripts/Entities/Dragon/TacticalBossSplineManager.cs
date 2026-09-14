@@ -48,6 +48,10 @@ public class TacticalBossSplineManager : MonoBehaviour
     /// </summary>
     public void InitializeRoutes(SplineComputer observation, SplineComputer[] escapes)
     {
+        if (bossFollower == null) bossFollower = GetComponent<SplineFollower>();
+        if (bodyManager == null) bodyManager = GetComponent<SegmentedDragonManager>();
+        if (bossFollower == null) return;
+
         observationSpline = observation;
         tacticalEscapeRoutes = escapes;
 
@@ -104,13 +108,24 @@ public class TacticalBossSplineManager : MonoBehaviour
         bossFollower.follow = false;
         SplineSample startSample = targetRoute.Evaluate(0);
 
+        if (bodyManager != null) bodyManager.PauseSplineFollow();
+        if (bodyManager != null) bodyManager.OrientSegmentsToTarget(startSample.position);
         yield return transform.DOMove(startSample.position, hopDuration)
+            .SetEase(Ease.InOutQuad)
+            .OnUpdate(() => { if (bodyManager != null) bodyManager.ForceAirborneFollow(transform.position); })
+            .WaitForCompletion();
+
             .SetEase(Ease.InOutQuad)
             .WaitForCompletion();
 
         // 3. Attach to the escape route and ride it
         bossFollower.spline = targetRoute;
-        bossFollower.wrapMode = SplineFollower.Wrap.Default; // Crucial: Don't loop, stop at the end!
+        if (bodyManager != null)
+        {
+            bodyManager.ResumeSplineFollow();
+            bodyManager.SwitchToNewSpline(targetRoute);
+        }
+
         bossFollower.SetPercent(0);
         bossFollower.follow = true;
 
@@ -121,13 +136,24 @@ public class TacticalBossSplineManager : MonoBehaviour
 
         // 4. Wait until the boss reaches the end of the escape route (Percent >= ~0.99)
         while (bossFollower.GetPercent() < 0.99f)
-        {
+        if (bodyManager != null) bodyManager.PauseSplineFollow();
+        if (bodyManager != null) bodyManager.OrientSegmentsToTarget(obsStartSample.position);
+        yield return transform.DOMove(obsStartSample.position, hopDuration)
+            .SetEase(Ease.InOutQuad)
+            .OnUpdate(() => { if (bodyManager != null) bodyManager.ForceAirborneFollow(transform.position); })
+            .WaitForCompletion();
+
             yield return null;
         }
 
         // 5. Finished the escape route! Now tween back to the Observation Spline to recharge
         bossFollower.follow = false;
-        SplineSample obsStartSample = observationSpline.Evaluate(0);
+        if (bodyManager != null)
+        {
+            bodyManager.ResumeSplineFollow();
+            bodyManager.SwitchToNewSpline(observationSpline);
+        }
+
 
         yield return transform.DOMove(obsStartSample.position, hopDuration)
             .SetEase(Ease.InOutQuad)

@@ -124,9 +124,17 @@ public class SegmentedDragonManager : MonoBehaviour
     // A dictionary to store the start distance offsets of each segment when a gap close begins
     // Offset is tracked rather than absolute position, so they can dynamically follow the moving head
     private Dictionary<DragonSegment, float> gapStartOffsets = new Dictionary<DragonSegment, float>();
+    private bool isAirborne = false;
+
 
     private void Update()
     {
+        if (isAirborne)
+        {
+            // Do nothing, we are being physically dragged by DOTween!
+            return;
+        }
+
         if (activeSegments.Count == 0 || headFollower == null) return;
 
         if (isClosingGap)
@@ -189,6 +197,42 @@ public class SegmentedDragonManager : MonoBehaviour
             }
 
             segment.Follower.SetPercent(currentDistance / totalSplineLength);
+        }
+    }
+
+    public void PauseSplineFollow()
+    {
+        isAirborne = true;
+        foreach (var segment in activeSegments)
+        {
+            if (segment.Follower != null) segment.Follower.follow = false;
+        }
+    }
+
+    public void ResumeSplineFollow()
+    {
+        isAirborne = false;
+        foreach (var segment in activeSegments)
+        {
+            if (segment.Follower != null) segment.Follower.follow = true;
+        }
+    }
+
+    public void ForceAirborneFollow(Vector3 headTargetPos)
+    {
+        // Simple drag follow logic for airborne transitions
+        for (int i = 1; i < activeSegments.Count; i++)
+        {
+            Vector3 targetPos = activeSegments[i-1].transform.position - (activeSegments[i-1].transform.forward * segmentSpacing);
+            activeSegments[i].transform.position = Vector3.Lerp(activeSegments[i].transform.position, targetPos, Time.deltaTime * 10f);
+        }
+    }
+
+    public void OrientSegmentsToTarget(Vector3 lookPos)
+    {
+        if (activeSegments.Count > 0)
+        {
+            activeSegments[0].transform.LookAt(lookPos);
         }
     }
 
