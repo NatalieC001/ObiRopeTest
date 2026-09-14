@@ -23,6 +23,9 @@ public class DragonSegment : MonoBehaviour
     [Tooltip("Reference to the child collider (useful for disabling physics upon death).")]
     [SerializeField] private Collider segmentCollider;
 
+    [Tooltip("The physics layer this segment will be forced onto so arrows can detect it. Displayed here as a reminder!")]
+    [SerializeField] private string targetLayer = "Enemy";
+
     private SegmentedDragonManager dragonManager;
     private BossCreature bossBrain;
     private SplineFollower follower;
@@ -34,6 +37,23 @@ public class DragonSegment : MonoBehaviour
     private void Awake()
     {
         follower = GetComponent<SplineFollower>();
+
+        // Force the physics layer so arrows detect this segment, even if the dev forgot to set it!
+        int layerIndex = LayerMask.NameToLayer(targetLayer);
+        if (layerIndex != -1)
+        {
+            gameObject.layer = layerIndex;
+
+            // Also explicitly ensure the collider child is on the layer, as that's what physics actually hits
+            if (segmentCollider != null)
+            {
+                segmentCollider.gameObject.layer = layerIndex;
+            }
+        }
+        else
+        {
+            Debug.LogWarning($"[DragonSegment] Layer '{targetLayer}' does not exist in your project settings!");
+        }
     }
 
     public void Initialize(SegmentedDragonManager manager, BossCreature brain, int index)

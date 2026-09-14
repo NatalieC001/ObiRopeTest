@@ -23,10 +23,25 @@ public class StandardCreature : MonoBehaviour
     [Tooltip("If an arrow type isn't listed here, it deals standard 1.0x damage.")]
     public ElementalModifier[] elementalModifiers;
 
+    [Header("Physics & Targeting")]
+    [Tooltip("The physics layer this creature will be forced onto so arrows can detect it. Displayed here as a reminder!")]
+    [SerializeField] private string targetLayer = "Enemy";
+
     private CreatureStatusEffects statusEffects;
 
     private void Awake()
     {
+        // Force the physics layer so arrows detect this creature, even if the dev forgot to set it!
+        int layerIndex = LayerMask.NameToLayer(targetLayer);
+        if (layerIndex != -1)
+        {
+            gameObject.layer = layerIndex;
+        }
+        else
+        {
+            Debug.LogWarning($"[StandardCreature] Layer '{targetLayer}' does not exist in your project settings!");
+        }
+
         // Try to find the status effect component (optional, but recommended)
         statusEffects = GetComponent<CreatureStatusEffects>();
     }
