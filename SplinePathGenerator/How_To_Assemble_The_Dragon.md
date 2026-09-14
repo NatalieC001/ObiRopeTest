@@ -12,31 +12,40 @@ Before we can build the whole dragon, we need to make the individual pieces: the
 
 **CRITICAL ARCHITECTURE RULE:** We *never* put scripts directly on 3D meshes. If you put scripts on a Cube, it is incredibly difficult to swap that Cube out for a real Dragon 3D model later. We always use the **"Empty Root"** pattern.
 
-### The Hierarchical View (What the Prefab Looks Like)
-Before we build it, here is exactly what your hierarchy should look like for every single Dragon Segment (Head, Body, Legs, Tail):
+### The Total Creature Design (How the Boss is Structured)
+Because the dragon is flexible and loops around corners, it cannot be one giant model with one giant collider. Instead, the Dragon is made of two entirely different things that work together:
+
+1. **The Boss Root:** A single, invisible "Manager" object that acts as the brain.
+2. **The Segments:** Dozens of small, individual pieces (a Head, 8 Bodies, 4 Legs, a Tail) that are spawned dynamically by the manager. Each of these tiny pieces has its own collider so the dragon bends realistically around corners!
+
+Here is what the architecture looks like:
 
 ```text
-▼ Dragon_Body (Empty GameObject)  <-- THIS IS THE PREFAB ROOT
+▼ Boss_AsianDragon (Empty GameObject)      <-- THE INVISIBLE BRAIN & MASTER PREFAB
+    |-- BossCreature.cs                    (Monitors total health, elemental weaknesses)
+    |-- CreatureStatusEffects.cs           (Handles being slowed/frozen by ice arrows)
+    |-- TacticalBossSplineManager.cs       (Handles hopping between escape routes)
+    |-- SegmentedDragonManager.cs          (The Factory: It holds the segment prefabs below and spawns them!)
+
+
+▼ Dragon_Body_Segment (Empty GameObject)   <-- THE INDIVIDUAL BODY PIECES (SPAWNED MANY TIMES)
     |-- Rigidbody (Is Kinematic = TRUE)
-    |-- DragonSegment.cs
-    |-- DissolveEffect.cs
-    |-- SplineFollower.cs (Auto-added, leave Spline field blank)
+    |-- DragonSegment.cs                   (Reports local damage back up to the Brain)
+    |-- DissolveEffect.cs                  (Visual burn-away effect)
+    |-- SplineFollower.cs                  (Auto-added)
     |
     ▼ Mesh_Visual (3D Model / Cube)
-        |-- MeshFilter
-        |-- MeshRenderer (Must use a Dissolve Material)
-        |-- (Optional) Spikes_Detail (Another nested 3D Model)
-        |-- (Optional) Armor_Plates (Another nested 3D Model)
+        |-- MeshFilter & MeshRenderer      (Must use a Dissolve Material)
     |
     ▼ Collider_Node (Empty GameObject)
-        |-- BoxCollider (Sized to fit the Mesh_Visual)
+        |-- BoxCollider                    (Sized to fit this specific mesh!)
 ```
 
-### Step 1: Create the Root Object (The Identity)
-1. Right-click in your Hierarchy and choose `Create Empty`. Name it **"Dragon_Body"**.
+### Step 1: Create a Body Segment Prefab
+1. Right-click in your Hierarchy and choose `Create Empty`. Name it **"Dragon_Body_Segment"**.
 2. **The Physics Anchor:** Click `Add Component` and add a **`Rigidbody`**.
    * *Crucial:* Check the box for **`Is Kinematic`**. This ensures the segment can be hit by your game's physical arrows, but gravity won't pull it off the spline track!
-3. **The Brain:** Click `Add Component` and search for **`DragonSegment`**.
+3. **The Sub-Brain:** Click `Add Component` and search for **`DragonSegment`**.
    * Set the Health (e.g., `100`).
    * Set the Power Contribution (e.g., `10`).
 4. **The Visual Effects:** Click `Add Component` and search for **`DissolveEffect`**.
@@ -44,7 +53,7 @@ Before we build it, here is exactly what your hierarchy should look like for eve
 
 ### Step 2: Add the Visuals and Colliders (The Children)
 Now we add the replaceable parts as children to the Root.
-1. Right-click your **"Dragon_Body"** root object and choose `3D Object -> Cube`. Name this child **"Mesh_Visual"**. (You can nest extra details inside this object later!).
+1. Right-click your **"Dragon_Body_Segment"** root object and choose `3D Object -> Cube`. Name this child **"Mesh_Visual"**. (You can nest extra details inside this object later!).
 2. Remove the auto-generated `BoxCollider` from this child (we want the physics on a separate node).
 3. Right-click the Root object again and choose `Create Empty`. Name it **"Collider_Node"**. Add a `BoxCollider` to this and size it to fit the cube.
 4. **Wire it up:** Go back to your Root object. Drag the **"Mesh_Visual"** into the `Target Renderer` slot on your `DissolveEffect` script. Drag the **"Collider_Node"** into the `Segment Collider` slot on your `DragonSegment` script.
@@ -53,11 +62,11 @@ Now we add the replaceable parts as children to the Root.
 
 ### Step 3: Configure Destructibility
 It would be very gory (and mechanically broken) if the player could destroy the Dragon's Head or Legs while the body was still alive! We want players to shoot the body segments to shrink the dragon's power, but we want the Head, Legs, and Tail to be permanent until the final boss dies.
-1. On your **"Dragon_Body"** prefab, ensure the `Is Destructible Part` checkbox on the `DragonSegment` script is **Checked (True)**.
+1. On your **"Dragon_Body_Segment"** prefab, ensure the `Is Destructible Part` checkbox on the `DragonSegment` script is **Checked (True)**.
 2. For your Head, Legs, and Tail prefabs, you must **Uncheck (False)** this box. When the player shoots the head, the damage will still hurt the overall Boss Health Bar, but the Head itself won't be destroyed mid-fight!
 
-### Step 4: Save the Prefabs
-1. Drag the **"Dragon_Body"** root object from your Hierarchy down into `Assets/SplinePathGenerator/Scripts/Entities/Dragon/Prefabs` to save it as a **Prefab**.
+### Step 4: Save the Segment Prefabs
+1. Drag the **"Dragon_Body_Segment"** root object from your Hierarchy down into `Assets/SplinePathGenerator/Scripts/Entities/Dragon/Prefabs` to save it as a **Prefab**.
 2. Delete it from the scene.
 3. Repeat this process to create your **"Dragon_Head"**, **"Dragon_FrontLegs"**, **"Dragon_BackLegs"**, and **"Dragon_Tail"** prefabs (Remembering to uncheck `Is Destructible Part` for these!).
 
@@ -65,22 +74,22 @@ It would be very gory (and mechanically broken) if the player could destroy the 
 
 ## Phase 2: Building the Boss Root (The Manager)
 
-Now we will create the "Brain" and "Skeleton" that controls the pieces we just made.
+Now we will create the invisible "Brain" that controls the pieces we just made.
 
 1. Right-click in the Hierarchy and choose **Create Empty**. Name it **"Boss_AsianDragon"**.
 2. **The Brain:** Click `Add Component` and add **`BossCreature`**.
-   * *Note: This will automatically attach the `TacticalBossSplineManager` for you!*
-3. **The Skeleton:** Click `Add Component` and add **`SegmentedDragonManager`**.
+   * *Note: This will automatically attach the `TacticalBossSplineManager` and `CreatureStatusEffects` for you!*
+3. **The Skeleton Factory:** Click `Add Component` and add **`SegmentedDragonManager`**.
 4. Look at the `SegmentedDragonManager` in the Inspector. You will see slots for the anatomy:
    * Drag your **Dragon_Head** prefab into the `Head Prefab` slot.
    * Drag your **Dragon_FrontLegs** prefab into the `Front Legs Prefab` slot.
-   * Drag your **Dragon_Body** prefab into the `Body Prefab` slot.
+   * Drag your **Dragon_Body_Segment** prefab into the `Body Prefab` slot.
    * Drag your **Dragon_BackLegs** prefab into the `Back Legs Prefab` slot.
    * Drag your **Dragon_Tail** prefab into the `Tail Prefab` slot.
-5. Set `Number Of Body Segments` to something fun (like `8`). This dictates how many standard body pieces exist *between* the front and back legs.
-6. Set `Segment Spacing` to control how far apart the cubes float (e.g., `1.5`).
-7. **Save the Boss:** Drag the "Boss_AsianDragon" object down into your `Entities/Dragon/Prefabs` folder to save the complete boss asset!
-8. Delete it from the scene (it should only exist as a prefab waiting to be spawned).
+5. Set `Number Of Body Segments` to something fun (like `8`). This dictates how many standard body pieces exist *between* the front and back legs. When the boss spawns, the Manager will duplicate this body prefab 8 times to create the full flexible snake.
+6. Set `Segment Spacing` to control how far apart the pieces float (e.g., `1.5`).
+7. **Save the Boss:** Drag the "Boss_AsianDragon" object down into your `Entities/Dragon/Prefabs` folder to save the complete boss master-asset!
+8. Delete it from the scene (it should only exist as a prefab waiting to be spawned by your Level Manager).
 
 ---
 
