@@ -25,7 +25,35 @@ The `TrainingLevelManager` will automatically read these enum strings, grab the 
 
 ---
 
-## 3. Boss Attack Vector Example (Swapping Paths)
+## 3. Debug Setup Guide (Testing the Dragon Instantly)
+
+If you want to test your Boss Dragon immediately without playing through the whole game, follow these exact steps to set up the `Level0_Debug` wave.
+
+### Step 1: Create the Wave Data
+1. In your Unity Project folder, right-click and choose **Create -> Archery Range -> Wave Data**.
+2. Name the new file **"Wave_Debug_Dragon"**.
+3. You do *not* need to add targets to the list here. The CSV handles the spawning instructions!
+
+### Step 2: Create the Level Config
+1. Right-click in your Project folder and choose **Create -> Archery Range -> Level Config**.
+2. Name the new file **"Level_0_Debug"**.
+3. Click on **Level_0_Debug** to open it in the Inspector.
+4. Drag your **Boss_AsianDragon** prefab into the **`Boss Dragon Prefab`** slot.
+5. In the **Waves** list at the bottom, click the **+** button.
+6. Drag your **"Wave_Debug_Dragon"** file into that new slot.
+
+### Step 3: Link to the Level Manager
+1. In your Scene, click on the object that holds your **`TrainingLevelManager`** script.
+2. Find the **Level Playlist** array in the Inspector.
+3. If you want this to be the very first thing that loads, drag your **"Level_0_Debug"** config into **Element 0** at the top of the list.
+
+### Step 4: The CSV Trigger
+Because we added the `Level0_Debug` row to the very top of your `LevelDesign_Template.csv` file, the game now knows exactly what to do.
+When you press **Play**, the Level Manager will read the CSV, see the `BossDragonAsset` tag, grab the Dragon from your `Level_0_Debug` config, and instantly spawn the boss!
+
+---
+
+## 4. Boss Attack Vector Example (Swapping Paths)
 
 You requested a specific flow for a boss using an "Open Path" (like a spiral or wave) for an attack run, starting at the boss and ending at the player.
 
