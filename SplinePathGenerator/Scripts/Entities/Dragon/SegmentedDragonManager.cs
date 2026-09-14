@@ -76,7 +76,7 @@ public class SegmentedDragonManager : MonoBehaviour
         SpawnSegment(tailPrefab, currentIndex, track);
 
         // 6. Force initial positioning
-        UpdateSegmentSpacing(false);
+        UpdateSegmentSpacing(false, 1f);
     }
 
     private void SpawnSegment(GameObject prefab, int index, SplineComputer track)
