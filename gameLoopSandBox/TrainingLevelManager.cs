@@ -305,6 +305,10 @@ public class TrainingLevelManager : MonoBehaviour
                 BossCreature boss = complexTarget.GetComponent<BossCreature>();
 
                 // For this prototype logic, we just find all StandardCreatures spawned so far this wave
+                // We use FindObjectsByType because StandardCreature inherits from MovingTarget.
+
+                // Note: StandardCreature script needs to be attached to spawned minions for them to be found here.
+
                 List<StandardCreature> minions = new List<StandardCreature>(FindObjectsByType<StandardCreature>(FindObjectsSortMode.None));
 
                 if (boss != null)

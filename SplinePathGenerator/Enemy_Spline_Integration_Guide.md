@@ -29,32 +29,29 @@ The `TrainingLevelManager` will automatically read these enum strings, grab the 
 
 If you want to test your Boss Dragon immediately without playing through the whole game, follow these exact steps to set up the `Level0_Debug` wave.
 
-### Step 1: Create the Wave Data
-1. In your Unity Project folder, right-click and choose **Create -> Archery Range -> Wave Data**.
-2. Name the new file **"Wave_Debug_Dragon"**.
-3. You do *not* need to add targets to the list here. The CSV handles the spawning instructions!
+### Step 1: Run the CSV Importer
+The game uses ScriptableObjects for wave data, not the raw CSV file. You must generate them first.
+1. Open your `LevelDesign_Template.csv` and ensure the `Level0_Debug` wave exists at the top (with `BossDragonAsset` in the MovementBehavior column).
+2. In Unity, go to the top menu bar and select **Archery Range -> CSV Level Importer**.
+3. Drag your `LevelDesign_Template.csv` and your Vanilla Target Prefab into the slots.
+4. Click **Generate Levels & Waves**.
+5. Unity will automatically create `Level0_Debug.asset` and `Level0_Debug_Wave1.asset` in your `Assets/Data` folder.
 
-### Step 2: Create the Level Config
-1. Right-click in your Project folder and choose **Create -> Archery Range -> Level Config**.
-2. Name the new file **"Level_0_Debug"**.
-3. Click on **Level_0_Debug** to open it in the Inspector.
-4. Drag your **Boss_AsianDragon** prefab into the **`Boss Dragon Prefab`** slot.
-5. In the **Waves** list at the bottom, click the **+** button.
-6. Drag your **"Wave_Debug_Dragon"** file into that new slot.
+### Step 2: Assign Prefabs to the Generated Config
+1. Click on the newly generated **`Level0_Debug`** asset (inside `Assets/Data/Levels`) to open it in the Inspector.
+2. Drag your **Boss_AsianDragon** prefab into the **`Boss Dragon Prefab`** slot.
 
 ### Step 3: Link to the Level Manager
 1. In your Scene, click on the object that holds your **`TrainingLevelManager`** script.
 2. Find the **Level Playlist** array in the Inspector.
-3. If you want this to be the very first thing that loads, drag your **"Level_0_Debug"** config into **Element 0** at the top of the list.
+3. If you want this to be the very first thing that loads, drag your **`Level0_Debug`** config into **Element 0** at the top of the list.
 
-### Step 4: The CSV Trigger
-Because we added the `Level0_Debug` row to the very top of your `LevelDesign_Template.csv` file, the game now knows exactly what to do.
-When you press **Play**, the Level Manager will read the CSV, see the `BossDragonAsset` tag, grab the Dragon from your `Level_0_Debug` config, and instantly spawn the boss!
+### Step 4: Play the Game
+When you press **Play**, the Level Manager will load your `Level0_Debug` config, see the `BossDragonAsset` movement behavior on the first wave, grab the Dragon prefab, and instantly spawn the boss!
 
 ---
 
 ## 4. Boss Attack Vector Example (Swapping Paths)
-
 You requested a specific flow for a boss using an "Open Path" (like a spiral or wave) for an attack run, starting at the boss and ending at the player.
 
 Here is the exact logic sequence your boss script (e.g., `BossController`) needs to execute when entering attack mode:

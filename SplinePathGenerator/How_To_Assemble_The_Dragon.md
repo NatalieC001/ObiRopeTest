@@ -121,10 +121,10 @@ Here is how you actually bring the boss to life during gameplay without writing 
 1. **Assign your Prefabs:** Open `LevelConfigSO` in your Inspector.
    * Drag your Minion Swarm prefab (created via the Spline Generator) into the `Spline Path Asset Prefab` slot.
    * Drag your **"Boss_AsianDragon"** prefab into the `Boss Dragon Prefab` slot.
-2. **Setup the CSV:** Open your `LevelDesign_Template.csv`.
+2. **Setup the CSV and Run the Importer:** Open your `LevelDesign_Template.csv`.
    * Create a wave row. In the `MovementBehavior` column, type `SplinePathAsset` to spawn your minion swarm.
    * Create a second wave row (or use the same one!). Type `BossDragonAsset` to spawn your dragon.
-3. **The Magic:** When you start the level, the `TrainingLevelManager` reads those strings.
+3. **The Magic:** Run the **Archery Range -> CSV Level Importer** in Unity to generate your data. When you start the level, the `TrainingLevelManager` reads the generated config assets.
    * It instantiates the Boss prefab.
    * It dynamically locates your `BossArenaManager` in the scene.
    * It gathers up all the spawned minions.

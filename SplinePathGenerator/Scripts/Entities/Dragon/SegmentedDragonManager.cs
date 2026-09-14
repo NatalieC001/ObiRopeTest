@@ -118,78 +118,77 @@ public class SegmentedDragonManager : MonoBehaviour
 
     // Controls whether the Update loop forces rigid spacing. Disabled briefly when closing a gap.
     private bool isClosingGap = false;
+    private float gapCloseTimer = 0f;
+    private float gapCloseDuration = 1f;
+
+    // A dictionary to store the start distance offsets of each segment when a gap close begins
+    // Offset is tracked rather than absolute position, so they can dynamically follow the moving head
+    private Dictionary<DragonSegment, float> gapStartOffsets = new Dictionary<DragonSegment, float>();
 
     private void Update()
     {
         if (activeSegments.Count == 0 || headFollower == null) return;
 
-        if (!isClosingGap)
+        if (isClosingGap)
+        {
+            gapCloseTimer += Time.deltaTime;
+            float t = gapCloseTimer / gapCloseDuration;
+
+            // Smoothly ease the interpolation
+            t = Mathf.SmoothStep(0f, 1f, t);
+
+            if (t >= 1f)
+            {
+                t = 1f;
+                isClosingGap = false; // Done closing gap, resume rigid follow
+            }
+
+            UpdateSegmentSpacing(true, t);
+        }
+        else
         {
             // Keep segments trailing rigidly behind the head based on distance
-            UpdateSegmentSpacing(false);
+            UpdateSegmentSpacing(false, 1f);
         }
     }
 
     /// <summary>
     /// Forces all segments behind the head to fall into line.
-    /// Can be instant (every frame) or smoothly tweened (when closing a gap).
+    /// If animateSmoothly is true, it blends between their stored start offset and their new target offset.
     /// </summary>
-    private void UpdateSegmentSpacing(bool animateSmoothly)
+    private void UpdateSegmentSpacing(bool animateSmoothly, float lerpT)
     {
         if (activeSegments.Count == 0 || headFollower == null || bossSpline == null) return;
 
-        // Calculate absolute distance along the spline length
         double totalSplineLength = bossSpline.CalculateLength();
         double headDistance = totalSplineLength * headFollower.GetPercent();
-
-        // If we are animating smoothly, we need to know when the longest animation finishes
-        float longestTweenDuration = 0f;
 
         for (int i = 1; i < activeSegments.Count; i++)
         {
             DragonSegment segment = activeSegments[i];
 
-            // Calculate where this segment should be (spacing * its position in line)
-            double targetDistance = headDistance - (segmentSpacing * i);
+            // The new required spacing offset behind the head
+            float targetOffset = segmentSpacing * i;
+
+            float currentOffsetToApply = targetOffset;
+
+            // If we are animating, smoothly transition from their old offset to their new offset
+            if (animateSmoothly && gapStartOffsets.ContainsKey(segment))
+            {
+                float startOffset = gapStartOffsets[segment];
+                currentOffsetToApply = Mathf.Lerp(startOffset, targetOffset, lerpT);
+            }
+
+            // Apply the offset behind the actively moving head
+            double currentDistance = headDistance - currentOffsetToApply;
 
             // Handle looping if the target goes below 0 length
-            if (targetDistance < 0)
+            if (currentDistance < 0)
             {
-                targetDistance += totalSplineLength;
+                currentDistance += totalSplineLength;
             }
 
-            if (animateSmoothly)
-            {
-                float tweenDuration = 1f;
-                longestTweenDuration = tweenDuration;
-
-                // Smoothly slide them forward to close a gap using DOVirtual
-                double startDist = totalSplineLength * segment.Follower.GetPercent();
-                DOVirtual.Float((float)startDist, (float)targetDistance, tweenDuration, (d) =>
-                {
-                    if (segment != null && segment.Follower != null)
-                    {
-                        // Convert distance back to percentage for Dreamteck 3.0.6 compatibility
-                        segment.Follower.SetPercent(d / totalSplineLength);
-                    }
-                })
-                .SetEase(Ease.InOutQuad)
-                .SetLink(segment.gameObject); // Safely kill tween if segment is destroyed
-            }
-            else
-            {
-                // Instant update for frame-by-frame slithering
-                segment.Follower.SetPercent(targetDistance / totalSplineLength);
-            }
-        }
-
-        // Resume rigid updates after the gap finishes closing
-        if (animateSmoothly)
-        {
-            DOVirtual.DelayedCall(longestTweenDuration, () =>
-            {
-                isClosingGap = false;
-            });
+            segment.Follower.SetPercent(currentDistance / totalSplineLength);
         }
     }
 
@@ -219,16 +218,36 @@ public class SegmentedDragonManager : MonoBehaviour
         }
 
         // Re-index remaining segments so they know their new place in line
+        // AND store their current physical offset from the head to use as the starting point for the tween
+        gapStartOffsets.Clear();
+
+        double totalSplineLength = bossSpline.CalculateLength();
+        double headDist = totalSplineLength * headFollower.GetPercent();
+
         for (int i = 0; i < activeSegments.Count; i++)
         {
             activeSegments[i].SegmentIndex = i;
+
+            // Calculate how far back this segment currently is from the head
+            double segDist = totalSplineLength * activeSegments[i].Follower.GetPercent();
+
+            // Handle looping seam calculations
+            double offsetDist = headDist - segDist;
+            if (offsetDist < -totalSplineLength / 2) // If segment is near 100% and head is near 0%
+            {
+                offsetDist += totalSplineLength;
+            }
+            else if (offsetDist > totalSplineLength / 2)
+            {
+                offsetDist -= totalSplineLength;
+            }
+
+            gapStartOffsets[activeSegments[i]] = (float)offsetDist;
         }
 
-        // Pause standard rigidly-spaced updates
+        // Pause standard rigidly-spaced updates and begin the smooth gap close
         isClosingGap = true;
-
-        // Animate the remaining segments forward to close the gap left by the missing piece
-        UpdateSegmentSpacing(true);
+        gapCloseTimer = 0f;
     }
 
     /// <summary>
