@@ -1,4 +1,5 @@
 LevelName,LevelIntroText,LevelOutroText,WaveName,ProgressionType,WaveDuration,SpawnDelay,PosX,PosZ,ScaleModifier,SpeedModifier,MovementBehavior,RequiredElement
+Level0_Debug,Test the Dragon Boss!,Good luck!,Wave1,ClearAllTargets,0,0,0,10,1,1,BossDragonAsset,Normal
 Level1_Intro,Get your bow ready!,Great job!,Wave1,ClearAllTargets,0,0,0,10,1,1,None,Normal
 Level1_Intro,Get your bow ready!,Great job!,Wave2,ClearAllTargets,0,0,-5,10,1,1,None,Normal
 Level1_Intro,Get your bow ready!,Great job!,Wave2,ClearAllTargets,0,0,5,10,1,1,None,Normal

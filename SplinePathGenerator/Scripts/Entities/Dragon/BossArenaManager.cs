@@ -61,6 +61,23 @@ public class BossArenaManager : MonoBehaviour
         activeBoss.InitializeArena(this);
     }
 
+    /// <summary>
+    /// Exclusively used when a developer drags the Boss prefab into the scene manually for testing.
+    /// It bypasses the minion count logic and instantly starts the fight.
+    /// </summary>
+    public void RegisterStrayBoss(BossCreature boss)
+    {
+        activeBoss = boss;
+        activeMinions = new List<StandardCreature>();
+        startingMinionCount = 0;
+
+        // Give the boss the environmental splines from the scene
+        activeBoss.InitializeArena(this);
+
+        // Because there are no minions to protect it, force it to engage immediately
+        TriggerBossEngagement();
+    }
+
     private void TriggerBossEngagement()
     {
         bossEngaged = true;
