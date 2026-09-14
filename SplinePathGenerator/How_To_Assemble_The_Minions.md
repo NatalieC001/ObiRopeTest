@@ -6,13 +6,35 @@ Here is how you build a standard Minion prefab that is ready to be used by the S
 
 ---
 
+## The Hierarchical View (What the Prefab Looks Like)
+Before we build it, here is exactly what your hierarchy should look like for a generic Minion:
+
+```text
+▼ Minion_Basic (Empty GameObject)  <-- THIS IS THE PREFAB ROOT
+    |-- Rigidbody (Is Kinematic = TRUE)
+    |-- StandardCreature.cs
+    |-- CreatureStatusEffects.cs
+    |-- DissolveEffect.cs
+    |
+    ▼ Mesh_Visual (3D Model / Cube)
+        |-- MeshFilter
+        |-- MeshRenderer (Must use a Dissolve Material)
+        |-- (Optional) Glowing_Eyes (Nested detail)
+        |-- (Optional) Wings (Nested detail)
+    |
+    ▼ Collider_Node (Empty GameObject)
+        |-- BoxCollider (or CapsuleCollider, sized to fit the Mesh_Visual)
+```
+
 ## Step 1: Create the Root Object (The Identity)
 1. Right-click in your Hierarchy and choose **Create Empty**. Name it **"Minion_Basic"**.
 2. **The Physics Anchor:** Click `Add Component` and add a **`Rigidbody`**.
    * *Crucial:* Check the box for **`Is Kinematic`**. This ensures the minion can be hit by your physical arrows, but gravity won't pull it off its spline track!
 3. **The Brain:** Click `Add Component` and search for **`StandardCreature`**.
    * This gives the minion basic health and an Elemental Type.
-4. **The Visual Effects:** Click `Add Component` and search for **`DissolveEffect`**. (This existing project script will make the minion burn away smoothly when destroyed).
+4. **The Status Effects:** Click `Add Component` and search for **`CreatureStatusEffects`**.
+   * This allows the minion to be slowed by Ice/Sticky arrows or frozen by Stasis.
+5. **The Visual Effects:** Click `Add Component` and search for **`DissolveEffect`**. (This existing project script will make the minion burn away smoothly when destroyed).
 
 ## Step 2: Add the Visuals and Colliders (The Children)
 Now we add the replaceable parts as children to the Root.

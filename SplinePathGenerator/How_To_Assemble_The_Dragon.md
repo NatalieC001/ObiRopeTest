@@ -12,6 +12,26 @@ Before we can build the whole dragon, we need to make the individual pieces: the
 
 **CRITICAL ARCHITECTURE RULE:** We *never* put scripts directly on 3D meshes. If you put scripts on a Cube, it is incredibly difficult to swap that Cube out for a real Dragon 3D model later. We always use the **"Empty Root"** pattern.
 
+### The Hierarchical View (What the Prefab Looks Like)
+Before we build it, here is exactly what your hierarchy should look like for every single Dragon Segment (Head, Body, Legs, Tail):
+
+```text
+▼ Dragon_Body (Empty GameObject)  <-- THIS IS THE PREFAB ROOT
+    |-- Rigidbody (Is Kinematic = TRUE)
+    |-- DragonSegment.cs
+    |-- DissolveEffect.cs
+    |-- SplineFollower.cs (Auto-added, leave Spline field blank)
+    |
+    ▼ Mesh_Visual (3D Model / Cube)
+        |-- MeshFilter
+        |-- MeshRenderer (Must use a Dissolve Material)
+        |-- (Optional) Spikes_Detail (Another nested 3D Model)
+        |-- (Optional) Armor_Plates (Another nested 3D Model)
+    |
+    ▼ Collider_Node (Empty GameObject)
+        |-- BoxCollider (Sized to fit the Mesh_Visual)
+```
+
 ### Step 1: Create the Root Object (The Identity)
 1. Right-click in your Hierarchy and choose `Create Empty`. Name it **"Dragon_Body"**.
 2. **The Physics Anchor:** Click `Add Component` and add a **`Rigidbody`**.
@@ -24,10 +44,10 @@ Before we can build the whole dragon, we need to make the individual pieces: the
 
 ### Step 2: Add the Visuals and Colliders (The Children)
 Now we add the replaceable parts as children to the Root.
-1. Right-click your **"Dragon_Body"** root object and choose `3D Object -> Cube`. Name this child **"Mesh_Visual"**.
-2. Remove the `BoxCollider` from this child (we want the physics on a separate node, or managed explicitly).
+1. Right-click your **"Dragon_Body"** root object and choose `3D Object -> Cube`. Name this child **"Mesh_Visual"**. (You can nest extra details inside this object later!).
+2. Remove the auto-generated `BoxCollider` from this child (we want the physics on a separate node).
 3. Right-click the Root object again and choose `Create Empty`. Name it **"Collider_Node"**. Add a `BoxCollider` to this and size it to fit the cube.
-4. **Wire it up:** Go back to your Root object. Drag the **"Mesh_Visual"** into the `Target Renderer` slot on your `DissolveEffect` script. Drag the **"Collider_Node"** into any relevant slots on your scripts.
+4. **Wire it up:** Go back to your Root object. Drag the **"Mesh_Visual"** into the `Target Renderer` slot on your `DissolveEffect` script. Drag the **"Collider_Node"** into the `Segment Collider` slot on your `DragonSegment` script.
 
 *Why do we do this?* Tomorrow, when your artist gives you a 3D Dragon model, you just delete the "Mesh_Visual" cube, drop the 3D model in as a child, and resize the "Collider_Node". You don't have to touch a single script!
 
