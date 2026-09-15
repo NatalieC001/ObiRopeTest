@@ -19,6 +19,16 @@ public class TacticalBossSplineManager : MonoBehaviour
     [Tooltip("How long it takes to smoothly hop from one route to another.")]
     public float hopDuration = 1.5f;
 
+    [Header("Freestyle Flight Settings")]
+    [Tooltip("How fast the dragon flies forward when off a spline.")]
+    public float freestyleFlightSpeed = 20f;
+
+    [Tooltip("How fast the dragon turns/steers when flying in the air.")]
+    public float freestyleTurnSpeed = 3f;
+
+    [Tooltip("When pursuing the player, the dragon will stop steering directly at them and swoop past if it gets this close.")]
+    public float swoopDistance = 15f;
+
     // These are injected at runtime by BossArenaManager to avoid Prefab serialization issues
     private SplineComputer observationSpline;
     private SplineComputer[] tacticalEscapeRoutes;
@@ -114,18 +124,18 @@ public class TacticalBossSplineManager : MonoBehaviour
         float distanceToPlayer = Vector3.Distance(transform.position, target.position);
 
         // Natural momentum: Always fly forward
-        transform.position += transform.forward * 20f * Time.deltaTime;
+        transform.position += transform.forward * freestyleFlightSpeed * Time.deltaTime;
 
         // If we are far away, steer towards the player. If we are too close,
         // maintain current forward momentum to "swoop" past them instead of stalling or turning on a dime!
-        if (distanceToPlayer > 15f)
+        if (distanceToPlayer > swoopDistance)
         {
             Vector3 direction = (target.position - transform.position).normalized;
             if (direction != Vector3.zero)
             {
                 Quaternion lookRot = Quaternion.LookRotation(direction);
                 // Slow rotation gives a wide, natural turning arc
-                transform.rotation = Quaternion.Slerp(transform.rotation, lookRot, Time.deltaTime * 2f);
+                transform.rotation = Quaternion.Slerp(transform.rotation, lookRot, Time.deltaTime * freestyleTurnSpeed * 0.75f);
             }
         }
     }
@@ -142,15 +152,12 @@ public class TacticalBossSplineManager : MonoBehaviour
 
         // 2. Freestyle fly through the air towards the start of the target spline.
         // We do not teleport or rigid-lerp. We use constant forward momentum and steer.
-        float flightSpeed = 25f;
-        float turnSpeed = 3f;
-
         bool hasReachedTarget = false;
 
         while (!hasReachedTarget)
         {
             // Always fly forward continuously to maintain momentum
-            transform.position += transform.forward * flightSpeed * Time.deltaTime;
+            transform.position += transform.forward * freestyleFlightSpeed * Time.deltaTime;
 
             // Calculate direction to the destination
             Vector3 directionToStart = (targetStartSample.position - transform.position).normalized;
@@ -164,7 +171,7 @@ public class TacticalBossSplineManager : MonoBehaviour
                 if (directionToStart != Vector3.zero)
                 {
                     Quaternion lookRot = Quaternion.LookRotation(directionToStart);
-                    transform.rotation = Quaternion.Slerp(transform.rotation, lookRot, Time.deltaTime * turnSpeed);
+                    transform.rotation = Quaternion.Slerp(transform.rotation, lookRot, Time.deltaTime * freestyleTurnSpeed);
                 }
             }
             else
@@ -174,7 +181,7 @@ public class TacticalBossSplineManager : MonoBehaviour
                 if (targetStartSample.forward != Vector3.zero)
                 {
                     Quaternion alignRot = Quaternion.LookRotation(targetStartSample.forward);
-                    transform.rotation = Quaternion.Slerp(transform.rotation, alignRot, Time.deltaTime * turnSpeed * 2f);
+                    transform.rotation = Quaternion.Slerp(transform.rotation, alignRot, Time.deltaTime * freestyleTurnSpeed * 2f);
                 }
 
                 // If we are practically touching the start point, we can latch on!
