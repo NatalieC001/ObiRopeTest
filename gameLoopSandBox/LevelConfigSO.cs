@@ -22,6 +22,12 @@ public class LevelConfigSO : ScriptableObject
     [Tooltip("The prefab to use for spawning targets in this level. Should have a MovingTarget component.")]
     public GameObject vanillaTargetPrefab;
 
+    [Tooltip("The prefab to use when a wave requests a SplinePathAsset (e.g. a baked swarm).")]
+    public GameObject splinePathAssetPrefab;
+
+    [Tooltip("The prefab to use when a wave requests the Boss Dragon.")]
+    public GameObject bossDragonPrefab;
+
     [Header("Wave Progression")]
     [Tooltip("The ordered list of waves that make up this level.")]
     public List<WaveDataSO> waves = new List<WaveDataSO>();

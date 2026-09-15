@@ -1,4 +1,5 @@
 LevelName,LevelIntroText,LevelOutroText,WaveName,ProgressionType,WaveDuration,SpawnDelay,PosX,PosZ,ScaleModifier,SpeedModifier,MovementBehavior,RequiredElement
+Level0_Debug,Test the Dragon Boss!,Good luck!,Wave1,ClearAllTargets,0,0,0,10,1,1,BossDragonAsset,Normal
 Level1_Intro,Get your bow ready!,Great job!,Wave1,ClearAllTargets,0,0,0,10,1,1,None,Normal
 Level1_Intro,Get your bow ready!,Great job!,Wave2,ClearAllTargets,0,0,-5,10,1,1,None,Normal
 Level1_Intro,Get your bow ready!,Great job!,Wave2,ClearAllTargets,0,0,5,10,1,1,None,Normal
@@ -10,3 +11,6 @@ Level2_Gallery,Moving Targets!,Nice shooting!,Wave2,ClearAllTargets,0,2,10,5,1,1
 Level3_Boss,Boss incoming!,You survived!,Wave1,TimeBased,20,0,-3,10,1,1,Rotator,Normal
 Level3_Boss,Boss incoming!,You survived!,Wave1,TimeBased,20,0,3,10,1,1,Rotator,Normal
 Level3_Boss,Boss incoming!,You survived!,Wave1,TimeBased,20,4,0,25,3,2,SwoopAndRetreatMovement,Fire
+Level4_Splines,Beautiful Shapes!,Perfect!,Wave1,TimeBased,20,0,0,15,1,0,SplinePathAsset,Normal
+Level4_Splines,Beautiful Shapes!,Perfect!,Wave2,ClearAllTargets,0,0,0,15,1,1,SplinePathAsset,Normal
+Level5_Dragon,The Dragon Awakens!,You slayed it!,Wave1,ClearAllTargets,0,0,0,10,1,1,BossDragonAsset,Normal

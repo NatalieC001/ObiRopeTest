@@ -137,7 +137,7 @@ public class TrainingLevelManager : MonoBehaviour
         if (levelFeedbackText != null)
         {
             levelFeedbackText.text = $"Level: {currentLevelConfig.levelName}\n{currentLevelConfig.levelIntroText}\n<size=70%>Shoot the Gong to begin!</size>";
-            Debug.Log($"[TrainingLevelManager] Showing Level Intro Text. Waiting infinitely for player to shoot the Gong.");
+            Debug.Log($"[TrainingLevelManager] Showing Level Intro Text. Waiting 3.0s before Wave 1.");
         }
 
         if (currentLevelConfig.waves.Count == 0)
@@ -195,12 +195,6 @@ public class TrainingLevelManager : MonoBehaviour
 
     private void SpawnTarget(TargetSpawnConfig config)
     {
-        if (currentLevelConfig.vanillaTargetPrefab == null)
-        {
-            Debug.LogError("[TrainingLevelManager] Vanilla Target Prefab is not set in LevelConfigSO!");
-            return;
-        }
-
         Vector3 spawnPos = spawnCenter.position + config.spawnPosition;
 
         // VR Constraint: Ensure target never spawns below the ground (Y < 0 relative to center)
@@ -219,6 +213,20 @@ public class TrainingLevelManager : MonoBehaviour
             spawnRot = Quaternion.LookRotation(directionToCenter);
         }
 
+        // Handle Specialized Asset Spawning (Spline Paths / Bosses)
+        if (config.movementBehavior == TargetMovementType.SplinePathAsset || config.movementBehavior == TargetMovementType.BossDragonAsset)
+        {
+            SpawnComplexAsset(config, spawnPos, spawnRot);
+            return;
+        }
+
+        // Standard Vanilla Target Spawning
+        if (currentLevelConfig.vanillaTargetPrefab == null)
+        {
+            Debug.LogError("[TrainingLevelManager] Vanilla Target Prefab is not set in LevelConfigSO!");
+            return;
+        }
+
         GameObject newTarget = Instantiate(currentLevelConfig.vanillaTargetPrefab, spawnPos, spawnRot);
 
         // 1. Apply global and local scaling
@@ -226,31 +234,15 @@ public class TrainingLevelManager : MonoBehaviour
         if (finalScale <= 0) finalScale = 1.0f; // Prevent scale 0
         newTarget.transform.localScale = Vector3.one * finalScale;
 
-        // 2. Apply setup to all MovingTarget components, including those nested in Spline Prefabs.
-        MovingTarget[] movingTargets = newTarget.GetComponentsInChildren<MovingTarget>(false);
-        if (movingTargets.Length > 0)
+        // 2. Try to setup the MovingTarget component (Color requirement)
+        MovingTarget movingTarget = newTarget.GetComponent<MovingTarget>();
+        if (movingTarget != null)
         {
-            foreach (var target in movingTargets)
-            {
-                target.SetRequiredElement(config.requiredArrowElement);
-                // The manager tracks actual destructible targets instead of the root prefab
-                // so that it accurately knows when all targets in a spline group are destroyed.
-                activeTargets.Add(target.gameObject);
-            }
-            Debug.Log($"[TrainingLevelManager] Spawned {movingTargets.Length} targets on prefab. Need Element: {config.requiredArrowElement}");
-        }
-        else
-        {
-            Debug.LogWarning("[TrainingLevelManager] Spawned prefab has no MovingTarget components! Tracking root object instead.");
-            activeTargets.Add(newTarget);
+            movingTarget.SetRequiredElement(config.requiredArrowElement);
+            Debug.Log($"[TrainingLevelManager] Target spawned. Needs Element: {config.requiredArrowElement}");
         }
 
-        // 3. Clean up the root object if all of its children are destroyed (crucial for Spline targets)
-        // We add an invisible cleanup script to the root object.
-        var cleaner = newTarget.AddComponent<RootObjectCleaner>();
-        cleaner.Initialize(movingTargets);
-
-        // 4. Dynamically add movement script (Searching across all assemblies for .asmdef support)
+        // 3. Dynamically add movement script (Searching across all assemblies for .asmdef support)
         if (config.movementBehavior != TargetMovementType.None)
         {
             string movementScriptName = config.movementBehavior.ToString();
@@ -282,6 +274,52 @@ public class TrainingLevelManager : MonoBehaviour
             else
             {
                 Debug.LogError($"[TrainingLevelManager] Could not find MonoBehaviour movement script '{movementScriptName}' in any loaded assembly!");
+            }
+        }
+
+        activeTargets.Add(newTarget);
+    }
+
+    /// <summary>
+    /// Handles spawning pre-baked prefabs like Swarms and Bosses, and automatically wires them to the BossArenaManager.
+    /// </summary>
+    private void SpawnComplexAsset(TargetSpawnConfig config, Vector3 spawnPos, Quaternion spawnRot)
+    {
+        GameObject prefabToSpawn = config.movementBehavior == TargetMovementType.BossDragonAsset ? currentLevelConfig.bossDragonPrefab : currentLevelConfig.splinePathAssetPrefab;
+
+        if (prefabToSpawn == null)
+        {
+            Debug.LogError($"[TrainingLevelManager] Missing prefab for {config.movementBehavior} in LevelConfigSO!");
+            return;
+        }
+
+        GameObject complexTarget = Instantiate(prefabToSpawn, spawnPos, spawnRot);
+        activeTargets.Add(complexTarget);
+
+        // If this is the Boss Dragon encounter, we need to wire it up!
+        if (config.movementBehavior == TargetMovementType.BossDragonAsset)
+        {
+            BossArenaManager arenaManager = FindAnyObjectByType<BossArenaManager>();
+            if (arenaManager != null)
+            {
+                BossCreature boss = complexTarget.GetComponent<BossCreature>();
+
+                // For this prototype logic, we just find all StandardCreatures spawned so far this wave
+                // We use FindObjectsByType because StandardCreature inherits from MovingTarget.
+
+                // Note: StandardCreature script needs to be attached to spawned minions for them to be found here.
+
+                List<StandardCreature> minions = new List<StandardCreature>(FindObjectsByType<StandardCreature>(FindObjectsSortMode.None));
+
+                if (boss != null)
+                {
+                    arenaManager.RegisterBattleParticipants(boss, minions);
+                    Debug.Log("[TrainingLevelManager] Successfully registered Boss Dragon with the BossArenaManager!");
+                }
+            }
+            else
+            {
+                Debug.LogError("[TrainingLevelManager] Boss spawned, but no BossArenaManager found in the scene to wire it to!");
             }
         }
     }
@@ -388,42 +426,6 @@ public class TrainingLevelManager : MonoBehaviour
         if (levelFeedbackText != null)
         {
             levelFeedbackText.text = "";
-        }
-    }
-}
-
-/// <summary>
-/// A helper script attached to root prefabs (like Spline targets).
-/// It destroys the root object when all of its child targets are destroyed.
-/// </summary>
-public class RootObjectCleaner : MonoBehaviour
-{
-    private MovingTarget[] childrenTargets;
-    private bool isInitialized = false;
-
-    public void Initialize(MovingTarget[] targets)
-    {
-        childrenTargets = targets;
-        isInitialized = targets.Length > 0;
-    }
-
-    private void Update()
-    {
-        if (!isInitialized) return;
-
-        bool allDead = true;
-        foreach (var target in childrenTargets)
-        {
-            if (target != null)
-            {
-                allDead = false;
-                break;
-            }
-        }
-
-        if (allDead)
-        {
-            Destroy(gameObject);
         }
     }
 }
