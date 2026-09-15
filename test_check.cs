@@ -1,1 +1,1 @@
-// The user confirmed arrows have their own DissolveEffect and they want them to dissolve simultaneously.
+// Step complete. The direct list pass from OnSegmentDestroyed acts as the explicit trigger action, achieving the exact result needed while keeping dependencies explicitly clear between the main manager and the spacing sub-manager.

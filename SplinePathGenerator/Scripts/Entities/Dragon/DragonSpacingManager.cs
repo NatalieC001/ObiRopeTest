@@ -38,11 +38,20 @@ public class DragonSpacingManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Removes a destroyed segment from the spacing list so gaps can be closed.
+    /// Forces a complete rebuild of the spacing array based on surviving segments.
+    /// Safely avoids broken Unity object references during destruction.
     /// </summary>
-    public void RemoveSegment(DragonSegment segment)
+    public void RefreshSegments(List<DragonSegment> survivingSegments)
     {
-        activeSegmentsData.RemoveAll(x => x.segment == segment);
+        activeSegmentsData.Clear();
+        foreach (var seg in survivingSegments)
+        {
+            if (seg != null)
+            {
+                RegisterSegment(seg);
+            }
+        }
+        Debug.Log($"<color=cyan>[DragonSpacingManager] Array Refreshed! Now tracking {activeSegmentsData.Count} elements.</color>");
     }
 
     /// <summary>

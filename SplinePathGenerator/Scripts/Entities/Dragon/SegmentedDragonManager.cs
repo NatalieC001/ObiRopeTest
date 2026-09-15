@@ -406,7 +406,7 @@ public class SegmentedDragonManager : MonoBehaviour
         activeSegments.Remove(destroyedSegment);
         if (spacingManager != null)
         {
-            spacingManager.RemoveSegment(destroyedSegment);
+            spacingManager.RefreshSegments(activeSegments);
         }
 
         Debug.Log($"<color=magenta>[SegmentedDragonManager] A segment fell! Boss power reduced to {totalBossPower}. Closing gap!</color>");
