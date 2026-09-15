@@ -197,6 +197,9 @@ public class SegmentedDragonManager : MonoBehaviour
         DragonSegment segment = segmentObj.GetComponent<DragonSegment>();
         if (segment == null) segment = segmentObj.AddComponent<DragonSegment>();
 
+        // Force indestructible flag based on prefab type
+        segment.isDestructiblePart = (prefab == bodyPrefab);
+
         segment.Initialize(this, bossBrain, index);
         activeSegments.Add(segment);
 

@@ -135,21 +135,11 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
         }
 
         // Trigger dissolve on the segment itself
-        float destroyDelay = 0.1f;
+        float destroyDelay = 1.0f; // Fixed safe delay to ensure objects are absolutely destroyed
         DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
         if (dissolve != null)
         {
             dissolve.TriggerDissolve();
-            // Use reflection to get the duration if possible, otherwise assume standard 2 seconds
-            System.Reflection.FieldInfo durationField = dissolve.GetType().GetField("DissolveDuration", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.IgnoreCase);
-            if (durationField != null)
-            {
-                destroyDelay = (float)durationField.GetValue(dissolve);
-            }
-            else
-            {
-                destroyDelay = 2f;
-            }
         }
 
         // Trigger dissolve on any arrows sticking out of this segment
