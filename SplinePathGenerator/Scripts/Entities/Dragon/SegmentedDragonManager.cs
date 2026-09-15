@@ -23,7 +23,7 @@ public class SegmentedDragonManager : MonoBehaviour
     [Tooltip("How many plain body segments to insert between the legs.")]
     public int numberOfBodySegments = 8;
 
-    [Tooltip("The physical distance between each segment along the spline.")]
+    [Tooltip("Legacy spacing, now handled by DragonSpacingManager. Kept for initialization fallback.")]
     public float segmentSpacing = 2f;
 
     [Tooltip("The total combined power of the boss based on remaining segments.")]
@@ -32,6 +32,9 @@ public class SegmentedDragonManager : MonoBehaviour
     // List tracking all live segments. Head is index 0.
     private List<DragonSegment> activeSegments = new List<DragonSegment>();
     private SplineComputer bossSpline;
+
+    // The new dynamic spacing manager
+    private DragonSpacingManager spacingManager;
 
     // The Dreamteck follower component for the Head. The rest of the body follows this.
     private SplineFollower headFollower;
@@ -53,6 +56,13 @@ public class SegmentedDragonManager : MonoBehaviour
         totalBossPower = 0f;
         activeSegments.Clear();
         bossBrain = GetComponent<BossCreature>();
+
+        spacingManager = GetComponent<DragonSpacingManager>();
+        if (spacingManager == null)
+        {
+            spacingManager = gameObject.AddComponent<DragonSpacingManager>();
+        }
+        spacingManager.ClearSegments();
 
         int currentIndex = 0;
 
@@ -101,7 +111,7 @@ public class SegmentedDragonManager : MonoBehaviour
 
         // Initialize history with pre-filled positions backward from ROOT object
         positionHistory.Clear();
-        float totalLength = activeSegments.Count * segmentSpacing * 2f;
+        float totalLength = spacingManager != null ? spacingManager.GetTotalDragonLength() * 2f : activeSegments.Count * segmentSpacing * 2f;
         int samples = Mathf.CeilToInt(totalLength / 0.1f) + 1;
 
         if (bossSpline != null)
@@ -164,6 +174,11 @@ public class SegmentedDragonManager : MonoBehaviour
         segment.Initialize(this, bossBrain, index);
         activeSegments.Add(segment);
 
+        if (spacingManager != null)
+        {
+            spacingManager.RegisterSegment(segment);
+        }
+
         totalBossPower += segment.powerContribution;
     }
 
@@ -204,7 +219,7 @@ public class SegmentedDragonManager : MonoBehaviour
                 distanceTraveled = headTotalDistance
             });
 
-            float maxNeededHistoryDistance = segmentSpacing * activeSegments.Count * 2f;
+            float maxNeededHistoryDistance = spacingManager != null ? spacingManager.GetTotalDragonLength() * 2f : segmentSpacing * activeSegments.Count * 2f;
             if (headTotalDistance - positionHistory[positionHistory.Count - 1].distanceTraveled > maxNeededHistoryDistance)
             {
                 positionHistory.RemoveAt(positionHistory.Count - 1);
@@ -242,11 +257,12 @@ public class SegmentedDragonManager : MonoBehaviour
         {
             DragonSegment segment = activeSegments[i];
 
-            float requiredDistanceBehindHead = segmentSpacing * i;
+            float requiredDistanceBehindHead = spacingManager != null ? spacingManager.GetTargetDistanceForSegment(segment) : segmentSpacing * i;
+
             if (animateSmoothly && currentSpacings.ContainsKey(segment))
             {
                 // Smoothly close the gap
-                requiredDistanceBehindHead = Mathf.Lerp(currentSpacings[segment], segmentSpacing * i, lerpT);
+                requiredDistanceBehindHead = Mathf.Lerp(currentSpacings[segment], requiredDistanceBehindHead, lerpT);
             }
 
             float targetDistanceInHistory = headTotalDistance - requiredDistanceBehindHead;
@@ -288,7 +304,38 @@ public class SegmentedDragonManager : MonoBehaviour
     {
         totalBossPower -= destroyedSegment.powerContribution;
 
+        // Before removing the piece, store EVERY segment's exact current physical target distance
+        // so we can smooth lerp from exactly where they are right now to their new tighter positions.
+
+        // Temporarily store current lerp distances in case we are interrupting a gap close
+        Dictionary<DragonSegment, float> previousSpacings = new Dictionary<DragonSegment, float>(currentSpacings);
+        currentSpacings.Clear();
+
+        foreach (var segment in activeSegments)
+        {
+            if (segment != destroyedSegment)
+            {
+                float dist = spacingManager != null ? spacingManager.GetTargetDistanceForSegment(segment) : segment.SegmentIndex * segmentSpacing;
+
+                // If we were already closing a gap, we want to lerp from our CURRENT interpolated distance
+                if (isClosingGap && previousSpacings.ContainsKey(segment))
+                {
+                    float lerpT = Mathf.SmoothStep(0f, 1f, gapCloseTimer / gapCloseDuration);
+                    float actualInterpolatedDist = Mathf.Lerp(previousSpacings[segment], dist, lerpT);
+                    currentSpacings[segment] = actualInterpolatedDist;
+                }
+                else
+                {
+                    currentSpacings[segment] = dist;
+                }
+            }
+        }
+
         activeSegments.Remove(destroyedSegment);
+        if (spacingManager != null)
+        {
+            spacingManager.RemoveSegment(destroyedSegment);
+        }
 
         Debug.Log($"<color=magenta>[SegmentedDragonManager] A segment fell! Boss power reduced to {totalBossPower}. Closing gap!</color>");
 
@@ -298,25 +345,10 @@ public class SegmentedDragonManager : MonoBehaviour
             return;
         }
 
-        currentSpacings.Clear();
-
-        // When a piece in the middle dies, pieces behind it shift their indices down by 1.
-        // We simply need to look at their old target distance vs their new target distance.
-        // E.g. segment #4 (tail) is at index 4. It should be at distance 4*spacing.
-        // When segment #3 dies, tail becomes index 3. It needs to move to 3*spacing.
-        // But physically it is CURRENTLY sitting at 4*spacing.
+        // Update the indices of remaining active segments
         for (int i = 0; i < activeSegments.Count; i++)
         {
-            // Their OLD index is whatever index they have right now before we update it
-            int oldIndex = activeSegments[i].SegmentIndex;
-
-            // Their NEW index is their position in the shortened list
             activeSegments[i].SegmentIndex = i;
-
-            // Their current physical distance behind the head is just their old expected spacing
-            float currentDistBehindHead = oldIndex * segmentSpacing;
-
-            currentSpacings[activeSegments[i]] = currentDistBehindHead;
         }
 
         // Pause standard rigidly-spaced updates and begin the smooth gap close

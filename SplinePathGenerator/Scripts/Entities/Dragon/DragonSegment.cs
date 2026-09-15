@@ -152,6 +152,25 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
     }
 
     /// <summary>
+    /// Helper to grab the size of this segment in case needed externally.
+    /// Size is calculated based on bounding box.
+    /// </summary>
+    public float GetSegmentSize()
+    {
+        Renderer r = segmentRenderer != null ? segmentRenderer : GetComponentInChildren<Renderer>();
+        if (r != null)
+        {
+            MeshFilter mf = r.GetComponent<MeshFilter>();
+            if (mf != null && mf.sharedMesh != null)
+            {
+                return mf.sharedMesh.bounds.size.z * mf.transform.lossyScale.z;
+            }
+            return r.bounds.size.z;
+        }
+        return 2.0f;
+    }
+
+    /// <summary>
     /// Called by the SegmentedDragonManager when the entire boss is defeated.
     /// Forces permanent pieces (Head, Legs, Tail) to finally dissolve.
     /// </summary>
