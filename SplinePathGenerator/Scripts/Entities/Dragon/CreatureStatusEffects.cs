@@ -14,7 +14,7 @@ public class CreatureStatusEffects : MonoBehaviour
 
     // State Tracking
     public bool IsBrittle { get; private set; } = false;
-
+    
     private Coroutine activeSpeedModifier;
 
     private void Awake()

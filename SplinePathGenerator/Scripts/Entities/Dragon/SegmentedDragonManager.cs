@@ -1,7 +1,8 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 using Dreamteck.Splines;
 using DG.Tweening;
-using System.Collections.Generic;
 
 /// <summary>
 /// Controls the multi-part Asian Dragon boss.
@@ -37,6 +38,12 @@ public class SegmentedDragonManager : MonoBehaviour
     private SplineFollower headFollower;
     private BossCreature bossBrain;
 
+    // --- TETHER STATE ---
+    private RopeArrow currentTether = null;
+    public bool IsTethered { get; private set; } = false;
+    public Transform TetherAnchorTransform { get; private set; } = null;
+    public float TetherMaxLength { get; private set; } = 0f;
+
     // --- BREADCRUMB SLITHERING SYSTEM ---
     private struct PositionData
     {
@@ -46,6 +53,21 @@ public class SegmentedDragonManager : MonoBehaviour
     }
     private List<PositionData> positionHistory = new List<PositionData>();
     private float headTotalDistance = 0f;
+
+    // Spacing animation state
+    private bool isClosingGap = false;
+    private float gapCloseTimer = 0f;
+    private float gapCloseDuration = 0.5f;
+
+    // Start / current distances used for animation and the final targets (physical spacing)
+    private Dictionary<DragonSegment, float> currentSpacings = new Dictionary<DragonSegment, float>();
+    private Dictionary<DragonSegment, float> targetSpacings = new Dictionary<DragonSegment, float>();
+
+    /// <summary>
+    /// Event invoked whenever the number of active segments changes (passes new remaining count).
+    /// Useful for UI feedback (how many segments left).
+    /// </summary>
+    public event Action<int> OnSegmentCountChanged;
 
     public void InitializeDragon(SplineComputer track)
     {
@@ -60,9 +82,11 @@ public class SegmentedDragonManager : MonoBehaviour
         SpawnSegment(headPrefab, currentIndex, track);
         headFollower = activeSegments[0].Follower;
 
-        // Disable the head's follower component entirely. The body will follow the ROOT object instead!
-        headFollower.enabled = false;
-        headFollower.follow = false;
+        if (headFollower != null)
+        {
+            headFollower.enabled = false;
+            headFollower.follow = false;
+        }
 
         currentIndex++;
 
@@ -90,23 +114,25 @@ public class SegmentedDragonManager : MonoBehaviour
         // 5. Spawn Tail
         SpawnSegment(tailPrefab, currentIndex, track);
 
-        // Clear follower components from body segments - they will be driven entirely by the History buffer!
+        // Disable followers for body parts (manager controls transforms)
         for (int i = 1; i < activeSegments.Count; i++)
         {
-            if (activeSegments[i].Follower != null)
+            var f = activeSegments[i].Follower;
+            if (f != null)
             {
-                activeSegments[i].Follower.enabled = false;
+                f.enabled = false;
             }
         }
 
-        // Initialize history with pre-filled positions backward from ROOT object
+        RopeArrowManagerObi7.OnRopeBroken += OnRopeBroken;
+
+        // Initialize breadcrumb history and initial spacings
         positionHistory.Clear();
         float totalLength = activeSegments.Count * segmentSpacing * 2f;
         int samples = Mathf.CeilToInt(totalLength / 0.1f) + 1;
 
         if (bossSpline != null)
         {
-            // We use the ROOT object's percent, as that is the true brain that moves!
             SplineFollower rootFollower = GetComponent<SplineFollower>();
             double startPercent = rootFollower != null ? rootFollower.GetPercent() : 0.0;
             float splineLength = bossSpline.CalculateLength();
@@ -129,23 +155,39 @@ public class SegmentedDragonManager : MonoBehaviour
                 percent = System.Math.Clamp(percent, 0.0, 1.0);
                 SplineSample sample = bossSpline.Evaluate(percent);
 
-                positionHistory.Add(new PositionData {
+                positionHistory.Add(new PositionData
+                {
                     position = sample.position,
                     rotation = sample.rotation,
                     distanceTraveled = -distBack
                 });
             }
-
-            UpdateSegmentSpacing(false, 1f);
         }
         else
         {
-            positionHistory.Add(new PositionData {
+            positionHistory.Add(new PositionData
+            {
                 position = transform.position,
                 rotation = transform.rotation,
                 distanceTraveled = 0f
             });
         }
+
+        // Compute initial target spacings using physical lengths and set current==target so there's no animation on spawn
+        ComputeTargetSpacingsFromPhysicalSizes();
+        currentSpacings.Clear();
+        foreach (var kv in targetSpacings) currentSpacings[kv.Key] = kv.Value;
+
+        // Place segments at their targets immediately
+        UpdateSegmentSpacing(false, 1f);
+
+        // Notify listeners of initial count
+        OnSegmentCountChanged?.Invoke(activeSegments.Count);
+    }
+
+    private void OnDestroy()
+    {
+        RopeArrowManagerObi7.OnRopeBroken -= OnRopeBroken;
     }
 
     private void SpawnSegment(GameObject prefab, int index, SplineComputer track)
@@ -158,8 +200,18 @@ public class SegmentedDragonManager : MonoBehaviour
         SplineFollower follower = segmentObj.GetComponent<SplineFollower>();
         if (follower == null) follower = segmentObj.AddComponent<SplineFollower>();
 
+        if (track != null)
+        {
+            follower.spline = track;
+        }
+
         DragonSegment segment = segmentObj.GetComponent<DragonSegment>();
         if (segment == null) segment = segmentObj.AddComponent<DragonSegment>();
+
+        segment.SetFollower(follower);
+
+        bool destructible = prefab == bodyPrefab;
+        segment.isDestructiblePart = destructible;
 
         segment.Initialize(this, bossBrain, index);
         activeSegments.Add(segment);
@@ -167,27 +219,66 @@ public class SegmentedDragonManager : MonoBehaviour
         totalBossPower += segment.powerContribution;
     }
 
-    /// <summary>
-    /// Updates the target spline for all active segments (e.g. when the boss evades to a new track).
-    /// </summary>
+    public void HandleRopeAttached(DragonSegment segment, RopeArrow rope)
+    {
+        if (rope == null || segment == null) return;
+
+        currentTether = rope;
+        IsTethered = true;
+        TetherAnchorTransform = rope.GetTailTransform();
+        if (TetherAnchorTransform != null)
+        {
+            TetherMaxLength = Vector3.Distance(transform.position, TetherAnchorTransform.position);
+        }
+        else
+        {
+            TetherMaxLength = 0f;
+        }
+
+        Debug.Log($"<color=cyan>[SegmentedDragonManager] Tether attached to segment {segment.SegmentIndex}. MaxLength: {TetherMaxLength:F2}</color>");
+    }
+
+    public void ReleaseTetherFromSegment(DragonSegment segment, RopeArrow rope)
+    {
+        if (rope == null) return;
+        if (currentTether == rope)
+        {
+            Debug.Log("<color=cyan>[SegmentedDragonManager] Tether released.</color>");
+            currentTether = null;
+            IsTethered = false;
+            TetherAnchorTransform = null;
+            TetherMaxLength = 0f;
+        }
+    }
+
+    private void OnRopeBroken(RopeArrow rope)
+    {
+        if (rope == null) return;
+        if (currentTether == rope)
+        {
+            ReleaseTetherFromSegment(null, rope);
+        }
+    }
+
     public void SwitchToNewSpline(SplineComputer newTrack)
     {
         bossSpline = newTrack;
+
+        // Also update followers' spline reference for head/body safety
+        foreach (var seg in activeSegments)
+        {
+            if (seg != null && seg.Follower != null)
+            {
+                seg.Follower.spline = newTrack;
+            }
+        }
     }
-
-    // Controls whether the Update loop forces rigid spacing. Disabled briefly when closing a gap.
-    private bool isClosingGap = false;
-    private float gapCloseTimer = 0f;
-    private float gapCloseDuration = 1f;
-
-    // When gap closing, segments blend from an inflated spacing value down to the normal spacing value
-    private Dictionary<DragonSegment, float> currentSpacings = new Dictionary<DragonSegment, float>();
 
     private void LateUpdate()
     {
         if (activeSegments.Count == 0) return;
 
-        // 1. Update the Breadcrumb History using the ROOT BOSS object, not the spawned head
+        // Update breadcrumb history (root boss object)
         Vector3 currentHeadPos = transform.position;
         if (positionHistory.Count == 0) return;
         PositionData lastData = positionHistory[0];
@@ -198,7 +289,8 @@ public class SegmentedDragonManager : MonoBehaviour
         {
             headTotalDistance += distMovedSinceLastFrame;
 
-            positionHistory.Insert(0, new PositionData {
+            positionHistory.Insert(0, new PositionData
+            {
                 position = currentHeadPos,
                 rotation = transform.rotation,
                 distanceTraveled = headTotalDistance
@@ -211,42 +303,50 @@ public class SegmentedDragonManager : MonoBehaviour
             }
         }
 
-        // 2. Handle Gap Closing Animation Timers
+        // Gap closing animation
         if (isClosingGap)
         {
             gapCloseTimer += Time.deltaTime;
             float t = gapCloseTimer / gapCloseDuration;
-
-            // Smoothly ease the interpolation
             t = Mathf.SmoothStep(0f, 1f, t);
 
             if (t >= 1f)
             {
                 t = 1f;
-                isClosingGap = false; // Done closing gap, resume rigid follow
+                isClosingGap = false;
             }
 
             UpdateSegmentSpacing(true, t);
         }
         else
         {
-            UpdateSegmentSpacing(false, 1f); // Follow rigidly
+            UpdateSegmentSpacing(false, 1f);
         }
     }
 
     private void UpdateSegmentSpacing(bool animateSmoothly, float lerpT)
     {
-        // 3. Move all segments (including the Head at index 0) along the history buffer.
-        // Because they follow the root object, the head just trails at 0 distance!
+        // Move all segments along the history buffer.
         for (int i = 0; i < activeSegments.Count; i++)
         {
             DragonSegment segment = activeSegments[i];
+            if (segment == null) continue;
 
-            float requiredDistanceBehindHead = segmentSpacing * i;
-            if (animateSmoothly && currentSpacings.ContainsKey(segment))
+            // Determine desired distance behind head
+            float startDist = segmentSpacing * i;
+            float endDist = segmentSpacing * i;
+
+            if (targetSpacings.TryGetValue(segment, out float target)) endDist = target;
+            if (currentSpacings.TryGetValue(segment, out float current)) startDist = current;
+
+            float requiredDistanceBehindHead;
+            if (animateSmoothly)
             {
-                // Smoothly close the gap
-                requiredDistanceBehindHead = Mathf.Lerp(currentSpacings[segment], segmentSpacing * i, lerpT);
+                requiredDistanceBehindHead = Mathf.Lerp(current, endDist, lerpT);
+            }
+            else
+            {
+                requiredDistanceBehindHead = endDist;
             }
 
             float targetDistanceInHistory = headTotalDistance - requiredDistanceBehindHead;
@@ -259,10 +359,8 @@ public class SegmentedDragonManager : MonoBehaviour
 
                 if (targetDistanceInHistory <= newer.distanceTraveled && targetDistanceInHistory >= older.distanceTraveled)
                 {
-                    // Interpolate between these two breadcrumbs
                     float range = newer.distanceTraveled - older.distanceTraveled;
-                    float t = (newer.distanceTraveled - targetDistanceInHistory) / range; // 0 = at newer, 1 = at older
-
+                    float t = (newer.distanceTraveled - targetDistanceInHistory) / range;
                     segment.transform.position = Vector3.Lerp(newer.position, older.position, t);
                     segment.transform.rotation = Quaternion.Slerp(newer.rotation, older.rotation, t);
                     break;
@@ -271,26 +369,46 @@ public class SegmentedDragonManager : MonoBehaviour
         }
     }
 
-    public void PauseSplineFollow()
-    {
-        // No longer needed, root object handles its own follow state
-    }
-
-    public void ResumeSplineFollow()
-    {
-        // No longer needed
-    }
-
     /// <summary>
-    /// Called by a DragonSegment when it is destroyed.
+    /// Called by DragonSegment after its dissolve completes.
+    /// This is the single, unit-testable hook for segment removal and spacing logic.
     /// </summary>
-    public void OnSegmentDestroyed(DragonSegment destroyedSegment)
+    public void NotifySegmentDissolved(DragonSegment dissolvedSegment)
     {
-        totalBossPower -= destroyedSegment.powerContribution;
+        if (dissolvedSegment == null) return;
 
-        activeSegments.Remove(destroyedSegment);
+        // 1) Capture current real distances behind head for remaining segments BEFORE removal
+        Dictionary<DragonSegment, float> actualDistances = new Dictionary<DragonSegment, float>(activeSegments.Count);
+        foreach (var seg in activeSegments)
+        {
+            if (seg == null || seg == dissolvedSegment) continue;
+            actualDistances[seg] = GetCurrentDistanceBehindHead(seg);
+        }
 
-        Debug.Log($"<color=magenta>[SegmentedDragonManager] A segment fell! Boss power reduced to {totalBossPower}. Closing gap!</color>");
+        // 2) Update boss power and remove the dissolved segment
+        totalBossPower -= dissolvedSegment.powerContribution;
+        bool removed = activeSegments.Remove(dissolvedSegment);
+        if (!removed)
+        {
+            Debug.LogWarning("[SegmentedDragonManager] NotifySegmentDissolved called for a segment not in activeSegments.");
+        }
+        else
+        {
+            Debug.Log($"<color=magenta>[SegmentedDragonManager] A segment dissolved! Boss power reduced to {totalBossPower}. Closing gap!</color>");
+        }
+
+        // Notify UI / callers about remaining segments
+        OnSegmentCountChanged?.Invoke(activeSegments.Count);
+
+        // Tether handling
+        if (IsTethered && currentTether != null)
+        {
+            Transform tail = currentTether.GetTailTransform();
+            if (tail != null && (tail.IsChildOf(dissolvedSegment.transform) || tail == dissolvedSegment.transform))
+            {
+                ReleaseTetherFromSegment(dissolvedSegment, currentTether);
+            }
+        }
 
         if (activeSegments.Count == 0)
         {
@@ -298,36 +416,127 @@ public class SegmentedDragonManager : MonoBehaviour
             return;
         }
 
+        // 3) Compute target spacings from physical sizes for the new list (head=0)
+        ComputeTargetSpacingsFromPhysicalSizes();
+
+        // 4) Set currentSpacings to captured actual distances (fall back to target if missing)
         currentSpacings.Clear();
-
-        // When a piece in the middle dies, pieces behind it shift their indices down by 1.
-        // We simply need to look at their old target distance vs their new target distance.
-        // E.g. segment #4 (tail) is at index 4. It should be at distance 4*spacing.
-        // When segment #3 dies, tail becomes index 3. It needs to move to 3*spacing.
-        // But physically it is CURRENTLY sitting at 4*spacing.
-        for (int i = 0; i < activeSegments.Count; i++)
+        foreach (var seg in activeSegments)
         {
-            // Their OLD index is whatever index they have right now before we update it
-            int oldIndex = activeSegments[i].SegmentIndex;
-
-            // Their NEW index is their position in the shortened list
-            activeSegments[i].SegmentIndex = i;
-
-            // Their current physical distance behind the head is just their old expected spacing
-            float currentDistBehindHead = oldIndex * segmentSpacing;
-
-            currentSpacings[activeSegments[i]] = currentDistBehindHead;
+            if (seg == null) continue;
+            if (actualDistances.TryGetValue(seg, out float captured))
+            {
+                currentSpacings[seg] = captured;
+            }
+            else if (targetSpacings.TryGetValue(seg, out float t))
+            {
+                currentSpacings[seg] = t;
+            }
+            else
+            {
+                currentSpacings[seg] = seg.SegmentIndex * segmentSpacing;
+            }
         }
 
-        // Pause standard rigidly-spaced updates and begin the smooth gap close
+        // Start the gap closing animation
         isClosingGap = true;
         gapCloseTimer = 0f;
     }
 
     /// <summary>
-    /// Called by BossCreature when the overall health reaches 0.
-    /// Commands all remaining permanent pieces (Head, Legs, Tail) to die.
+    /// Computes targetSpacings for activeSegments using each segment's physical length so gaps are exact.
+    /// The head is placed at 0; subsequent segments are placed behind head cumulatively:
+    /// prevHalf + gap + currHalf.
     /// </summary>
+    private void ComputeTargetSpacingsFromPhysicalSizes()
+    {
+        targetSpacings.Clear();
+        float cumulative = 0f;
+
+        for (int i = 0; i < activeSegments.Count; i++)
+        {
+            var seg = activeSegments[i];
+            if (seg == null) continue;
+
+            // For head (i==0), distance is 0
+            if (i == 0)
+            {
+                targetSpacings[seg] = 0f;
+                cumulative = GetSegmentPhysicalLength(seg) * 0.5f; // head's half-length
+                continue;
+            }
+
+            float prevHalf = cumulative; // this currently holds previous half-length when looped
+            float currLength = GetSegmentPhysicalLength(seg);
+            float currHalf = currLength * 0.5f;
+
+            // Desired distance behind head = previous cumulative (head half + ... ) + segmentSpacing + currHalf
+            float distanceBehindHead = cumulative + segmentSpacing + currHalf;
+
+            targetSpacings[seg] = distanceBehindHead;
+
+            // Update cumulative to be previous cumulative + segmentSpacing + currFull (so next prevHalf becomes half of next)
+            cumulative = distanceBehindHead + currHalf;
+        }
+
+        // Also update logical SegmentIndex according to current ordering
+        for (int i = 0; i < activeSegments.Count; i++)
+        {
+            if (activeSegments[i] != null) activeSegments[i].SegmentIndex = i;
+        }
+    }
+
+    // Helper: estimate segment physical length along its forward axis using renderer bounds projection.
+    private float GetSegmentPhysicalLength(DragonSegment seg)
+    {
+        if (seg == null) return segmentSpacing; // fallback
+        Renderer rend = seg.GetComponentInChildren<Renderer>();
+        if (rend == null)
+        {
+            return segmentSpacing; // fallback default
+        }
+
+        Vector3 size = rend.bounds.size; // world-space extents
+        Vector3 forward = seg.transform.forward.normalized;
+        // Project bounds size onto forward axis (approximation)
+        float length = Mathf.Abs(Vector3.Dot(size, forward));
+        if (length < 0.1f) length = segmentSpacing; // avoid degenerate cases
+        return length;
+    }
+
+    // Helper: find nearest breadcrumb and compute distance behind head
+    private float GetCurrentDistanceBehindHead(DragonSegment seg)
+    {
+        if (seg == null) return 0f;
+        if (positionHistory == null || positionHistory.Count == 0)
+        {
+            return seg.SegmentIndex * segmentSpacing;
+        }
+
+        float bestDist = float.MaxValue;
+        float bestEntryDistanceTraveled = positionHistory[0].distanceTraveled;
+        Vector3 segPos = seg.transform.position;
+        for (int i = 0; i < positionHistory.Count; i++)
+        {
+            float d = Vector3.SqrMagnitude(positionHistory[i].position - segPos);
+            if (d < bestDist)
+            {
+                bestDist = d;
+                bestEntryDistanceTraveled = positionHistory[i].distanceTraveled;
+            }
+        }
+
+        float distBehindHead = headTotalDistance - bestEntryDistanceTraveled;
+        if (distBehindHead < 0f) distBehindHead = 0f;
+        return distBehindHead;
+    }
+
+    [Obsolete("Use NotifySegmentDissolved(DragonSegment) instead.")]
+    public void OnSegmentDestroyed(DragonSegment destroyedSegment)
+    {
+        NotifySegmentDissolved(destroyedSegment);
+    }
+
     public void TriggerTotalDeath()
     {
         Debug.Log("<color=red>[SegmentedDragonManager] The entire dragon is collapsing!</color>");
@@ -339,5 +548,21 @@ public class SegmentedDragonManager : MonoBehaviour
             }
         }
         activeSegments.Clear();
+
+        currentTether = null;
+        IsTethered = false;
+        TetherAnchorTransform = null;
+        TetherMaxLength = 0f;
+
+        // Notify UI/listeners that there are zero segments left
+        OnSegmentCountChanged?.Invoke(0);
+    }
+
+    /// <summary>
+    /// Query how many live segments remain (convenience for UI).
+    /// </summary>
+    public int GetRemainingSegmentCount()
+    {
+        return activeSegments.Count;
     }
 }

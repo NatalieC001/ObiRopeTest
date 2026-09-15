@@ -206,6 +206,39 @@ public class BossCreature : MonoBehaviour
     }
 
     /// <summary>
+    /// Force the boss to begin evasive maneuvers immediately.
+    /// Called by other systems (e.g. DragonSegment) when the boss is hit and should react instantly.
+    /// This was added to fix the CS1061 compile error and to ensure the dragon uses escape splines on hit.
+    /// </summary>
+    public void ForceImmediateEvasion()
+    {
+        if (tacticalManager == null) tacticalManager = GetComponent<TacticalBossSplineManager>();
+        if (tacticalManager == null)
+        {
+            Debug.LogWarning("[BossCreature] ForceImmediateEvasion called but TacticalBossSplineManager not found.");
+            return;
+        }
+
+        Debug.Log("<color=red>[BossCreature] ForceImmediateEvasion: ordering immediate tactical evasion.</color>");
+
+        // If the boss was orchestrating, engage first so movement routines behave correctly
+        if (currentPhase == BossPhase.Orchestrator)
+        {
+            EngagePlayer();
+        }
+
+        // Trigger the evasion routine on the tactical manager (this will use the configured escape splines)
+        tacticalManager.EvadeToEscapeRoute();
+
+        // Reset accumulators so we don't re-trigger immediately
+        recentDamageAccumulator = 0f;
+        damageDecayTimer = 0f;
+
+        // Move into Exhausted state so tactical flow (recharge after route) is consistent
+        currentPhase = BossPhase.Exhausted;
+    }
+
+    /// <summary>
     /// Called when the player shoots the boss.
     /// </summary>
     public void TakeDamage(float baseAmount, Vector3 hitPoint, ElementTypeOB7 arrowType = ElementTypeOB7.Normal)
