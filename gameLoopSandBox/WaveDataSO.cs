@@ -29,7 +29,9 @@ public enum TargetMovementType
     FishSwimMovement,
     PingPongMovement,
     Rotator,
-    SwoopAndRetreatMovement
+    SwoopAndRetreatMovement,
+    SplinePathAsset, // Used for standard baked Swarm prefabs
+    BossDragonAsset  // Used specifically to trigger the Boss Dragon encounter
 }
 
 /// <summary>

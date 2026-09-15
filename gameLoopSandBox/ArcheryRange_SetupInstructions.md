@@ -38,10 +38,10 @@ To ensure accessibility and an easy "at-a-glance" workflow, the entire level pro
 ---
 
 ## 2. The Game Loop Flow
-1. **Level Start:** The Announcer text shows the Level's Intro Text, explicitly appending instructions to "Shoot the Gong to begin!". It waits infinitely, ensuring the player is never confused or relying on inference.
-2. **Ready Up:** The player shoots the Gong. The text disappears and the fast-paced waves begin instantly.
+1. **Level Start:** The Announcer text shows the Level's Intro Text. It waits infinitely.
+2. **Ready Up:** The player shoots the Gong. The text disappears and the fast-paced waves begin.
 3. **The Waves:** Waves flow seamlessly into one another instantly with no text interruptions. The HUD text updates in real-time.
-4. **Level Complete:** When all waves finish, the Announcer shows the Level Outro Text, the player's completion time, and explicitly appends instructions to "Shoot the Gong to continue!". It waits infinitely.
+4. **Level Complete:** When all waves finish, the Announcer shows the Level Outro Text and the player's completion time. It waits infinitely.
 5. **Next Level:** The player shoots the Gong, and the cycle repeats for Level 2.
 
 ---
@@ -112,23 +112,3 @@ Use these 8 concepts to build a progressively challenging archery sandbox!
   - Spawn 1 "Boss" target at `Z = 20` with `spawnDelay = 5.0`.
   - Make the boss massive (`scaleModifier = 3.0`), extremely fast (`speedModifier = 3.0`), require an `Electric` arrow, and use `Rotator` or `SwoopAndRetreatMovement`.
   - The player has to clear the minions before the boss overwhelms them!
----
-
-## 4. Spline Targets (Dreamteck + DOTween)
-For complex target behavior, such as targets that fly in formation or trail behind each other (like classic sonic rings), you can create **Spline Target Prefabs**.
-
-### Creating a Spline Target Prefab
-1. Create an Empty GameObject and add a **Dreamteck SplineComputer** component to draw your path (e.g. a star, circle, or looping track).
-2. Attach the **SplineTargetMovement** component to this root object.
-3. Add a single standard Target (e.g., your vanilla target with colliders and MovingTarget script) as a **child** of this root object. (The script will automatically disable this child and duplicate it at runtime).
-4. Save this whole setup as a Prefab (e.g. "OrbitingStarTargets").
-
-### Spline Target Movement Styles
-The **SplineTargetMovement** component gives you incredible control over the "juice" of the wave:
-* **StaticShape**: The targets are evenly spaced along the spline path and sit perfectly still. Great for creating static shapes out of targets.
-* **RigidFollower**: All targets are evenly spaced and move perfectly in unison around the spline path.
-* **DynamicTrailing**: A snaking, trailing effect! Targets follow a leader around the path with a specific `trailingDelay`. Because this uses DOTween, you can apply wild eases (like Bounce or Elastic) to how they traverse the spline.
-* **OrbitLeader**: Highly dynamic! The first target runs along the spline path natively. All other targets are parented to it and use DOTween to aggressively orbit the leader as it moves.
-
-### Using them in the Manager
-You do not need to modify the `TrainingLevelManager` to use these. Simply assign your new "OrbitingStarTargets" Prefab into the Level's `vanillaTargetPrefab` slot, and the manager will spawn the Spline system directly into the world for that level!
