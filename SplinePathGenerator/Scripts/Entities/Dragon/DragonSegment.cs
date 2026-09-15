@@ -19,9 +19,9 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
 
     [Header("Visuals & Physics")]
     [Tooltip("Reference to the child mesh renderer (useful for triggering visual effects).")]
-    [SerializeField] private Renderer segmentRenderer;
+    [SerializeField] protected Renderer segmentRenderer;
     [Tooltip("Reference to the child collider (useful for disabling physics upon death).")]
-    [SerializeField] private Collider segmentCollider;
+    [SerializeField] protected Collider segmentCollider;
 
     [Tooltip("The physics layer this segment will be forced onto so arrows can detect it. Displayed here as a reminder!")]
     [SerializeField] private string targetLayer = "Enemy";
