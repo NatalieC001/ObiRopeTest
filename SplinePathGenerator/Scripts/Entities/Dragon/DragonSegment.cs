@@ -6,7 +6,7 @@ using Dreamteck.Splines;
 /// Handles segment health and reports destruction to the main SegmentedDragonManager.
 /// </summary>
 [RequireComponent(typeof(SplineFollower))]
-public class DragonSegment : MonoBehaviour
+public class DragonSegment : MonoBehaviour, IArrowTarget
 {
     [Header("Segment Stats")]
     [Tooltip("Can this individual piece be destroyed mid-fight? (Check True for body segments, False for Head/Legs/Tail).")]
@@ -63,6 +63,11 @@ public class DragonSegment : MonoBehaviour
         SegmentIndex = index;
     }
 
+    public void OnArrowHit(float damage, Vector3 impactPoint, ElementTypeOB7 elementType)
+    {
+        TakeDamage(damage, impactPoint, elementType);
+    }
+
     /// <summary>
     /// Called when the player shoots this specific segment.
     /// </summary>
@@ -96,12 +101,34 @@ public class DragonSegment : MonoBehaviour
 
     private void Die()
     {
+        if (!isDestructiblePart) return;
+
         Debug.Log($"<color=red>[DragonSegment] Segment {SegmentIndex} Destroyed!</color>");
 
         // Disable physics immediately so arrows don't keep hitting the dying segment
         if (segmentCollider != null)
         {
             segmentCollider.enabled = false;
+            Destroy(segmentCollider.gameObject, 0.1f); // Ensure the physics engine totally removes it
+        }
+
+        // Clean up any arrows sticking out of this segment
+        StickingArrow[] attachedArrows = GetComponentsInChildren<StickingArrow>(true);
+        foreach (StickingArrow arrow in attachedArrows)
+        {
+            if (arrow != null)
+            {
+                Destroy(arrow.gameObject);
+            }
+        }
+
+        // Find any "ArrowAnchor" objects that the StickingArrow might have parented directly
+        foreach (Transform child in transform)
+        {
+            if (child.name.Contains("ArrowAnchor"))
+            {
+                Destroy(child.gameObject);
+            }
         }
 
         // Notify the body manager that this piece is gone so it can close the gap
@@ -110,9 +137,18 @@ public class DragonSegment : MonoBehaviour
             dragonManager.OnSegmentDestroyed(this);
         }
 
-        // Note: Actual dissolve visual effects are handled by DissolveEffect.cs
-        // acting on the segmentRenderer. We just destroy the root object.
-        Destroy(gameObject);
+        // If there is a DissolveEffect, let it play and destroy the object after a delay
+        // Otherwise, destroy immediately.
+        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
+        if (dissolve != null)
+        {
+            dissolve.TriggerDissolve();
+            Destroy(gameObject, 2f); // Give time for the visual effect to play
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
     }
 
     /// <summary>
