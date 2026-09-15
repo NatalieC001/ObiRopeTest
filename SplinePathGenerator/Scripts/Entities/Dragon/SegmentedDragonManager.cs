@@ -110,14 +110,19 @@ public class SegmentedDragonManager : MonoBehaviour
                 float distBack = i * 0.1f;
                 // Calculate percentage based on distance backward
                 double percent = startPercent - (distBack / splineLength);
-                if (bossSpline.isClosed && percent < 0)
+                if (bossSpline.isClosed)
                 {
-                    percent += 1.0;
+                    while (percent < 0.0) percent += 1.0;
+                    while (percent > 1.0) percent -= 1.0;
                 }
-                else if (!bossSpline.isClosed && percent < 0)
+                else
                 {
-                    percent = 0;
+                    if (percent < 0.0) percent = 0.0;
+                    if (percent > 1.0) percent = 1.0;
                 }
+
+                // Hard clamp for absolute safety against floating point errors
+                percent = System.Math.Clamp(percent, 0.0, 1.0);
 
                 SplineSample sample = bossSpline.Evaluate(percent);
 
@@ -306,21 +311,22 @@ public class SegmentedDragonManager : MonoBehaviour
         }
 
         currentSpacings.Clear();
+
+        // When a piece in the middle dies, pieces behind it shift their indices down by 1.
+        // We simply need to look at their old target distance vs their new target distance.
+        // E.g. segment #4 (tail) is at index 4. It should be at distance 4*spacing.
+        // When segment #3 dies, tail becomes index 3. It needs to move to 3*spacing.
+        // But physically it is CURRENTLY sitting at 4*spacing.
         for (int i = 0; i < activeSegments.Count; i++)
         {
+            // Their OLD index is whatever index they have right now before we update it
+            int oldIndex = activeSegments[i].SegmentIndex;
+
+            // Their NEW index is their position in the shortened list
             activeSegments[i].SegmentIndex = i;
 
-            // Temporarily store how far back they physically are right now
-            float currentDistBehindHead = headTotalDistance;
-            var match = positionHistory.Find(p => Vector3.Distance(p.position, activeSegments[i].transform.position) < 1f);
-            if (match.distanceTraveled > 0)
-            {
-                currentDistBehindHead = headTotalDistance - match.distanceTraveled;
-            }
-            else
-            {
-                currentDistBehindHead = (i + 1) * segmentSpacing; // Was further back
-            }
+            // Their current physical distance behind the head is just their old expected spacing
+            float currentDistBehindHead = oldIndex * segmentSpacing;
 
             currentSpacings[activeSegments[i]] = currentDistBehindHead;
         }

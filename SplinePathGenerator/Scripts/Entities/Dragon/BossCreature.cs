@@ -124,6 +124,16 @@ public class BossCreature : MonoBehaviour
         // In a full implementation, this would point the dragon directly at the watchtower.
         // For now, it enters the combat state.
         Debug.Log("<color=magenta>[BossCreature] Phase 2: Dragon attacking player!</color>");
+
+        // Unhook from the spline so the dragon can freestyle toward the player
+        if (tacticalManager != null)
+        {
+            GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+            if (playerObj != null)
+            {
+                tacticalManager.StartFreestylePursuit(playerObj.transform);
+            }
+        }
     }
 
     private void Update()
@@ -136,6 +146,15 @@ public class BossCreature : MonoBehaviour
             {
                 currentStamina = 0;
                 EnterExhaustedPhase();
+            }
+            else if (tacticalManager != null)
+            {
+                // Let the tactical manager handle the freestyle movement
+                GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+                if (playerObj != null)
+                {
+                    tacticalManager.UpdateFreestylePursuit(playerObj.transform);
+                }
             }
         }
         else if (currentPhase == BossPhase.Recharging)
