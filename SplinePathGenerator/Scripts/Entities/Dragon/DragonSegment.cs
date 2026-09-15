@@ -63,6 +63,23 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
         SegmentIndex = index;
     }
 
+    public void OnRopeAttached(RopeArrow rope)
+    {
+        if (dragonManager != null)
+        {
+            dragonManager.HandleRopeAttached(this, rope);
+        }
+    }
+
+    // Called by RopeArrow when it is cleaned up / detached from this segment
+    public void OnRopeDetached(RopeArrow rope)
+    {
+        if (dragonManager != null)
+        {
+            dragonManager.ReleaseTetherFromSegment(this, rope);
+        }
+    }
+
     public void OnArrowHit(float damage, Vector3 impactPoint, ElementTypeOB7 elementType)
     {
         TakeDamage(damage, impactPoint, elementType);

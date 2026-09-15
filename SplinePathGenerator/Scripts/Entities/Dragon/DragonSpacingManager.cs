@@ -112,24 +112,11 @@ public class DragonSpacingManager : MonoBehaviour
 
     private float CalculateSegmentLength(DragonSegment segment)
     {
-        Renderer r = segment.GetComponentInChildren<Renderer>();
-        if (r != null)
+        if (segment != null)
         {
-            // Use local bounding box multiplied by local scale to avoid rotation issues
-            MeshFilter mf = segment.GetComponentInChildren<MeshFilter>();
-            if (mf != null && mf.sharedMesh != null)
-            {
-                return mf.sharedMesh.bounds.size.z * mf.transform.lossyScale.z;
-            }
-            else
-            {
-                // Fallback to world bounds if no mesh filter (e.g. SkinnedMeshRenderer)
-                // Note: This might be slightly inaccurate if the object is rotated weirdly at spawn
-                return r.bounds.size.z;
-            }
+            return segment.GetSegmentSize();
         }
 
-        Debug.LogWarning($"[DragonSpacingManager] No renderer found on {segment.gameObject.name}, defaulting to 2.0 length");
         return 2.0f; // Default fallback
     }
 }

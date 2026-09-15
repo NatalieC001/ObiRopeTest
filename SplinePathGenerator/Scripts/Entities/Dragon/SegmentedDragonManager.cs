@@ -122,6 +122,9 @@ public class SegmentedDragonManager : MonoBehaviour
 
         RopeArrowManagerObi7.OnRopeBroken += OnRopeBroken;
 
+        // Notify listeners of initial count
+        OnSegmentCountChanged?.Invoke(activeSegments.Count);
+
         // Initialize history with pre-filled positions backward from ROOT object
         positionHistory.Clear();
         float totalLength = spacingManager != null ? spacingManager.GetTotalDragonLength() * 2f : activeSegments.Count * segmentSpacing * 2f;
@@ -412,6 +415,9 @@ public class SegmentedDragonManager : MonoBehaviour
             activeSegments[i].SegmentIndex = i;
         }
 
+        // Notify listeners of segment loss
+        OnSegmentCountChanged?.Invoke(activeSegments.Count);
+
         // Handle tether detachment if the piece that dissolved was the tether anchor
         if (IsTethered && currentTether != null)
         {
@@ -447,5 +453,7 @@ public class SegmentedDragonManager : MonoBehaviour
         IsTethered = false;
         TetherAnchorTransform = null;
         TetherMaxLength = 0f;
+
+        OnSegmentCountChanged?.Invoke(0);
     }
 }
