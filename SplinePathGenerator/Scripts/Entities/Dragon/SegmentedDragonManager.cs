@@ -262,10 +262,13 @@ public class SegmentedDragonManager : MonoBehaviour
         RopeArrowManagerObi7.OnRopeBroken -= OnRopeBroken;
     }
 
+    [Header("Animation")]
+    [Tooltip("How many seconds it takes for the remaining segments to slide up and close the gap when a piece is destroyed.")]
+    public float gapCloseDuration = 1f;
+
     // Controls whether the Update loop forces rigid spacing. Disabled briefly when closing a gap.
     private bool isClosingGap = false;
     private float gapCloseTimer = 0f;
-    private float gapCloseDuration = 1f;
 
     // When gap closing, segments blend from an inflated spacing value down to the normal spacing value
     private Dictionary<DragonSegment, float> currentSpacings = new Dictionary<DragonSegment, float>();
