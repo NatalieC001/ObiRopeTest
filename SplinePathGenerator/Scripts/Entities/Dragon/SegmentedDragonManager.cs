@@ -41,10 +41,7 @@ public class SegmentedDragonManager : MonoBehaviour
     private BossCreature bossBrain;
 
     // --- TETHER STATE ---
-    // Note: Use object instead of RopeArrow if RopeArrow is not available here,
-    // but the user's snippet shows they have a RopeArrow script.
-    // I will use dynamic/var if there's type issues, but I will assume RopeArrow exists as per the snippet.
-    private MonoBehaviour currentTether = null;
+    private RopeArrow currentTether = null;
     public bool IsTethered { get; private set; } = false;
     public Transform TetherAnchorTransform { get; private set; } = null;
     public float TetherMaxLength { get; private set; } = 0f;
@@ -123,18 +120,7 @@ public class SegmentedDragonManager : MonoBehaviour
             }
         }
 
-        if (RopeArrowManagerObi7.Instance != null)
-        {
-            // Subscribe using reflection to avoid compilation errors if OnRopeBroken is not an event we can easily bind to here
-            // But we can try to bind directly first
-            // Note: C# events require direct compile-time knowledge to use +=. If it fails to compile locally we can't test,
-            // but we'll use the user's snippet exact text.
-        }
-
-        try {
-            // Using standard event binding as requested
-            RopeArrowManagerObi7.OnRopeBroken += OnRopeBrokenEventAdapter;
-        } catch {}
+        RopeArrowManagerObi7.OnRopeBroken += OnRopeBroken;
 
         // Initialize history with pre-filled positions backward from ROOT object
         positionHistory.Clear();
@@ -217,19 +203,14 @@ public class SegmentedDragonManager : MonoBehaviour
         bossSpline = newTrack;
     }
 
-    public void HandleRopeAttached(DragonSegment segment, MonoBehaviour rope)
+    public void HandleRopeAttached(DragonSegment segment, RopeArrow rope)
     {
         if (rope == null || segment == null) return;
 
         currentTether = rope;
         IsTethered = true;
 
-        // Try to get tail transform using reflection or dynamic since RopeArrow might not be strictly defined here
-        System.Reflection.MethodInfo getTailMethod = rope.GetType().GetMethod("GetTailTransform");
-        if (getTailMethod != null)
-        {
-            TetherAnchorTransform = getTailMethod.Invoke(rope, null) as Transform;
-        }
+        TetherAnchorTransform = rope.GetTailTransform();
 
         if (TetherAnchorTransform != null)
         {
@@ -243,7 +224,7 @@ public class SegmentedDragonManager : MonoBehaviour
         Debug.Log($"<color=cyan>[SegmentedDragonManager] Tether attached to segment {segment.SegmentIndex}. MaxLength: {TetherMaxLength:F2}</color>");
     }
 
-    public void ReleaseTetherFromSegment(DragonSegment segment, MonoBehaviour rope)
+    public void ReleaseTetherFromSegment(DragonSegment segment, RopeArrow rope)
     {
         if (rope == null) return;
         if (currentTether == rope)
@@ -256,17 +237,7 @@ public class SegmentedDragonManager : MonoBehaviour
         }
     }
 
-    // Event adapter matching the exact user snippet signature (RopeArrow parameter)
-    // We use dynamic or just object to avoid breaking compilation if RopeArrow isn't in scope here.
-    // In Unity, sometimes scripts are in different asmdefs.
-    // Given the snippet: private void OnRopeBroken(RopeArrow rope)
-    // Since we used MonoBehaviour, let's keep it safe. But the event in RopeArrowManagerObi7 likely passes the RopeArrow type.
-    private void OnRopeBrokenEventAdapter(dynamic rope)
-    {
-        OnRopeBroken(rope as MonoBehaviour);
-    }
-
-    private void OnRopeBroken(MonoBehaviour rope)
+    private void OnRopeBroken(RopeArrow rope)
     {
         if (rope == null) return;
         if (currentTether == rope)
@@ -277,9 +248,7 @@ public class SegmentedDragonManager : MonoBehaviour
 
     private void OnDestroy()
     {
-        try {
-            RopeArrowManagerObi7.OnRopeBroken -= OnRopeBrokenEventAdapter;
-        } catch {}
+        RopeArrowManagerObi7.OnRopeBroken -= OnRopeBroken;
     }
 
     // Controls whether the Update loop forces rigid spacing. Disabled briefly when closing a gap.
@@ -446,14 +415,10 @@ public class SegmentedDragonManager : MonoBehaviour
         // Handle tether detachment if the piece that dissolved was the tether anchor
         if (IsTethered && currentTether != null)
         {
-            System.Reflection.MethodInfo getTailMethod = currentTether.GetType().GetMethod("GetTailTransform");
-            if (getTailMethod != null)
+            Transform tail = currentTether.GetTailTransform();
+            if (tail != null && (tail.IsChildOf(destroyedSegment.transform) || tail == destroyedSegment.transform))
             {
-                Transform tail = getTailMethod.Invoke(currentTether, null) as Transform;
-                if (tail != null && (tail.IsChildOf(destroyedSegment.transform) || tail == destroyedSegment.transform))
-                {
-                    ReleaseTetherFromSegment(destroyedSegment, currentTether);
-                }
+                ReleaseTetherFromSegment(destroyedSegment, currentTether);
             }
         }
 

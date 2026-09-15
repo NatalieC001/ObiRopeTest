@@ -1,5 +1,4 @@
-
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Obi;
@@ -24,6 +23,10 @@ public class RopeArrowManagerObi7 : MonoBehaviour
 
 
     public static RopeArrowManagerObi7 Instance { get; private set; }
+
+    // Event fired whenever a rope/tether is intentionally broken or removed.
+    // Subscribers (like SegmentedDragonManager) can react to release and clean up tether state.
+    public static event System.Action<RopeArrow> OnRopeBroken;
 
     [Header("Obi 7 Setup (Drag from Hierarchy)")]
     [Tooltip("Drag the single ObiSolver object from the Scene Hierarchy.")]
@@ -74,6 +77,65 @@ public class RopeArrowManagerObi7 : MonoBehaviour
 
     private void OnDisable()
     {
+    }
+
+
+    /// <summary>
+    /// Called when a RopeArrow receives an elemental infusion (player hit its tail with an elemental arrow).
+    /// This method routes the infusion to the correct RopePair:
+    /// - If the arrow already has a connected ObiRope, find the generated pair and infuse it.
+    /// - Otherwise, try to infuse any active pair that references this arrow.
+    /// - If it is still the first pending arrow, try to infuse the pendingPair.
+    /// </summary>
+    public void ApplyElementalEffect(RopeArrow arrow)
+    {
+        if (arrow == null) return;
+
+        ElementTypeOB7 element = arrow.CurrentElement;
+
+        // 1) If arrow has a generated rope, find its pair and try infusing the pair
+        ObiRope connected = arrow.GetConnectedRope();
+        if (connected != null)
+        {
+            var pair = GetPairForRope(connected);
+            if (pair != null)
+            {
+                bool ok = pair.TryInfuse(element);
+                Debug.Log($"<color=cyan>[RopeManager] Infusion routed to generated pair. Success: {ok}</color>");
+                return;
+            }
+        }
+
+        // 2) Search active pairs for one that references this arrow (covers race conditions)
+        foreach (var p in activePairs)
+        {
+            if (p == null) continue;
+            if (p.Arrow1 == arrow || p.Arrow2 == arrow)
+            {
+                bool ok = p.TryInfuse(element);
+                Debug.Log($"<color=cyan>[RopeManager] Infusion routed to active pair. Success: {ok}</color>");
+                return;
+            }
+        }
+
+        // 3) If still pending (first arrow only), attempt to infuse the pendingPair
+        if (pendingPair != null && pendingPair.Arrow1 == arrow)
+        {
+            bool ok = pendingPair.TryInfuse(element);
+            Debug.Log($"<color=cyan>[RopeManager] Infusion routed to pending pair. Success: {ok}</color>");
+            return;
+        }
+
+        // 4) Nothing matched — log for debugging
+        Debug.LogWarning("<color=orange>[RopeManager] ApplyElementalEffect: Could not find rope pair to apply infusion to.</color>");
+    }
+
+    /// <summary>
+    /// Notify subscribers that a rope associated with the provided rope-arrow is being broken/removed.
+    /// </summary>
+    public void NotifyRopeBroken(RopeArrow ropeArrow)
+    {
+        OnRopeBroken?.Invoke(ropeArrow);
     }
 
     /// <summary>
@@ -152,6 +214,43 @@ public class RopeArrowManagerObi7 : MonoBehaviour
     private void HandleArrowHit(StickingArrow arrow, GameObject hitTargetObject)
     {
         Debug.Log($"<color=magenta>[RopeManager] Received RegisterRopeArrow call from Target: {hitTargetObject.name}. Arrow: {arrow.gameObject.name}</color>");
+
+        // If this arrow is already in a pending pair, ignore it to prevent weird states
+        if (pendingPair != null && pendingPair.Arrow1 == arrow)
+        {
+            Debug.LogWarning("<color=orange>[RopeManager] Arrow tried to register, but it is already the FIRST arrow! Ignoring.</color>");
+            return;
+        }
+
+        if (pendingPair == null)
+        {
+            // First arrow of a new pair
+            pendingPair = ScriptableObject.CreateInstance<RopeArrowPairOB7>();
+            pendingPair.Initialize(arrow);
+            activePairs.Add(pendingPair);
+            Debug.Log("<color=magenta>[RopeManager] Registered as FIRST arrow. Creating pending pair.</color>");
+        }
+        else
+        {
+            // Second arrow hit. Complete the pair!
+            Debug.Log("<color=magenta>[RopeManager] Registered as SECOND arrow. Triggering Obi generation Coroutine...</color>");
+
+            // Cache the reference to start the coroutine
+            RopeArrowPairOB7 pairToGenerate = pendingPair;
+
+            // IMMEDATELY NULLIFY PENDING PAIR.
+            // THIS ENSURES THE VERY NEXT ARROW WILL 100% BE FORCED INTO THE (pendingPair == null) BLOCK
+            pendingPair = null;
+
+            pairToGenerate.IsGenerating = true;
+            StartCoroutine(GenerateRopeForPair(pairToGenerate, arrow));
+        }
+    }
+
+    // Added overload to handle RopeArrow directly
+    private void HandleArrowHit(RopeArrow arrow, GameObject hitTargetObject)
+    {
+        Debug.Log($"<color=magenta>[RopeManager] Received RegisterRopeArrow call (RopeArrow) from Target: {hitTargetObject.name}. Arrow: {arrow.gameObject.name}</color>");
 
         // If this arrow is already in a pending pair, ignore it to prevent weird states
         if (pendingPair != null && pendingPair.Arrow1 == arrow)
@@ -376,6 +475,18 @@ public class RopeArrowManagerObi7 : MonoBehaviour
         HandleArrowHit(arrow, hitObj);
     }
 
+    // Accept a RopeArrow registering itself as a first/second arrow:
+    public void RegisterRopeArrow(RopeArrow arrow, GameObject hitObj, Vector3 impactPoint)
+    {
+        // Convert to the internal flow: create a lightweight adapter object or call an internal polymorphic handler.
+        // If existing logic expects StickingArrow fields (tailPoint), the manager should be updated to use
+        // RopeArrow.GetTailTransform() where appropriate. For now, try to reuse the same internal code by creating
+        // a minimal wrapper class or overloads for GenerateRopeForPair that accept RopeArrow.
+
+        // Minimal immediate action: forward to the same internal handler by adding a small helper overload:
+        HandleArrowHit(arrow, hitObj); // implement HandleArrowHit(RopeArrow, GameObject) below
+    }
+
     public void FreezeRope(ObiRope rope)
     {
         if (rope != null && rope.solver != null)
@@ -402,6 +513,3 @@ public class RopeArrowManagerObi7 : MonoBehaviour
         HandleArrowDestroyed(arrow);
     }
 }
-
-
-
