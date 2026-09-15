@@ -88,7 +88,7 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
     /// <summary>
     /// Called when the player shoots this specific segment.
     /// </summary>
-    public void TakeDamage(float amount, Vector3 hitPoint, ElementTypeOB7 arrowType = ElementTypeOB7.Normal)
+    public virtual void TakeDamage(float amount, Vector3 hitPoint, ElementTypeOB7 arrowType = ElementTypeOB7.Normal)
     {
         // Pass damage up to the brain so the overall boss loses health and can trigger evasions!
         if (bossBrain != null)
@@ -116,19 +116,34 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
         }
     }
 
-    private void Die()
+    private void Start()
+    {
+        // For destructible body parts, we intercept the OnDissolveCompleted event right from the start.
+        // The DissolveEffect script naturally handles the arrow hit and plays the animation immediately.
+        // We just sit back and wait for it to finish, then we obliterate the root object and close the gap.
+        if (isDestructiblePart)
+        {
+            DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
+            if (dissolve != null)
+            {
+                dissolve.OnDissolveCompleted += FinalizeDestruction;
+            }
+        }
+    }
+
+    protected virtual void Die()
     {
         if (!isDestructiblePart) return;
 
-        Debug.Log($"<color=red>[DragonSegment] Segment {SegmentIndex} starting destruction sequence!</color>");
+        Debug.Log($"<color=red>[DragonSegment] Segment {SegmentIndex} health reached 0!</color>");
 
-        // 1. Disable physics immediately so arrows don't keep hitting the dying segment
+        // Disable physics immediately so arrows don't keep hitting it
         if (segmentCollider != null)
         {
             segmentCollider.enabled = false;
         }
 
-        // 2. Trigger dissolve on any arrows sticking out of this segment simultaneously
+        // Trigger dissolve on any arrows sticking out of this segment simultaneously.
         StickingArrow[] attachedArrows = GetComponentsInChildren<StickingArrow>(true);
         foreach (StickingArrow arrow in attachedArrows)
         {
@@ -142,21 +157,28 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
             }
         }
 
-        // 3. Trigger dissolve on the segment itself and pass the completion callback
+        // Explicitly command the segment's visual effect to start dissolving!
+        // This will eventually fire the OnDissolveCompleted event we subscribed to in Start,
+        // which will trigger FinalizeDestruction().
         DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
         if (dissolve != null)
         {
-            // The elegant callback approach: When the visual effect completely finishes,
-            // trigger the final array cleanup and obliterate the object.
-            dissolve.TriggerDissolve(() =>
-            {
-                FinalizeDestruction();
-            });
+            dissolve.TriggerDissolve();
         }
         else
         {
-            // Fallback if no visual effect is attached
+            // Fallback: If no DissolveEffect exists to fire the event, we just destroy it now
             FinalizeDestruction();
+        }
+    }
+
+    private void OnDestroy()
+    {
+        // Clean up the event listener to avoid memory leaks
+        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
+        if (dissolve != null)
+        {
+            dissolve.OnDissolveCompleted -= FinalizeDestruction;
         }
     }
 
@@ -199,7 +221,7 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
     /// Called by the SegmentedDragonManager when the entire boss is defeated.
     /// Forces permanent pieces (Head, Legs, Tail) to finally dissolve.
     /// </summary>
-    public void TriggerTotalDeath()
+    public virtual void TriggerTotalDeath()
     {
         if (segmentCollider != null)
         {
