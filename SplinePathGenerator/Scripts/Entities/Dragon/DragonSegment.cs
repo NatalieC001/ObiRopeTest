@@ -126,26 +126,6 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
         if (segmentCollider != null)
         {
             segmentCollider.enabled = false;
-            Destroy(segmentCollider.gameObject, 0.1f); // Ensure the physics engine totally removes it
-        }
-
-        // Clean up any arrows sticking out of this segment
-        StickingArrow[] attachedArrows = GetComponentsInChildren<StickingArrow>(true);
-        foreach (StickingArrow arrow in attachedArrows)
-        {
-            if (arrow != null)
-            {
-                Destroy(arrow.gameObject);
-            }
-        }
-
-        // Find any "ArrowAnchor" objects that the StickingArrow might have parented directly
-        foreach (Transform child in transform)
-        {
-            if (child.name.Contains("ArrowAnchor"))
-            {
-                Destroy(child.gameObject);
-            }
         }
 
         // Notify the body manager that this piece is gone so it can close the gap
@@ -154,18 +134,59 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
             dragonManager.OnSegmentDestroyed(this);
         }
 
-        // If there is a DissolveEffect, let it play and destroy the object after a delay
-        // Otherwise, destroy immediately.
+        // Trigger dissolve on the segment itself
+        float destroyDelay = 0.1f;
         DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
         if (dissolve != null)
         {
             dissolve.TriggerDissolve();
-            Destroy(gameObject, 2f); // Give time for the visual effect to play
+            // Use reflection to get the duration if possible, otherwise assume standard 2 seconds
+            System.Reflection.FieldInfo durationField = dissolve.GetType().GetField("DissolveDuration", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.IgnoreCase);
+            if (durationField != null)
+            {
+                destroyDelay = (float)durationField.GetValue(dissolve);
+            }
+            else
+            {
+                destroyDelay = 2f;
+            }
         }
-        else
+
+        // Trigger dissolve on any arrows sticking out of this segment
+        StickingArrow[] attachedArrows = GetComponentsInChildren<StickingArrow>(true);
+        foreach (StickingArrow arrow in attachedArrows)
         {
-            Destroy(gameObject);
+            if (arrow != null)
+            {
+                DissolveEffect arrowDissolve = arrow.GetComponentInChildren<DissolveEffect>();
+                if (arrowDissolve != null)
+                {
+                    arrowDissolve.TriggerDissolve();
+                }
+                Destroy(arrow.gameObject, destroyDelay);
+            }
         }
+
+        // Find any "ArrowAnchor" objects that the StickingArrow might have parented directly
+        foreach (Transform child in transform)
+        {
+            if (child.name.Contains("ArrowAnchor"))
+            {
+                Destroy(child.gameObject, destroyDelay);
+            }
+        }
+
+        // Explicitly destroy all child objects (like Mesh_Visual and Collider_Node) to ensure they are cleaned up cleanly
+        foreach (Transform child in transform)
+        {
+            if (child != transform)
+            {
+                Destroy(child.gameObject, destroyDelay);
+            }
+        }
+
+        // Destroy the root object
+        Destroy(gameObject, destroyDelay);
     }
 
     /// <summary>

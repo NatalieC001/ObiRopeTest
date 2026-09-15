@@ -120,6 +120,16 @@ public class SegmentedDragonManager : MonoBehaviour
             }
         }
 
+        // Register all segments strictly after they are completely spawned
+        if (spacingManager != null)
+        {
+            spacingManager.ClearSegments();
+            foreach (var seg in activeSegments)
+            {
+                spacingManager.RegisterSegment(seg);
+            }
+        }
+
         RopeArrowManagerObi7.OnRopeBroken += OnRopeBroken;
 
         // Notify listeners of initial count
@@ -189,11 +199,6 @@ public class SegmentedDragonManager : MonoBehaviour
 
         segment.Initialize(this, bossBrain, index);
         activeSegments.Add(segment);
-
-        if (spacingManager != null)
-        {
-            spacingManager.RegisterSegment(segment);
-        }
 
         totalBossPower += segment.powerContribution;
     }
@@ -410,9 +415,20 @@ public class SegmentedDragonManager : MonoBehaviour
         }
 
         // Update the indices of remaining active segments
+        int destructibleCount = 0;
         for (int i = 0; i < activeSegments.Count; i++)
         {
             activeSegments[i].SegmentIndex = i;
+            if (activeSegments[i].isDestructiblePart)
+            {
+                destructibleCount++;
+            }
+        }
+
+        if (destructibleCount == 0 && bossBrain != null)
+        {
+            Debug.Log("<color=red>[SegmentedDragonManager] No destructible segments remain. Executing Boss Death!</color>");
+            bossBrain.TakeDamage(99999f, transform.position, ElementTypeOB7.Normal);
         }
 
         // Notify listeners of segment loss
