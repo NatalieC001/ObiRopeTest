@@ -59,7 +59,11 @@ public class SegmentedDragonManager : MonoBehaviour
         // 1. Spawn Head
         SpawnSegment(headPrefab, currentIndex, track);
         headFollower = activeSegments[0].Follower;
-        headFollower.follow = true; // Only head actively follows the spline!
+
+        // Disable the head's follower component entirely. The body will follow the ROOT object instead!
+        headFollower.enabled = false;
+        headFollower.follow = false;
+
         currentIndex++;
 
         // 2. Spawn Front Legs (if assigned)
@@ -95,20 +99,21 @@ public class SegmentedDragonManager : MonoBehaviour
             }
         }
 
-        // Initialize history with pre-filled positions backward from head
+        // Initialize history with pre-filled positions backward from ROOT object
         positionHistory.Clear();
-        float totalLength = activeSegments.Count * segmentSpacing * 2f; // Get plenty of history
-        int samples = Mathf.CeilToInt(totalLength / 0.1f) + 1; // sample every 0.1 units backwards for smooth history
+        float totalLength = activeSegments.Count * segmentSpacing * 2f;
+        int samples = Mathf.CeilToInt(totalLength / 0.1f) + 1;
 
         if (bossSpline != null)
         {
-            double startPercent = headFollower.GetPercent();
+            // We use the ROOT object's percent, as that is the true brain that moves!
+            SplineFollower rootFollower = GetComponent<SplineFollower>();
+            double startPercent = rootFollower != null ? rootFollower.GetPercent() : 0.0;
             float splineLength = bossSpline.CalculateLength();
 
             for (int i = 0; i < samples; i++)
             {
                 float distBack = i * 0.1f;
-                // Calculate percentage based on distance backward
                 double percent = startPercent - (distBack / splineLength);
                 if (bossSpline.isClosed)
                 {
@@ -121,9 +126,7 @@ public class SegmentedDragonManager : MonoBehaviour
                     if (percent > 1.0) percent = 1.0;
                 }
 
-                // Hard clamp for absolute safety against floating point errors
                 percent = System.Math.Clamp(percent, 0.0, 1.0);
-
                 SplineSample sample = bossSpline.Evaluate(percent);
 
                 positionHistory.Add(new PositionData {
@@ -133,14 +136,13 @@ public class SegmentedDragonManager : MonoBehaviour
                 });
             }
 
-            // Immediately apply positions to segments so they spawn unspooled
             UpdateSegmentSpacing(false, 1f);
         }
         else
         {
             positionHistory.Add(new PositionData {
-                position = headFollower.transform.position,
-                rotation = headFollower.transform.rotation,
+                position = transform.position,
+                rotation = transform.rotation,
                 distanceTraveled = 0f
             });
         }
@@ -171,7 +173,6 @@ public class SegmentedDragonManager : MonoBehaviour
     public void SwitchToNewSpline(SplineComputer newTrack)
     {
         bossSpline = newTrack;
-        if (headFollower != null) headFollower.spline = newTrack;
     }
 
     // Controls whether the Update loop forces rigid spacing. Disabled briefly when closing a gap.
@@ -184,28 +185,25 @@ public class SegmentedDragonManager : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (activeSegments.Count == 0 || headFollower == null) return;
+        if (activeSegments.Count == 0) return;
 
-        // 1. Update the Head's Breadcrumb History
-        Vector3 currentHeadPos = activeSegments[0].transform.position;
+        // 1. Update the Breadcrumb History using the ROOT BOSS object, not the spawned head
+        Vector3 currentHeadPos = transform.position;
         if (positionHistory.Count == 0) return;
-        PositionData lastData = positionHistory[0]; // newest is at index 0
+        PositionData lastData = positionHistory[0];
 
         float distMovedSinceLastFrame = Vector3.Distance(currentHeadPos, lastData.position);
 
-        // Only record a new breadcrumb if the head has actually moved a tiny bit
         if (distMovedSinceLastFrame > 0.05f)
         {
             headTotalDistance += distMovedSinceLastFrame;
 
             positionHistory.Insert(0, new PositionData {
                 position = currentHeadPos,
-                rotation = activeSegments[0].transform.rotation,
+                rotation = transform.rotation,
                 distanceTraveled = headTotalDistance
             });
 
-            // Prune history buffer so it doesn't grow infinitely.
-            // We only need enough history to cover the tail.
             float maxNeededHistoryDistance = segmentSpacing * activeSegments.Count * 2f;
             if (headTotalDistance - positionHistory[positionHistory.Count - 1].distanceTraveled > maxNeededHistoryDistance)
             {
@@ -238,8 +236,9 @@ public class SegmentedDragonManager : MonoBehaviour
 
     private void UpdateSegmentSpacing(bool animateSmoothly, float lerpT)
     {
-        // 3. Move the Body Segments along the history buffer
-        for (int i = 1; i < activeSegments.Count; i++)
+        // 3. Move all segments (including the Head at index 0) along the history buffer.
+        // Because they follow the root object, the head just trails at 0 distance!
+        for (int i = 0; i < activeSegments.Count; i++)
         {
             DragonSegment segment = activeSegments[i];
 
@@ -274,12 +273,12 @@ public class SegmentedDragonManager : MonoBehaviour
 
     public void PauseSplineFollow()
     {
-        if (headFollower != null) headFollower.follow = false;
+        // No longer needed, root object handles its own follow state
     }
 
     public void ResumeSplineFollow()
     {
-        if (headFollower != null) headFollower.follow = true;
+        // No longer needed
     }
 
     /// <summary>
@@ -289,7 +288,6 @@ public class SegmentedDragonManager : MonoBehaviour
     {
         totalBossPower -= destroyedSegment.powerContribution;
 
-        bool wasHead = (activeSegments.IndexOf(destroyedSegment) == 0);
         activeSegments.Remove(destroyedSegment);
 
         Debug.Log($"<color=magenta>[SegmentedDragonManager] A segment fell! Boss power reduced to {totalBossPower}. Closing gap!</color>");
@@ -297,17 +295,7 @@ public class SegmentedDragonManager : MonoBehaviour
         if (activeSegments.Count == 0)
         {
             // The whole dragon is dead!
-            headFollower = null;
             return;
-        }
-
-        if (wasHead)
-        {
-            // NOTE: Under breadcrumb logic, destroying the literal head is complex.
-            // Normally the head is invincible (`isDestructiblePart = false`).
-            headFollower = activeSegments[0].Follower;
-            headFollower.enabled = true;
-            headFollower.follow = true;
         }
 
         currentSpacings.Clear();

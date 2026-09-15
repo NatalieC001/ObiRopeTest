@@ -111,16 +111,22 @@ public class TacticalBossSplineManager : MonoBehaviour
     {
         if (target == null) return;
 
-        // Simple pursuit logic in the air
-        Vector3 direction = (target.position - transform.position).normalized;
-        // Fly towards player
-        transform.position += direction * 15f * Time.deltaTime;
+        float distanceToPlayer = Vector3.Distance(transform.position, target.position);
 
-        // Rotate smoothly towards player
-        if (direction != Vector3.zero)
+        // Natural momentum: Always fly forward
+        transform.position += transform.forward * 20f * Time.deltaTime;
+
+        // If we are far away, steer towards the player. If we are too close,
+        // maintain current forward momentum to "swoop" past them instead of stalling or turning on a dime!
+        if (distanceToPlayer > 15f)
         {
-            Quaternion lookRot = Quaternion.LookRotation(direction);
-            transform.rotation = Quaternion.Slerp(transform.rotation, lookRot, Time.deltaTime * 5f);
+            Vector3 direction = (target.position - transform.position).normalized;
+            if (direction != Vector3.zero)
+            {
+                Quaternion lookRot = Quaternion.LookRotation(direction);
+                // Slow rotation gives a wide, natural turning arc
+                transform.rotation = Quaternion.Slerp(transform.rotation, lookRot, Time.deltaTime * 2f);
+            }
         }
     }
 
@@ -132,26 +138,56 @@ public class TacticalBossSplineManager : MonoBehaviour
         // Tell the body manager we are freestyle. It will just follow history naturally.
         if (bodyManager != null) bodyManager.SwitchToNewSpline(null);
 
-        // 2. Freestyle fly through the air to the start of the target spline
         SplineSample targetStartSample = targetRoute.Evaluate(0);
-        Vector3 startPos = transform.position;
-        Quaternion startRot = transform.rotation;
 
-        float timer = 0f;
-        while (timer < hopDuration)
+        // 2. Freestyle fly through the air towards the start of the target spline.
+        // We do not teleport or rigid-lerp. We use constant forward momentum and steer.
+        float flightSpeed = 25f;
+        float turnSpeed = 3f;
+
+        bool hasReachedTarget = false;
+
+        while (!hasReachedTarget)
         {
-            timer += Time.deltaTime;
-            float t = timer / hopDuration;
-            t = Mathf.SmoothStep(0f, 1f, t);
+            // Always fly forward continuously to maintain momentum
+            transform.position += transform.forward * flightSpeed * Time.deltaTime;
 
-            // Lerp position and rotation directly
-            transform.position = Vector3.Lerp(startPos, targetStartSample.position, t);
-            transform.rotation = Quaternion.Slerp(startRot, targetStartSample.rotation, t);
+            // Calculate direction to the destination
+            Vector3 directionToStart = (targetStartSample.position - transform.position).normalized;
+
+            // Distance to destination
+            float distance = Vector3.Distance(transform.position, targetStartSample.position);
+
+            if (distance > 10f)
+            {
+                // Steer towards the target point
+                if (directionToStart != Vector3.zero)
+                {
+                    Quaternion lookRot = Quaternion.LookRotation(directionToStart);
+                    transform.rotation = Quaternion.Slerp(transform.rotation, lookRot, Time.deltaTime * turnSpeed);
+                }
+            }
+            else
+            {
+                // We are very close to the start of the spline!
+                // Start aligning our rotation to match the direction the spline expects us to be facing
+                if (targetStartSample.forward != Vector3.zero)
+                {
+                    Quaternion alignRot = Quaternion.LookRotation(targetStartSample.forward);
+                    transform.rotation = Quaternion.Slerp(transform.rotation, alignRot, Time.deltaTime * turnSpeed * 2f);
+                }
+
+                // If we are practically touching the start point, we can latch on!
+                if (distance < 2f)
+                {
+                    hasReachedTarget = true;
+                }
+            }
 
             yield return null;
         }
 
-        // 3. We arrived! Attach to the target route.
+        // 3. We arrived! Attach to the target route seamlessly.
         bossFollower.follow = false;
         bossFollower.spline = targetRoute;
         bossFollower.wrapMode = SplineFollower.Wrap.Default;

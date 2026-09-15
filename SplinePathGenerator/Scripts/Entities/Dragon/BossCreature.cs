@@ -187,6 +187,10 @@ public class BossCreature : MonoBehaviour
         currentPhase = BossPhase.Exhausted;
         Debug.Log("<color=cyan>[BossCreature] Phase 3: Dragon is exhausted! Fleeing to recharge!</color>");
 
+        // Permanently decay stamina so fights don't last forever
+        maxStamina *= 0.7f;
+        if (maxStamina < 20f) maxStamina = 20f; // Minimum stamina floor so it can still fight briefly
+
         // Command the manager to flee through environmental splines
         tacticalManager.StartEvasionRoutine();
     }
