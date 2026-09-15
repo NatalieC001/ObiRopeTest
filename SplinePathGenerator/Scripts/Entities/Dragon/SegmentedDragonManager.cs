@@ -459,11 +459,30 @@ public class SegmentedDragonManager : MonoBehaviour
     public void TriggerTotalDeath()
     {
         Debug.Log("<color=red>[SegmentedDragonManager] The entire dragon is collapsing!</color>");
+
+        float longestDissolveDuration = 0f;
+
         foreach (var segment in activeSegments)
         {
             if (segment != null)
             {
                 segment.TriggerTotalDeath();
+
+                // Find the longest dissolve time to synchronize the root destruction
+                DissolveEffect dissolve = segment.GetComponentInChildren<DissolveEffect>();
+                if (dissolve != null)
+                {
+                    System.Reflection.FieldInfo durationField = dissolve.GetType().GetField("dissolveDuration", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    if (durationField != null)
+                    {
+                        float duration = (float)durationField.GetValue(dissolve);
+                        if (duration > longestDissolveDuration) longestDissolveDuration = duration;
+                    }
+                    else
+                    {
+                        if (1.5f > longestDissolveDuration) longestDissolveDuration = 1.5f; // Fallback
+                    }
+                }
             }
         }
         activeSegments.Clear();
@@ -474,5 +493,10 @@ public class SegmentedDragonManager : MonoBehaviour
         TetherMaxLength = 0f;
 
         OnSegmentCountChanged?.Invoke(0);
+
+        // Schedule the root boss object (which holds BossCreature) to be destroyed exactly
+        // after the longest child dissolve finishes. This guarantees the visual completes gracefully
+        // AND the TrainingLevelManager detects the null object to advance the wave!
+        Destroy(gameObject, longestDissolveDuration + 0.1f);
     }
 }

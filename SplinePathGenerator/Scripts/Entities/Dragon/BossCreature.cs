@@ -293,14 +293,22 @@ public class BossCreature : MonoBehaviour
         // Stop movement
         tacticalManager.enabled = false;
 
-        // Command all indestructible pieces (Head, Legs, Tail) to dissolve
+        // Disable physics immediately so no further hits trigger logic
+        Collider rootCollider = GetComponent<Collider>();
+        if (rootCollider != null) rootCollider.enabled = false;
+
+        // Command all indestructible pieces (Head, Legs, Tail) to gracefully dissolve.
+        // The SegmentedDragonManager will handle destroying this root GameObject
+        // once the visual animations finish, which will signal the TrainingLevelManager to advance!
         SegmentedDragonManager dragonBody = GetComponent<SegmentedDragonManager>();
         if (dragonBody != null)
         {
             dragonBody.TriggerTotalDeath();
         }
-
-        // Clean up the main boss entity
-        Destroy(gameObject, 1f);
+        else
+        {
+            // Fallback if no body manager exists
+            Destroy(gameObject);
+        }
     }
 }

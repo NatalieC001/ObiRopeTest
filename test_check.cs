@@ -1,2 +1,1 @@
-// The script already has `dissolve.TriggerDissolve(() => { Destroy(gameObject); });`
-// So it will correctly play the animation and gracefully destroy itself!
+// This was fully implemented in the above step. The root object holding the BossCreature will be deleted, which naturally takes all the children with it.
