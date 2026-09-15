@@ -120,29 +120,15 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
     {
         if (!isDestructiblePart) return;
 
-        Debug.Log($"<color=red>[DragonSegment] Segment {SegmentIndex} Destroyed!</color>");
+        Debug.Log($"<color=red>[DragonSegment] Segment {SegmentIndex} starting destruction sequence!</color>");
 
-        // Disable physics immediately so arrows don't keep hitting the dying segment
+        // 1. Disable physics immediately so arrows don't keep hitting the dying segment
         if (segmentCollider != null)
         {
             segmentCollider.enabled = false;
         }
 
-        // Notify the body manager that this piece is gone so it can close the gap
-        if (dragonManager != null)
-        {
-            dragonManager.OnSegmentDestroyed(this);
-        }
-
-        // Trigger dissolve on the segment itself
-        float destroyDelay = 1.0f; // Fixed safe delay to ensure objects are absolutely destroyed
-        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
-        if (dissolve != null)
-        {
-            dissolve.TriggerDissolve();
-        }
-
-        // Trigger dissolve on any arrows sticking out of this segment
+        // 2. Trigger dissolve on any arrows sticking out of this segment simultaneously
         StickingArrow[] attachedArrows = GetComponentsInChildren<StickingArrow>(true);
         foreach (StickingArrow arrow in attachedArrows)
         {
@@ -153,30 +139,41 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
                 {
                     arrowDissolve.TriggerDissolve();
                 }
-                Destroy(arrow.gameObject, destroyDelay);
             }
         }
 
-        // Find any "ArrowAnchor" objects that the StickingArrow might have parented directly
-        foreach (Transform child in transform)
+        // 3. Trigger dissolve on the segment itself and pass the completion callback
+        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
+        if (dissolve != null)
         {
-            if (child.name.Contains("ArrowAnchor"))
+            // The elegant callback approach: When the visual effect completely finishes,
+            // trigger the final array cleanup and obliterate the object.
+            dissolve.TriggerDissolve(() =>
             {
-                Destroy(child.gameObject, destroyDelay);
-            }
+                FinalizeDestruction();
+            });
         }
-
-        // Explicitly destroy all child objects (like Mesh_Visual and Collider_Node) to ensure they are cleaned up cleanly
-        foreach (Transform child in transform)
+        else
         {
-            if (child != transform)
-            {
-                Destroy(child.gameObject, destroyDelay);
-            }
+            // Fallback if no visual effect is attached
+            FinalizeDestruction();
+        }
+    }
+
+    /// <summary>
+    /// Called EXACTLY when the visual dissolve finishes via callback.
+    /// Safely purges the segment from the tracking arrays and obliterates the GameObject hierarchy.
+    /// </summary>
+    private void FinalizeDestruction()
+    {
+        // Tell the manager to wipe this piece from the tracking array and close the gap!
+        if (dragonManager != null)
+        {
+            dragonManager.OnSegmentDestroyed(this);
         }
 
-        // Destroy the root object
-        Destroy(gameObject, destroyDelay);
+        // Permanently destroy the root object, which automatically takes the Mesh, Collider, and Arrows with it.
+        Destroy(gameObject);
     }
 
     /// <summary>

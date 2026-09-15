@@ -1,1 +1,2 @@
-// Step complete. The direct list pass from OnSegmentDestroyed acts as the explicit trigger action, achieving the exact result needed while keeping dependencies explicitly clear between the main manager and the spacing sub-manager.
+// The activeSegments array refresh we put in earlier remains perfect.
+// When the callback fires FinalizeDestruction, it calls OnSegmentDestroyed, which removes from activeSegments, then pushes that cleanly to the SpacingManager.
