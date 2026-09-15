@@ -137,7 +137,7 @@ public class TrainingLevelManager : MonoBehaviour
         if (levelFeedbackText != null)
         {
             levelFeedbackText.text = $"Level: {currentLevelConfig.levelName}\n{currentLevelConfig.levelIntroText}\n<size=70%>Shoot the Gong to begin!</size>";
-            Debug.Log($"[TrainingLevelManager] Showing Level Intro Text. Waiting infinitely for player to shoot the Gong.");
+            Debug.Log($"[TrainingLevelManager] Showing Level Intro Text. Waiting 3.0s before Wave 1.");
         }
 
         if (currentLevelConfig.waves.Count == 0)
@@ -234,31 +234,15 @@ public class TrainingLevelManager : MonoBehaviour
         if (finalScale <= 0) finalScale = 1.0f; // Prevent scale 0
         newTarget.transform.localScale = Vector3.one * finalScale;
 
-        // 2. Apply setup to all MovingTarget components, including those nested in Spline Prefabs.
-        MovingTarget[] movingTargets = newTarget.GetComponentsInChildren<MovingTarget>(false);
-        if (movingTargets.Length > 0)
+        // 2. Try to setup the MovingTarget component (Color requirement)
+        MovingTarget movingTarget = newTarget.GetComponent<MovingTarget>();
+        if (movingTarget != null)
         {
-            foreach (var target in movingTargets)
-            {
-                target.SetRequiredElement(config.requiredArrowElement);
-                // The manager tracks actual destructible targets instead of the root prefab
-                // so that it accurately knows when all targets in a spline group are destroyed.
-                activeTargets.Add(target.gameObject);
-            }
-            Debug.Log($"[TrainingLevelManager] Spawned {movingTargets.Length} targets on prefab. Need Element: {config.requiredArrowElement}");
-        }
-        else
-        {
-            Debug.LogWarning("[TrainingLevelManager] Spawned prefab has no MovingTarget components! Tracking root object instead.");
-            activeTargets.Add(newTarget);
+            movingTarget.SetRequiredElement(config.requiredArrowElement);
+            Debug.Log($"[TrainingLevelManager] Target spawned. Needs Element: {config.requiredArrowElement}");
         }
 
-        // 3. Clean up the root object if all of its children are destroyed (crucial for Spline targets)
-        // We add an invisible cleanup script to the root object.
-        var cleaner = newTarget.AddComponent<RootObjectCleaner>();
-        cleaner.Initialize(movingTargets);
-
-        // 4. Dynamically add movement script (Searching across all assemblies for .asmdef support)
+        // 3. Dynamically add movement script (Searching across all assemblies for .asmdef support)
         if (config.movementBehavior != TargetMovementType.None)
         {
             string movementScriptName = config.movementBehavior.ToString();
@@ -292,6 +276,8 @@ public class TrainingLevelManager : MonoBehaviour
                 Debug.LogError($"[TrainingLevelManager] Could not find MonoBehaviour movement script '{movementScriptName}' in any loaded assembly!");
             }
         }
+
+        activeTargets.Add(newTarget);
     }
 
     /// <summary>
@@ -440,42 +426,6 @@ public class TrainingLevelManager : MonoBehaviour
         if (levelFeedbackText != null)
         {
             levelFeedbackText.text = "";
-        }
-    }
-}
-
-/// <summary>
-/// A helper script attached to root prefabs (like Spline targets).
-/// It destroys the root object when all of its child targets are destroyed.
-/// </summary>
-public class RootObjectCleaner : MonoBehaviour
-{
-    private MovingTarget[] childrenTargets;
-    private bool isInitialized = false;
-
-    public void Initialize(MovingTarget[] targets)
-    {
-        childrenTargets = targets;
-        isInitialized = targets.Length > 0;
-    }
-
-    private void Update()
-    {
-        if (!isInitialized) return;
-
-        bool allDead = true;
-        foreach (var target in childrenTargets)
-        {
-            if (target != null)
-            {
-                allDead = false;
-                break;
-            }
-        }
-
-        if (allDead)
-        {
-            Destroy(gameObject);
         }
     }
 }
