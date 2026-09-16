@@ -1,6 +1,6 @@
 using UnityEngine;
 
-/// <summary>
+/// <summary>NEEEEEWW
 /// The 'Brain' for an advanced Boss creature.
 /// It monitors health and battle state, and commands the TacticalBossSplineManager
 /// to make intelligent evasion choices (like jumping to escape splines) when threatened.
@@ -203,6 +203,39 @@ public class BossCreature : MonoBehaviour
     {
         currentPhase = BossPhase.Recharging;
         Debug.Log("<color=cyan>[BossCreature] Phase 4: Recharging stamina on the observation deck!</color>");
+    }
+
+    /// <summary>
+    /// Force the boss to begin evasive maneuvers immediately.
+    /// Called by other systems (e.g. DragonSegment) when the boss is hit and should react instantly.
+    /// This was added to fix the CS1061 compile error and to ensure the dragon uses escape splines on hit.
+    /// </summary>
+    public void ForceImmediateEvasion()
+    {
+        if (tacticalManager == null) tacticalManager = GetComponent<TacticalBossSplineManager>();
+        if (tacticalManager == null)
+        {
+            Debug.LogWarning("[BossCreature] ForceImmediateEvasion called but TacticalBossSplineManager not found.");
+            return;
+        }
+
+        Debug.Log("<color=red>[BossCreature] ForceImmediateEvasion: ordering immediate tactical evasion.</color>");
+
+        // If the boss was orchestrating, engage first so movement routines behave correctly
+        if (currentPhase == BossPhase.Orchestrator)
+        {
+            EngagePlayer();
+        }
+
+        // Trigger the evasion routine on the tactical manager (this will use the configured escape splines)
+        tacticalManager.EvadeToEscapeRoute();
+
+        // Reset accumulators so we don't re-trigger immediately
+        recentDamageAccumulator = 0f;
+        damageDecayTimer = 0f;
+
+        // Move into Exhausted state so tactical flow (recharge after route) is consistent
+        currentPhase = BossPhase.Exhausted;
     }
 
     /// <summary>
