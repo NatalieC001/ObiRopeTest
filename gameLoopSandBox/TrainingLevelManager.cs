@@ -7,7 +7,7 @@ using UnityEngine;
 
 /// <summary>
 /// Manages the progression of levels and waves for the archery training range.
-/// Reads data from a LevelConfigSO and spawns targets based on WaveDataSO configurations.
+/// Reads data from a LevelConfigSO and spawns targets based on WaveData configurations.
 /// </summary>
 public class TrainingLevelManager : MonoBehaviour
 {
@@ -75,7 +75,7 @@ public class TrainingLevelManager : MonoBehaviour
             return;
         }
 
-        WaveDataSO currentWave = currentLevelConfig.waves[currentWaveIndex];
+        WaveData currentWave = currentLevelConfig.waves[currentWaveIndex];
 
         // Clean up list of destroyed targets so we always have an accurate count
         activeTargets.RemoveAll(t => t == null);
@@ -156,7 +156,7 @@ public class TrainingLevelManager : MonoBehaviour
             return;
         }
 
-        WaveDataSO waveData = currentLevelConfig.waves[index];
+        WaveData waveData = currentLevelConfig.waves[index];
         Debug.Log($"[TrainingLevelManager] Starting Wave {index + 1}/{currentLevelConfig.waves.Count}. Progression: {waveData.progressionType}");
 
         // Waves no longer interrupt the action with text or delays!
@@ -167,74 +167,65 @@ public class TrainingLevelManager : MonoBehaviour
 
         activeTargets.Clear();
         activeSpawnCoroutines.Clear();
-        pendingSpawns = waveData.targets.Count;
+        pendingSpawns = waveData.characters.Count;
         waveTimer = 0f;
         isWaveActive = true;
 
         OnWaveStarted?.Invoke(index);
 
         // Start spawning targets - each target gets its own coroutine to fix cumulative delay issues
-        foreach (var targetConfig in waveData.targets)
+        foreach (var charConfig in waveData.characters)
         {
-            Coroutine spawnRoutine = StartCoroutine(SpawnTargetWithDelay(targetConfig));
+            Coroutine spawnRoutine = StartCoroutine(SpawnCharacterWithDelay(charConfig));
             activeSpawnCoroutines.Add(spawnRoutine);
         }
     }
 
-    private IEnumerator SpawnTargetWithDelay(TargetSpawnConfig targetConfig)
+    private IEnumerator SpawnCharacterWithDelay(CharacterConfigBase charConfig)
     {
-        if (targetConfig.spawnDelay > 0)
+        if (charConfig.spawnDelay > 0)
         {
-            yield return new WaitForSeconds(targetConfig.spawnDelay);
+            yield return new WaitForSeconds(charConfig.spawnDelay);
         }
 
-        SpawnTarget(targetConfig);
+        SpawnCharacter(charConfig);
 
         pendingSpawns--;
     }
 
-    private void SpawnTarget(TargetSpawnConfig config)
+    private void SpawnCharacter(CharacterConfigBase charConfig)
     {
-        Vector3 spawnPos = spawnCenter.position + config.spawnPosition;
-
-        // VR Constraint: Ensure target never spawns below the ground (Y < 0 relative to center)
-        if (spawnPos.y < spawnCenter.position.y)
+        if (charConfig is MinionConfig minionConfig)
         {
-            spawnPos.y = spawnCenter.position.y;
+            SpawnMinion(minionConfig);
+        }
+        else if (charConfig is BossConfig bossConfig)
+        {
+            SpawnBoss(bossConfig);
+        }
+    }
+
+    private void SpawnMinion(MinionConfig config)
+    {
+        if (config.prefab == null)
+        {
+            Debug.LogError("[TrainingLevelManager] Minion Prefab is not set in LevelConfigSO!");
+            return;
         }
 
-        // VR Constraint: Ensure target is perfectly upright, facing the spawn center (the player's expected position)
-        Vector3 directionToCenter = spawnCenter.position - spawnPos;
-        directionToCenter.y = 0; // Keep rotation strictly horizontal (no tilting up/down)
-
+        Vector3 spawnPos = spawnCenter.position;
         Quaternion spawnRot = Quaternion.identity;
-        if (directionToCenter.sqrMagnitude > 0.001f)
+
+        if (config.spawnPointPrefab != null)
         {
-            spawnRot = Quaternion.LookRotation(directionToCenter);
+            GameObject spawnPoint = Instantiate(config.spawnPointPrefab, spawnCenter.position, Quaternion.identity);
+            spawnPos = spawnPoint.transform.position;
+            spawnRot = spawnPoint.transform.rotation;
         }
 
-        // Handle Specialized Asset Spawning (Spline Paths / Bosses)
-        if (config.movementBehavior == TargetMovementType.SplinePathAsset || config.movementBehavior == TargetMovementType.BossDragonAsset)
-        {
-            SpawnComplexAsset(config, spawnPos, spawnRot);
-            return;
-        }
+        GameObject newTarget = Instantiate(config.prefab, spawnPos, spawnRot);
 
-        // Standard Vanilla Target Spawning
-        if (currentLevelConfig.vanillaTargetPrefab == null)
-        {
-            Debug.LogError("[TrainingLevelManager] Vanilla Target Prefab is not set in LevelConfigSO!");
-            return;
-        }
-
-        GameObject newTarget = Instantiate(currentLevelConfig.vanillaTargetPrefab, spawnPos, spawnRot);
-
-        // 1. Apply global and local scaling
-        float finalScale = currentLevelConfig.globalScaleMultiplier * config.scaleModifier;
-        if (finalScale <= 0) finalScale = 1.0f; // Prevent scale 0
-        newTarget.transform.localScale = Vector3.one * finalScale;
-
-        // 2. Try to setup the MovingTarget component (Color requirement)
+        // Try to setup the MovingTarget component (Color requirement)
         MovingTarget movingTarget = newTarget.GetComponent<MovingTarget>();
         if (movingTarget != null)
         {
@@ -242,33 +233,24 @@ public class TrainingLevelManager : MonoBehaviour
             Debug.Log($"[TrainingLevelManager] Target spawned. Needs Element: {config.requiredArrowElement}");
         }
 
-        // 3. Dynamically add movement script (Searching across all assemblies for .asmdef support)
-        if (config.movementBehavior != TargetMovementType.None)
+        // Spawn the movement asset if needed
+        if (config.movementAssetPrefab != null && config.movementType == TargetMovementType.SplinePathAsset)
         {
-            string movementScriptName = config.movementBehavior.ToString();
+            Instantiate(config.movementAssetPrefab, spawnPos, Quaternion.identity);
+            // Additional logic to wire spline path to the target could go here
+        }
+
+        // Dynamically add movement script (Searching across all assemblies for .asmdef support)
+        if (config.movementType != TargetMovementType.None && config.movementType != TargetMovementType.SplinePathAsset && config.movementType != TargetMovementType.BossDragonAsset)
+        {
+            string movementScriptName = config.movementType.ToString();
             Type movementType = FindTypeInAllAssemblies(movementScriptName);
 
             if (movementType != null && typeof(MonoBehaviour).IsAssignableFrom(movementType))
             {
-                Component movementComp = newTarget.AddComponent(movementType);
-
-                // If the movement script has a "speed" property, try to set it via reflection
-                var speedField = movementType.GetField("speed", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-                var speedProp = movementType.GetProperty("Speed", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-
-                float finalSpeed = currentLevelConfig.globalSpeedMultiplier * config.speedModifier;
-
-                if (speedField != null && speedField.FieldType == typeof(float))
+                if (newTarget.GetComponent(movementType) == null)
                 {
-                    speedField.SetValue(movementComp, finalSpeed);
-                }
-                else if (speedProp != null && speedProp.PropertyType == typeof(float) && speedProp.CanWrite)
-                {
-                    speedProp.SetValue(movementComp, finalSpeed);
-                }
-                else
-                {
-                     Debug.LogWarning($"[TrainingLevelManager] Movement script '{movementScriptName}' attached, but could not find a 'speed' or 'Speed' float field to apply the modifier.");
+                    newTarget.AddComponent(movementType);
                 }
             }
             else
@@ -280,47 +262,59 @@ public class TrainingLevelManager : MonoBehaviour
         activeTargets.Add(newTarget);
     }
 
-    /// <summary>
-    /// Handles spawning pre-baked prefabs like Swarms and Bosses, and automatically wires them to the BossArenaManager.
-    /// </summary>
-    private void SpawnComplexAsset(TargetSpawnConfig config, Vector3 spawnPos, Quaternion spawnRot)
+    private void SpawnBoss(BossConfig config)
     {
-        GameObject prefabToSpawn = config.movementBehavior == TargetMovementType.BossDragonAsset ? currentLevelConfig.bossDragonPrefab : currentLevelConfig.splinePathAssetPrefab;
-
-        if (prefabToSpawn == null)
+        if (config.prefab == null)
         {
-            Debug.LogError($"[TrainingLevelManager] Missing prefab for {config.movementBehavior} in LevelConfigSO!");
+            Debug.LogError("[TrainingLevelManager] Boss Prefab is not set in LevelConfigSO!");
             return;
         }
 
-        GameObject complexTarget = Instantiate(prefabToSpawn, spawnPos, spawnRot);
-        activeTargets.Add(complexTarget);
+        Vector3 spawnPos = spawnCenter.position;
+        Quaternion spawnRot = Quaternion.identity;
+
+        if (config.spawnPointPrefab != null)
+        {
+            GameObject spawnPoint = Instantiate(config.spawnPointPrefab, spawnCenter.position, Quaternion.identity);
+            spawnPos = spawnPoint.transform.position;
+            spawnRot = spawnPoint.transform.rotation;
+        }
+
+        GameObject bossObj = Instantiate(config.prefab, spawnPos, spawnRot);
+        activeTargets.Add(bossObj);
+
+        if (config.observationPathPrefab != null)
+        {
+            Instantiate(config.observationPathPrefab, spawnCenter.position, Quaternion.identity);
+        }
+
+        if (config.escapePathPrefab != null)
+        {
+            Instantiate(config.escapePathPrefab, spawnCenter.position, Quaternion.identity);
+        }
 
         // If this is the Boss Dragon encounter, we need to wire it up!
-        if (config.movementBehavior == TargetMovementType.BossDragonAsset)
+        BossArenaManager arenaManager = FindAnyObjectByType<BossArenaManager>();
+        if (arenaManager != null)
         {
-            BossArenaManager arenaManager = FindAnyObjectByType<BossArenaManager>();
-            if (arenaManager != null)
+            BossCreature boss = bossObj.GetComponent<BossCreature>();
+
+            // For this prototype logic, we just find all StandardCreatures spawned so far this wave
+            // We use FindObjectsByType because StandardCreature inherits from MovingTarget.
+
+            // Note: StandardCreature script needs to be attached to spawned minions for them to be found here.
+
+            List<StandardCreature> minions = new List<StandardCreature>(FindObjectsByType<StandardCreature>(FindObjectsSortMode.None));
+
+            if (boss != null)
             {
-                BossCreature boss = complexTarget.GetComponent<BossCreature>();
-
-                // For this prototype logic, we just find all StandardCreatures spawned so far this wave
-                // We use FindObjectsByType because StandardCreature inherits from MovingTarget.
-
-                // Note: StandardCreature script needs to be attached to spawned minions for them to be found here.
-
-                List<StandardCreature> minions = new List<StandardCreature>(FindObjectsByType<StandardCreature>(FindObjectsSortMode.None));
-
-                if (boss != null)
-                {
-                    arenaManager.RegisterBattleParticipants(boss, minions);
-                    Debug.Log("[TrainingLevelManager] Successfully registered Boss Dragon with the BossArenaManager!");
-                }
+                arenaManager.RegisterBattleParticipants(boss, minions);
+                Debug.Log("[TrainingLevelManager] Successfully registered Boss Dragon with the BossArenaManager!");
             }
-            else
-            {
-                Debug.LogError("[TrainingLevelManager] Boss spawned, but no BossArenaManager found in the scene to wire it to!");
-            }
+        }
+        else
+        {
+            Debug.LogError("[TrainingLevelManager] Boss spawned, but no BossArenaManager found in the scene to wire it to!");
         }
     }
 

@@ -7,7 +7,8 @@ using UnityEngine;
 public class CSVLevelImporter : EditorWindow
 {
     private TextAsset csvFile;
-    private GameObject vanillaTargetPrefab;
+    private string minionsFolderPath = "Assets/Prefabs/Minions";
+    private string bossesFolderPath = "Assets/Prefabs/Bosses";
 
     [MenuItem("Archery Range/CSV Level Importer")]
     public static void ShowWindow()
@@ -19,21 +20,17 @@ public class CSVLevelImporter : EditorWindow
     {
         GUILayout.Label("CSV Level Configuration Importer", EditorStyles.boldLabel);
 
-        EditorGUILayout.HelpBox("Select your LevelDesign.csv file and the default Target Prefab to generate ScriptableObjects automatically.", MessageType.Info);
+        EditorGUILayout.HelpBox("Select your LevelDesign.csv file to generate LevelConfigSO automatically.", MessageType.Info);
 
         csvFile = (TextAsset)EditorGUILayout.ObjectField("CSV File", csvFile, typeof(TextAsset), false);
-        vanillaTargetPrefab = (GameObject)EditorGUILayout.ObjectField("Vanilla Target Prefab", vanillaTargetPrefab, typeof(GameObject), false);
+        minionsFolderPath = EditorGUILayout.TextField("Minions Folder Path", minionsFolderPath);
+        bossesFolderPath = EditorGUILayout.TextField("Bosses Folder Path", bossesFolderPath);
 
-        if (GUILayout.Button("Generate Levels & Waves"))
+        if (GUILayout.Button("Generate Levels"))
         {
             if (csvFile == null)
             {
                 EditorUtility.DisplayDialog("Error", "Please select a CSV file.", "OK");
-                return;
-            }
-            if (vanillaTargetPrefab == null)
-            {
-                EditorUtility.DisplayDialog("Error", "Please assign the Vanilla Target Prefab.", "OK");
                 return;
             }
 
@@ -69,13 +66,13 @@ public class CSVLevelImporter : EditorWindow
                 {
                     introText = cols[1].Trim(),
                     outroText = cols[2].Trim(),
-                    waves = new Dictionary<string, WaveDataSO>()
+                    waves = new Dictionary<string, WaveData>()
                 };
             }
 
             if (!levelDataMap[levelName].waves.ContainsKey(waveName))
             {
-                WaveDataSO newWaveData = ScriptableObject.CreateInstance<WaveDataSO>();
+                WaveData newWaveData = new WaveData();
 
                 if (Enum.TryParse(cols[4].Trim(), true, out WaveProgressionType progEnum))
                 {
@@ -83,42 +80,45 @@ public class CSVLevelImporter : EditorWindow
                 }
 
                 float.TryParse(cols[5], out newWaveData.waveDuration);
-                newWaveData.targets = new List<TargetSpawnConfig>();
+                newWaveData.characters = new List<CharacterConfigBase>();
 
                 levelDataMap[levelName].waves[waveName] = newWaveData;
             }
 
-            TargetSpawnConfig config = new TargetSpawnConfig();
+            float spawnDelay = 0f;
+            float.TryParse(cols[6], out spawnDelay);
 
-            float.TryParse(cols[6], out config.spawnDelay);
-
-            float posX, posZ;
-            float.TryParse(cols[7], out posX);
-            float.TryParse(cols[8], out posZ);
-            config.spawnPosition = new Vector3(posX, 0, posZ);
-
-            if (!float.TryParse(cols[9], out config.scaleModifier)) config.scaleModifier = 1f;
-            if (!float.TryParse(cols[10], out config.speedModifier)) config.speedModifier = 1f;
-
+            TargetMovementType movementBehavior = TargetMovementType.None;
             if (Enum.TryParse(cols[11].Trim(), true, out TargetMovementType moveEnum))
             {
-                config.movementBehavior = moveEnum;
-            }
-            else
-            {
-                config.movementBehavior = TargetMovementType.None;
+                movementBehavior = moveEnum;
             }
 
+            ElementTypeOB7 requiredElement = ElementTypeOB7.Normal;
             if (Enum.TryParse(cols[12].Trim(), true, out ElementTypeOB7 elementEnum))
             {
-                config.requiredArrowElement = elementEnum;
+                requiredElement = elementEnum;
+            }
+
+            CharacterConfigBase config = null;
+
+            if (movementBehavior == TargetMovementType.BossDragonAsset)
+            {
+                BossConfig bossConfig = new BossConfig();
+                bossConfig.spawnDelay = spawnDelay;
+                bossConfig.requiredArrowElement = requiredElement;
+                config = bossConfig;
             }
             else
             {
-                config.requiredArrowElement = ElementTypeOB7.Normal;
+                MinionConfig minionConfig = new MinionConfig();
+                minionConfig.spawnDelay = spawnDelay;
+                minionConfig.requiredArrowElement = requiredElement;
+                minionConfig.movementType = movementBehavior;
+                config = minionConfig;
             }
 
-            levelDataMap[levelName].waves[waveName].targets.Add(config);
+            levelDataMap[levelName].waves[waveName].characters.Add(config);
         }
 
         GenerateAssets(levelDataMap);
@@ -128,9 +128,6 @@ public class CSVLevelImporter : EditorWindow
     {
         string rootPath = "Assets/Data";
         if (!AssetDatabase.IsValidFolder(rootPath)) AssetDatabase.CreateFolder("Assets", "Data");
-
-        string wavesPath = rootPath + "/Waves";
-        if (!AssetDatabase.IsValidFolder(wavesPath)) AssetDatabase.CreateFolder(rootPath, "Waves");
 
         string levelsPath = rootPath + "/Levels";
         if (!AssetDatabase.IsValidFolder(levelsPath)) AssetDatabase.CreateFolder(rootPath, "Levels");
@@ -152,29 +149,14 @@ public class CSVLevelImporter : EditorWindow
             levelConfig.levelName = levelName;
             levelConfig.levelIntroText = levelDataInfo.introText;
             levelConfig.levelOutroText = levelDataInfo.outroText;
-            levelConfig.vanillaTargetPrefab = vanillaTargetPrefab;
+            levelConfig.minionsFolderPath = minionsFolderPath;
+            levelConfig.bossesFolderPath = bossesFolderPath;
+
             levelConfig.waves.Clear();
 
             foreach (var waveKvp in levelDataInfo.waves)
             {
-                string waveName = waveKvp.Key;
-                WaveDataSO parsedWaveData = waveKvp.Value;
-
-                // Create Wave Config
-                string waveAssetPath = $"{wavesPath}/{levelName}_{waveName}.asset";
-                WaveDataSO waveData = AssetDatabase.LoadAssetAtPath<WaveDataSO>(waveAssetPath);
-                if (waveData == null)
-                {
-                    waveData = ScriptableObject.CreateInstance<WaveDataSO>();
-                    AssetDatabase.CreateAsset(waveData, waveAssetPath);
-                }
-
-                waveData.progressionType = parsedWaveData.progressionType;
-                waveData.waveDuration = parsedWaveData.waveDuration;
-                waveData.targets = parsedWaveData.targets;
-
-                EditorUtility.SetDirty(waveData);
-                levelConfig.waves.Add(waveData);
+                levelConfig.waves.Add(waveKvp.Value);
             }
 
             EditorUtility.SetDirty(levelConfig);
@@ -183,13 +165,13 @@ public class CSVLevelImporter : EditorWindow
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
 
-        EditorUtility.DisplayDialog("Success", "Levels and Waves generated successfully from CSV!", "OK");
+        EditorUtility.DisplayDialog("Success", "Levels generated successfully from CSV!", "OK");
     }
 
     private class LevelBuilderData
     {
         public string introText;
         public string outroText;
-        public Dictionary<string, WaveDataSO> waves;
+        public Dictionary<string, WaveData> waves;
     }
 }

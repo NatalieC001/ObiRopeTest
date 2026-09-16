@@ -1,5 +1,66 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
+
+/// <summary>
+/// Defines how a wave progresses to the next one.
+/// </summary>
+public enum WaveProgressionType
+{
+    ClearAllTargets,
+    TimeBased
+}
+
+/// <summary>
+/// Defines the specific movement script to inject at runtime.
+/// </summary>
+public enum TargetMovementType
+{
+    None, // Static target
+    CorkscrewMovement,
+    FigureEightMovement,
+    FishSwimMovement,
+    PingPongMovement,
+    Rotator,
+    SwoopAndRetreatMovement,
+    SplinePathAsset,
+    BossDragonAsset
+}
+
+[Serializable]
+public abstract class CharacterConfigBase
+{
+    public float spawnDelay;
+    public ElementTypeOB7 requiredArrowElement;
+}
+
+[Serializable]
+public class MinionConfig : CharacterConfigBase
+{
+    public GameObject prefab;
+    public GameObject spawnPointPrefab;
+    public TargetMovementType movementType;
+    public GameObject movementAssetPrefab;
+}
+
+[Serializable]
+public class BossConfig : CharacterConfigBase
+{
+    public GameObject prefab;
+    public GameObject spawnPointPrefab;
+    public GameObject observationPathPrefab;
+    public GameObject escapePathPrefab;
+}
+
+[Serializable]
+public class WaveData
+{
+    public WaveProgressionType progressionType = WaveProgressionType.ClearAllTargets;
+    public float waveDuration = 60f;
+
+    [SerializeReference]
+    public List<CharacterConfigBase> characters = new List<CharacterConfigBase>();
+}
 
 /// <summary>
 /// Data container for a full level, consisting of multiple waves.
@@ -19,23 +80,10 @@ public class LevelConfigSO : ScriptableObject
     [TextArea(2, 4)]
     public string levelOutroText = "Level Complete!";
 
-    [Tooltip("The prefab to use for spawning targets in this level. Should have a MovingTarget component.")]
-    public GameObject vanillaTargetPrefab;
+    [Header("Folder Paths for Picker")]
+    public string minionsFolderPath = "Assets/Prefabs/Minions";
+    public string bossesFolderPath = "Assets/Prefabs/Bosses";
 
-    [Tooltip("The prefab to use when a wave requests a SplinePathAsset (e.g. a baked swarm).")]
-    public GameObject splinePathAssetPrefab;
-
-    [Tooltip("The prefab to use when a wave requests the Boss Dragon.")]
-    public GameObject bossDragonPrefab;
-
-    [Header("Wave Progression")]
-    [Tooltip("The ordered list of waves that make up this level.")]
-    public List<WaveDataSO> waves = new List<WaveDataSO>();
-
-    [Header("Global Modifiers")]
-    [Tooltip("A global scale multiplier applied to all targets in this level.")]
-    public float globalScaleMultiplier = 1.0f;
-
-    [Tooltip("A global speed multiplier applied to all targets in this level.")]
-    public float globalSpeedMultiplier = 1.0f;
+    [Header("Waves")]
+    public List<WaveData> waves = new List<WaveData>();
 }
