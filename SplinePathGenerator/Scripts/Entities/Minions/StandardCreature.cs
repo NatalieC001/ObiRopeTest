@@ -107,14 +107,69 @@ public class StandardCreature : MonoBehaviour
     {
         Debug.Log($"[StandardCreature] {gameObject.name} has died.");
 
-        // Ensure we detach from any Dreamteck splines properly upon death
+        // 1. Ensure we detach from any Dreamteck splines properly upon death
         Dreamteck.Splines.SplineFollower follower = GetComponent<Dreamteck.Splines.SplineFollower>();
         if (follower != null)
         {
             follower.follow = false;
         }
 
-        // Trigger death effects here (dissolve, ragdoll, etc.)
+        // 2. Disable all physical colliders in children immediately so arrows stop sticking/colliding
+        Collider[] childColliders = GetComponentsInChildren<Collider>();
+        foreach (Collider col in childColliders)
+        {
+            if (col != null)
+            {
+                col.enabled = false;
+            }
+        }
+
+        // 3. Trigger dissolve on any arrows sticking out of this creature simultaneously
+        StickingArrow[] attachedArrows = GetComponentsInChildren<StickingArrow>(true);
+        foreach (StickingArrow arrow in attachedArrows)
+        {
+            if (arrow != null)
+            {
+                DissolveEffect arrowDissolve = arrow.GetComponentInChildren<DissolveEffect>();
+                if (arrowDissolve != null)
+                {
+                    arrowDissolve.TriggerDissolve();
+                }
+            }
+        }
+
+        // 4. Trigger the main creature's visual dissolve effect
+        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
+        if (dissolve != null)
+        {
+            // We subscribe to the completion event. When the visual finishes, it deletes the object.
+            dissolve.OnDissolveCompleted += FinalizeDestruction;
+            dissolve.TriggerDissolve();
+        }
+        else
+        {
+            // Fallback: If no DissolveEffect component exists, just destroy it immediately
+            FinalizeDestruction();
+        }
+    }
+
+    private void OnDestroy()
+    {
+        // Clean up the event listener to avoid memory leaks if destroyed prematurely
+        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
+        if (dissolve != null)
+        {
+            dissolve.OnDissolveCompleted -= FinalizeDestruction;
+        }
+    }
+
+    /// <summary>
+    /// Called exactly when the visual dissolve finishes via callback.
+    /// Safely obliterates the root GameObject hierarchy (which takes the Mesh, Collider, and Arrows with it).
+    /// </summary>
+    private void FinalizeDestruction()
+    {
+        // This instantly removes it from the TrainingLevelManager's active tracking loop.
         Destroy(gameObject);
     }
 }
