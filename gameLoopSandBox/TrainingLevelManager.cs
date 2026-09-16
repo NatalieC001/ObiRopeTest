@@ -136,6 +136,11 @@ public class TrainingLevelManager : MonoBehaviour
 
         if (levelFeedbackText != null)
         {
+            // Ensure the text is visible if it was previously faded out
+            Color color = levelFeedbackText.color;
+            color.a = 1f;
+            levelFeedbackText.color = color;
+
             levelFeedbackText.text = $"Level: {currentLevelConfig.levelName}\n{currentLevelConfig.levelIntroText}\n<size=70%>Shoot the Gong to begin!</size>";
             Debug.Log($"[TrainingLevelManager] Showing Level Intro Text. Waiting 3.0s before Wave 1.");
         }
@@ -418,6 +423,11 @@ public class TrainingLevelManager : MonoBehaviour
 
         if (levelFeedbackText != null)
         {
+            // Ensure the text is visible if it was previously faded out
+            Color color = levelFeedbackText.color;
+            color.a = 1f;
+            levelFeedbackText.color = color;
+
             levelFeedbackText.text = $"{currentLevelConfig.levelOutroText}\n<size=70%>Level Time: {levelTimeTaken:F1}s\nShoot the Gong to continue!</size>";
             Debug.Log($"[TrainingLevelManager] Showing Level Outro Text. Waiting for Gong trigger.");
         }
