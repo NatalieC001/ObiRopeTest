@@ -167,7 +167,7 @@ public class SegmentedDragonManager : MonoBehaviour
         segment.Initialize(this, bossBrain, index);
         activeSegments.Add(segment);
 
-        if (segment.isDestructiblePart)
+        if (!(segment is PermanentDragonSegment))
         {
             destructibleSegments.Add(segment);
         }
