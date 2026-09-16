@@ -333,14 +333,14 @@ public class BossCreature : MonoBehaviour
             dragonBody.TriggerTotalDeath();
         }
 
-        // Clean up the main boss entity
-        Destroy(gameObject, 1f);
-
         // Notify the level manager to move on after a short delay so the dissolve can play
         TrainingLevelManager levelManager = FindAnyObjectByType<TrainingLevelManager>();
         if (levelManager != null)
         {
             levelManager.ForceCompleteWaveWithDelay(2f);
         }
+
+        // Clean up the main boss entity after the level manager delay
+        Destroy(gameObject, 2.5f);
     }
 }
