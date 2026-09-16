@@ -48,7 +48,13 @@ public class StandardCreature : MonoBehaviour
 
         // Cache the true dissolve effect belonging to THIS creature's mesh hierarchy
         // before any arrows hit it to ensure we don't accidentally grab an arrow's dissolve script later.
-        myDissolveEffect = transform.root.GetComponentInChildren<DissolveEffect>();
+        // We use GetComponent on our own object first, and fallback to children to ensure we never
+        // grab a sibling's component inside a Swarm hierarchy.
+        myDissolveEffect = GetComponent<DissolveEffect>();
+        if (myDissolveEffect == null)
+        {
+            myDissolveEffect = GetComponentInChildren<DissolveEffect>();
+        }
     }
 
     private void Start()
@@ -168,12 +174,13 @@ public class StandardCreature : MonoBehaviour
 
     /// <summary>
     /// Called exactly when the visual dissolve finishes via callback.
-    /// Safely obliterates the absolute root GameObject hierarchy (which takes the Mesh, Collider, and Arrows with it).
+    /// Safely obliterates the GameObject hierarchy (which takes the Mesh, Collider, and Arrows with it).
     /// </summary>
     private void FinalizeDestruction()
     {
         // This instantly removes it from the TrainingLevelManager's active tracking loop.
-        // We use transform.root to guarantee the entire prefab hierarchy is wiped, even if this script is on a child.
-        Destroy(transform.root.gameObject);
+        // We destroy gameObject directly because this script sits on the Minion_Basic root.
+        // Doing this preserves the overall Swarm parent if this minion is part of a larger swarm.
+        Destroy(gameObject);
     }
 }
