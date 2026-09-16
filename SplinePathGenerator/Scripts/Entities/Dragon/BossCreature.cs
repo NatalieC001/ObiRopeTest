@@ -286,21 +286,22 @@ public class BossCreature : MonoBehaviour
         }
     }
 
-    private void Die()
+    public void Die()
     {
         Debug.Log("<color=red>[BossCreature] The Boss has been defeated!</color>");
 
         // Stop movement
         tacticalManager.enabled = false;
 
-        // Command all indestructible pieces (Head, Legs, Tail) to dissolve
+        // Command all indestructible pieces (Head, Legs, Tail) to dissolve, and destroy the root only when they finish.
         SegmentedDragonManager dragonBody = GetComponent<SegmentedDragonManager>();
         if (dragonBody != null)
         {
-            dragonBody.TriggerTotalDeath();
+            dragonBody.TriggerTotalDeath(() => Destroy(gameObject));
         }
-
-        // Clean up the main boss entity
-        Destroy(gameObject, 1f);
+        else
+        {
+            Destroy(gameObject);
+        }
     }
 }
