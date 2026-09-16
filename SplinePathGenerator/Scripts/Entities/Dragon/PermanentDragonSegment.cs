@@ -7,10 +7,14 @@ using UnityEngine;
 /// </summary>
 public class PermanentDragonSegment : DragonSegment
 {
+    private void Awake()
+    {
+        // Force this to be indestructible before SegmentedDragonManager checks it in SpawnSegment()
+        isDestructiblePart = false;
+    }
+
     private void Start()
     {
-        // Force this to be indestructible just in case the manager didn't catch it
-        isDestructiblePart = false;
 
         // Ensure DissolveEffect waits for TriggerTotalDeath
         DissolveEffect effect = GetComponentInChildren<DissolveEffect>();
