@@ -33,7 +33,9 @@ public class LevelDiagnosticTool : EditorWindow
                 string path = AssetDatabase.GUIDToAssetPath(guid);
                 LevelConfigSO config = AssetDatabase.LoadAssetAtPath<LevelConfigSO>(path);
 
-                writer.WriteLine($"\n--- Level: {config.levelName} ---");
+                writer.WriteLine();
+                writer.WriteLine($"Level Name: {config.levelName}");
+                writer.WriteLine($"File Path: {path}");
 
                 // Verify Prefabs
                 writer.WriteLine("PREFAB ASSIGNMENTS:");
