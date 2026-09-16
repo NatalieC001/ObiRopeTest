@@ -372,13 +372,32 @@ public class TrainingLevelManager : MonoBehaviour
         }
         activeTargets.Clear();
 
-        Debug.Log($"[TrainingLevelManager] Wave {currentWaveIndex + 1} Completed. Instantly starting next wave.");
+        Debug.Log($"[TrainingLevelManager] Wave {currentWaveIndex + 1} Completed. Starting transition.");
 
         OnWaveCompleted?.Invoke(currentWaveIndex);
 
         currentWaveIndex++;
 
-        // Instant, silent momentum. No text, no waiting.
+        StartCoroutine(HandleWaveTransition());
+    }
+
+    private IEnumerator HandleWaveTransition()
+    {
+        if (hudText != null)
+        {
+            int remainingWaves = currentLevelConfig.waves.Count - currentWaveIndex;
+            if (remainingWaves > 0)
+            {
+                hudText.text = $"Wave Cleared!\nNext Wave Starting... ({remainingWaves} left)";
+            }
+            else
+            {
+                hudText.text = "Final Wave Cleared!";
+            }
+        }
+
+        yield return new WaitForSeconds(2.5f);
+
         StartWave(currentWaveIndex);
     }
 
@@ -391,15 +410,14 @@ public class TrainingLevelManager : MonoBehaviour
 
         if (currentWaveIndex == 0 && currentLevelConfig != null && currentLevelConfig.waves.Count > 0)
         {
-            // If we are at the start of a level waiting to begin, shooting the gong starts wave 1
+            // The Next Level Intro is already loaded and displayed by HandleLevelTransition.
+            // Shooting the gong strictly starts Wave 1 of the currently loaded level.
             if (levelFeedbackText != null) levelFeedbackText.text = "";
             StartWave(currentWaveIndex);
         }
         else
         {
-            // If we finished a level and shot the gong, go to the next level's Intro
-            currentLevelIndex++;
-            StartLevel(currentLevelIndex);
+            Debug.LogWarning("[TrainingLevelManager] Gong hit, but a wave is already active or no waves are configured.");
         }
     }
 
@@ -409,18 +427,75 @@ public class TrainingLevelManager : MonoBehaviour
         if (hudText != null) hudText.text = ""; // Clear the HUD cleanly
 
         float levelTimeTaken = Time.time - currentLevelStartTime;
-        Debug.Log($"[TrainingLevelManager] Level '{currentLevelConfig.levelName}' completed in {levelTimeTaken:F1}s! Waiting for player to hit the Gong to advance.");
-
-        if (levelFeedbackText != null)
-        {
-            levelFeedbackText.text = $"{currentLevelConfig.levelOutroText}\n<size=70%>Level Time: {levelTimeTaken:F1}s\nShoot the Gong to continue!</size>";
-            levelFeedbackText.alpha = 1f; // Ensure text is visible
-            Debug.Log($"[TrainingLevelManager] Showing Level Outro Text. Waiting for Gong trigger.");
-        }
+        Debug.Log($"[TrainingLevelManager] Level '{currentLevelConfig.levelName}' completed in {levelTimeTaken:F1}s!");
 
         OnLevelCompleted?.Invoke();
 
-        // The manager now waits infinitely. The player must shoot the LevelAdvanceGong to trigger AdvanceToNextLevel()
+        StartCoroutine(HandleLevelTransition(levelTimeTaken));
+    }
+
+    private IEnumerator HandleLevelTransition(float levelTimeTaken)
+    {
+        // 1. Show the Outro text
+        if (levelFeedbackText != null)
+        {
+            levelFeedbackText.text = $"{currentLevelConfig.levelOutroText}\n<size=70%>Level Time: {levelTimeTaken:F1}s</size>";
+            levelFeedbackText.alpha = 1f;
+        }
+
+        // Wait for player to read Outro
+        yield return new WaitForSeconds(4f);
+
+        // 2. Fade out Outro (simple fade)
+        if (levelFeedbackText != null)
+        {
+            float fadeTime = 1f;
+            float elapsedTime = 0f;
+            while (elapsedTime < fadeTime)
+            {
+                levelFeedbackText.alpha = Mathf.Lerp(1f, 0f, elapsedTime / fadeTime);
+                elapsedTime += Time.deltaTime;
+                yield return null;
+            }
+            levelFeedbackText.alpha = 0f;
+        }
+
+        // 3. Load the Next Level's Data
+        currentLevelIndex++;
+
+        if (currentLevelIndex >= levelPlaylist.Count)
+        {
+            Debug.Log("[TrainingLevelManager] Entire Campaign Completed!");
+            if (levelFeedbackText != null)
+            {
+                levelFeedbackText.text = "Campaign Complete!\nThanks for playing!";
+                levelFeedbackText.alpha = 1f;
+            }
+            yield break; // Stop here if no more levels
+        }
+
+        // Load the new config
+        currentLevelConfig = levelPlaylist[currentLevelIndex];
+        currentWaveIndex = 0;
+        currentLevelStartTime = Time.time;
+
+        Debug.Log($"[TrainingLevelManager] Loaded Next Level: {currentLevelConfig.levelName}");
+
+        // 4. Set Next Level's Intro Text and Fade In
+        if (levelFeedbackText != null)
+        {
+            levelFeedbackText.text = $"Level: {currentLevelConfig.levelName}\n{currentLevelConfig.levelIntroText}\n<size=70%>Shoot the Gong to begin!</size>";
+
+            float fadeTime = 1f;
+            float elapsedTime = 0f;
+            while (elapsedTime < fadeTime)
+            {
+                levelFeedbackText.alpha = Mathf.Lerp(0f, 1f, elapsedTime / fadeTime);
+                elapsedTime += Time.deltaTime;
+                yield return null;
+            }
+            levelFeedbackText.alpha = 1f;
+        }
     }
 
     private void ClearFeedbackText()
