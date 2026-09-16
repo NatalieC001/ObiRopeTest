@@ -140,7 +140,7 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
         if (segmentCollider != null)
         {
             segmentCollider.enabled = false;
-            }
+        }
 
         // Clean up any arrows sticking out of this segment
         StickingArrow[] attachedArrows = GetComponentsInChildren<StickingArrow>(true);
@@ -167,12 +167,11 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
             dragonManager.OnSegmentDestroyed(this);
         }
 
-        // If there is a DissolveEffect, let it play and destroy the object after a delay
-        // Otherwise, destroy immediately.
+        // Let it play and destroy the object via callback, keeping children intact until it finishes.
         DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
         if (dissolve != null)
         {
-            dissolve.TriggerDissolve(() => Destroy(gameObject)); // Give time for the visual effect to play
+            dissolve.TriggerDissolve(() => Destroy(gameObject));
         }
         else
         {
@@ -184,7 +183,7 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
     /// Called by the SegmentedDragonManager when the entire boss is defeated.
     /// Forces permanent pieces (Head, Legs, Tail) to finally dissolve.
     /// </summary>
-        public virtual void TriggerTotalDeath(System.Action onComplete)
+    public virtual void TriggerTotalDeath(System.Action onComplete)
     {
         if (segmentCollider != null)
         {

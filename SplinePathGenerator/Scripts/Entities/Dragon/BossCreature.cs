@@ -286,7 +286,7 @@ public class BossCreature : MonoBehaviour
         }
     }
 
-        public void Die()
+    public void Die()
     {
         Debug.Log("<color=red>[BossCreature] The Boss has been defeated!</color>");
 

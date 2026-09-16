@@ -161,7 +161,6 @@ public class SegmentedDragonManager : MonoBehaviour
         SplineFollower follower = segmentObj.GetComponent<SplineFollower>();
         if (follower == null) follower = segmentObj.AddComponent<SplineFollower>();
 
-        // Try to get ANY DragonSegment type (including PermanentDragonSegment) that is already attached to the prefab!
         DragonSegment segment = segmentObj.GetComponent<DragonSegment>();
         if (segment == null) segment = segmentObj.AddComponent<DragonSegment>();
 
@@ -345,7 +344,7 @@ public class SegmentedDragonManager : MonoBehaviour
     /// Called by BossCreature when the overall health reaches 0.
     /// Commands all remaining permanent pieces (Head, Legs, Tail) to die.
     /// </summary>
-        public void TriggerTotalDeath(System.Action onComplete)
+    public void TriggerTotalDeath(System.Action onComplete)
     {
         Debug.Log("<color=red>[SegmentedDragonManager] The entire dragon is collapsing!</color>");
 

@@ -15,7 +15,6 @@ public class PermanentDragonSegment : DragonSegment
 
     private void Start()
     {
-
         // Ensure DissolveEffect waits for TriggerTotalDeath
         DissolveEffect effect = GetComponentInChildren<DissolveEffect>();
         if (effect != null)
