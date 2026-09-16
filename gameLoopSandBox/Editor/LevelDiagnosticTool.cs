@@ -39,17 +39,26 @@ public class LevelDiagnosticTool : EditorWindow
 
                 // Verify Prefabs
                 writer.WriteLine("PREFAB ASSIGNMENTS:");
-                writer.WriteLine($"  - Vanilla Target: {(config.vanillaTargetPrefab != null ? config.vanillaTargetPrefab.name : "MISSING!")}");
-                writer.WriteLine($"  - Spline Swarm:   {(config.splinePathAssetPrefab != null ? config.splinePathAssetPrefab.name : "MISSING!")}");
-                writer.WriteLine($"  - Boss Dragon:    {(config.bossDragonPrefab != null ? config.bossDragonPrefab.name : "MISSING!")}");
-                writer.WriteLine();
 
-                if (config.bossDragonPrefab == null || config.splinePathAssetPrefab == null)
-                {
-                     writer.WriteLine("  WARNING: You have MISSING prefabs in this level config!");
-                     writer.WriteLine("  If you ask a wave to spawn a Boss or a Swarm, it might fail or spawn the wrong thing.");
-                     writer.WriteLine("  FIX: Open the CSV Importer and assign all prefabs before generating, or assign them manually in the inspector.");
+                if (config.vanillaTargetPrefab != null) {
+                    writer.WriteLine($"  - Vanilla Target: {config.vanillaTargetPrefab.name}");
+                } else {
+                    writer.WriteLine($"  - Vanilla Target: MISSING! -> FIX: Open CSV Importer window, click 'Auto-Find Prefabs', and click Generate.");
                 }
+
+                if (config.splinePathAssetPrefab != null) {
+                    writer.WriteLine($"  - Spline Swarm:   {config.splinePathAssetPrefab.name}");
+                } else {
+                    writer.WriteLine($"  - Spline Swarm:   MISSING! -> FIX: Open CSV Importer window, click 'Auto-Find Prefabs', and click Generate.");
+                }
+
+                if (config.bossDragonPrefab != null) {
+                    writer.WriteLine($"  - Boss Dragon:    {config.bossDragonPrefab.name}");
+                } else {
+                    writer.WriteLine($"  - Boss Dragon:    MISSING! -> FIX: Open CSV Importer window, click 'Auto-Find Prefabs', and click Generate.");
+                }
+
+                writer.WriteLine();
 
                 // Verify Waves
                 for (int i = 0; i < config.waves.Count; i++)
