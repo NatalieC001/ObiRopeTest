@@ -46,11 +46,21 @@ public class TrainingLevelManager : MonoBehaviour
     public event Action<int> OnWaveCompleted;
     public event Action OnLevelCompleted;
 
+    private MinionManager minionManager;
+
     private void Start()
     {
         if (spawnCenter == null)
         {
             spawnCenter = this.transform;
+        }
+
+        minionManager = FindAnyObjectByType<MinionManager>();
+        if (minionManager == null)
+        {
+            GameObject go = new GameObject("MinionManager");
+            minionManager = go.AddComponent<MinionManager>();
+            Debug.Log("[TrainingLevelManager] Auto-created MinionManager in the scene.");
         }
 
         if (levelPlaylist.Count > 0)
@@ -236,6 +246,13 @@ public class TrainingLevelManager : MonoBehaviour
         {
             movingTarget.SetRequiredElement(config.requiredArrowElement);
             Debug.Log($"[TrainingLevelManager] Target spawned. Needs Element: {config.requiredArrowElement}");
+        }
+
+        // Initialize StandardCreature exactly like DragonSegment
+        StandardCreature creature = newTarget.GetComponent<StandardCreature>();
+        if (creature != null)
+        {
+            creature.Initialize(minionManager);
         }
 
         // Spawn the movement asset if needed

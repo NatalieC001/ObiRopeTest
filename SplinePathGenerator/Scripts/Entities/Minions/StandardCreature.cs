@@ -28,6 +28,16 @@ public class StandardCreature : MonoBehaviour, IArrowTarget
     [SerializeField] private string targetLayer = "Enemy";
 
     private CreatureStatusEffects statusEffects;
+    private MinionManager minionManager;
+
+    public void Initialize(MinionManager manager)
+    {
+        minionManager = manager;
+        if (minionManager != null)
+        {
+            minionManager.RegisterMinion(this);
+        }
+    }
 
     private void Awake()
     {
@@ -36,6 +46,16 @@ public class StandardCreature : MonoBehaviour, IArrowTarget
         if (layerIndex != -1)
         {
             gameObject.layer = layerIndex;
+
+            // Also explicitly ensure the collider children are on the layer, as that's what physics actually hits
+            Collider[] childColliders = GetComponentsInChildren<Collider>(true);
+            foreach (Collider col in childColliders)
+            {
+                if (col != null)
+                {
+                    col.gameObject.layer = layerIndex;
+                }
+            }
         }
         else
         {
@@ -182,15 +202,13 @@ public class StandardCreature : MonoBehaviour, IArrowTarget
     /// </summary>
     private void FinalizeDestruction()
     {
-        // Tell the manager to wipe this piece from the scene!
-        if (MinionManager.Instance != null)
+        // Tell the manager to wipe this piece from the tracking array and close the gap!
+        if (minionManager != null)
         {
-            MinionManager.Instance.OnMinionDestroyed(this);
+            minionManager.OnMinionDestroyed(this);
         }
-        else
-        {
-            // Fallback just in case
-            Destroy(gameObject);
-        }
+
+        // Permanently destroy the root object, which automatically takes the Mesh, Collider, and Arrows with it.
+        Destroy(gameObject);
     }
 }

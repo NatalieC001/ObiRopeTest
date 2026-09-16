@@ -7,47 +7,27 @@ using UnityEngine;
 /// </summary>
 public class MinionManager : MonoBehaviour
 {
-    private static MinionManager instance;
-
-    public static MinionManager Instance
-    {
-        get
-        {
-            if (instance == null)
-            {
-                instance = FindFirstObjectByType<MinionManager>();
-                if (instance == null)
-                {
-                    GameObject go = new GameObject("MinionManager");
-                    instance = go.AddComponent<MinionManager>();
-                }
-            }
-            return instance;
-        }
-    }
-
-    private void Awake()
-    {
-        if (instance != null && instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-        instance = this;
-    }
+    // Tracking lists can be added here if needed for broader swarm behaviors
+    public List<StandardCreature> activeMinions = new List<StandardCreature>();
 
     /// <summary>
     /// Called by a minion exactly when its visual dissolve finishes.
-    /// Safely purges it and destroys the root GameObject hierarchy.
+    /// Safely purges it from any tracking arrays so it can destroy itself cleanly.
     /// </summary>
     public void OnMinionDestroyed(StandardCreature minion)
     {
         if (minion != null)
         {
-            Debug.Log($"<color=magenta>[MinionManager] Removing minion {minion.gameObject.name} from the scene cleanly.</color>");
+            Debug.Log($"<color=magenta>[MinionManager] Removing minion {minion.gameObject.name} from tracking arrays.</color>");
+            activeMinions.Remove(minion);
+        }
+    }
 
-            // TrainingLevelManager's Update loop will detect the null and progress the wave automatically
-            Destroy(minion.gameObject);
+    public void RegisterMinion(StandardCreature minion)
+    {
+        if (minion != null && !activeMinions.Contains(minion))
+        {
+            activeMinions.Add(minion);
         }
     }
 }
