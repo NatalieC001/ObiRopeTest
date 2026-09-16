@@ -8,9 +8,8 @@ Level2_Gallery,Moving Targets!,Nice shooting!,Wave1,ClearAllTargets,0,0,0,15,1,1
 Level2_Gallery,Moving Targets!,Nice shooting!,Wave1,ClearAllTargets,0,0,5,20,1,1.5,PingPongMovement,Normal
 Level2_Gallery,Moving Targets!,Nice shooting!,Wave2,ClearAllTargets,0,0,-10,5,1,1.2,None,Electric
 Level2_Gallery,Moving Targets!,Nice shooting!,Wave2,ClearAllTargets,0,2,10,5,1,1.2,None,Electric
-Level3_Boss,Boss incoming!,You survived!,Wave1,TimeBased,20,0,-3,10,1,1,Rotator,Normal
-Level3_Boss,Boss incoming!,You survived!,Wave1,TimeBased,20,0,3,10,1,1,Rotator,Normal
-Level3_Boss,Boss incoming!,You survived!,Wave1,TimeBased,20,4,0,25,3,2,SwoopAndRetreatMovement,Fire
+Level3_Boss,Boss incoming!,You survived!,Wave1,ClearAllTargets,0,0,-3,10,1,1,SplinePathAsset,Normal
+Level3_Boss,Boss incoming!,You survived!,Wave1,ClearAllTargets,0,0,3,10,1,1,BossDragonAsset,Normal
 Level4_Splines,Beautiful Shapes!,Perfect!,Wave1,TimeBased,20,0,0,15,1,0,SplinePathAsset,Normal
 Level4_Splines,Beautiful Shapes!,Perfect!,Wave2,ClearAllTargets,0,0,0,15,1,1,SplinePathAsset,Normal
 Level5_Dragon,The Dragon Awakens!,You slayed it!,Wave1,ClearAllTargets,0,0,0,10,1,1,BossDragonAsset,Normal

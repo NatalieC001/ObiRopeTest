@@ -8,6 +8,8 @@ public class CSVLevelImporter : EditorWindow
 {
     private TextAsset csvFile;
     private GameObject vanillaTargetPrefab;
+    private GameObject splinePathAssetPrefab;
+    private GameObject bossDragonPrefab;
 
     [MenuItem("Archery Range/CSV Level Importer")]
     public static void ShowWindow()
@@ -21,8 +23,15 @@ public class CSVLevelImporter : EditorWindow
 
         EditorGUILayout.HelpBox("Select your LevelDesign.csv file and the default Target Prefab to generate ScriptableObjects automatically.", MessageType.Info);
 
+        if (GUILayout.Button("Auto-Find Prefabs in Project"))
+        {
+            AutoFindPrefabs();
+        }
+
         csvFile = (TextAsset)EditorGUILayout.ObjectField("CSV File", csvFile, typeof(TextAsset), false);
         vanillaTargetPrefab = (GameObject)EditorGUILayout.ObjectField("Vanilla Target Prefab", vanillaTargetPrefab, typeof(GameObject), false);
+        splinePathAssetPrefab = (GameObject)EditorGUILayout.ObjectField("Spline Path Prefab", splinePathAssetPrefab, typeof(GameObject), false);
+        bossDragonPrefab = (GameObject)EditorGUILayout.ObjectField("Boss Dragon Prefab", bossDragonPrefab, typeof(GameObject), false);
 
         if (GUILayout.Button("Generate Levels & Waves"))
         {
@@ -31,14 +40,27 @@ public class CSVLevelImporter : EditorWindow
                 EditorUtility.DisplayDialog("Error", "Please select a CSV file.", "OK");
                 return;
             }
-            if (vanillaTargetPrefab == null)
+            if (vanillaTargetPrefab == null || splinePathAssetPrefab == null || bossDragonPrefab == null)
             {
-                EditorUtility.DisplayDialog("Error", "Please assign the Vanilla Target Prefab.", "OK");
+                EditorUtility.DisplayDialog("Error", "Please assign all Prefabs (Vanilla, Spline, and Boss).", "OK");
                 return;
             }
 
             ParseAndGenerate(csvFile.text);
         }
+    }
+
+    private void AutoFindPrefabs()
+    {
+        // Try to automatically locate common prefab names
+        string[] bossGuids = AssetDatabase.FindAssets("t:Prefab Boss");
+        if (bossGuids.Length > 0) bossDragonPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(bossGuids[0]));
+
+        string[] splineGuids = AssetDatabase.FindAssets("t:Prefab Spline");
+        if (splineGuids.Length > 0) splinePathAssetPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(splineGuids[0]));
+
+        string[] targetGuids = AssetDatabase.FindAssets("t:Prefab Target");
+        if (targetGuids.Length > 0) vanillaTargetPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(targetGuids[0]));
     }
 
     private void ParseAndGenerate(string csvContent)
@@ -153,6 +175,8 @@ public class CSVLevelImporter : EditorWindow
             levelConfig.levelIntroText = levelDataInfo.introText;
             levelConfig.levelOutroText = levelDataInfo.outroText;
             levelConfig.vanillaTargetPrefab = vanillaTargetPrefab;
+            levelConfig.splinePathAssetPrefab = splinePathAssetPrefab;
+            levelConfig.bossDragonPrefab = bossDragonPrefab;
             levelConfig.waves.Clear();
 
             foreach (var waveKvp in levelDataInfo.waves)
