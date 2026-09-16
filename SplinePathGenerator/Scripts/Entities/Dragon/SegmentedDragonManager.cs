@@ -29,6 +29,9 @@ public class SegmentedDragonManager : MonoBehaviour
     [Tooltip("The total combined power of the boss based on remaining segments.")]
     public float totalBossPower { get; private set; }
 
+    // Tracking list for body segments to monitor win condition
+    private List<DragonSegment> destructibleSegments = new List<DragonSegment>();
+
     // List tracking all live segments. Head is index 0.
     private List<DragonSegment> activeSegments = new List<DragonSegment>();
     private SplineComputer bossSpline;
@@ -164,6 +167,11 @@ public class SegmentedDragonManager : MonoBehaviour
         segment.Initialize(this, bossBrain, index);
         activeSegments.Add(segment);
 
+        if (segment.isDestructiblePart)
+        {
+            destructibleSegments.Add(segment);
+        }
+
         totalBossPower += segment.powerContribution;
     }
 
@@ -289,6 +297,14 @@ public class SegmentedDragonManager : MonoBehaviour
         totalBossPower -= destroyedSegment.powerContribution;
 
         activeSegments.Remove(destroyedSegment);
+        destructibleSegments.Remove(destroyedSegment);
+
+        if (destructibleSegments.Count == 0 && bossBrain != null)
+        {
+            Debug.Log("<color=green>[SegmentedDragonManager] All body segments destroyed! Triggering Boss Death.</color>");
+            bossBrain.Die();
+            return;
+        }
 
         Debug.Log($"<color=magenta>[SegmentedDragonManager] A segment fell! Boss power reduced to {totalBossPower}. Closing gap!</color>");
 
@@ -328,16 +344,38 @@ public class SegmentedDragonManager : MonoBehaviour
     /// Called by BossCreature when the overall health reaches 0.
     /// Commands all remaining permanent pieces (Head, Legs, Tail) to die.
     /// </summary>
-    public void TriggerTotalDeath()
+    public void TriggerTotalDeath(System.Action onComplete)
     {
         Debug.Log("<color=red>[SegmentedDragonManager] The entire dragon is collapsing!</color>");
+
+        int segmentsToDissolve = activeSegments.Count;
+
+        if (segmentsToDissolve == 0)
+        {
+            onComplete?.Invoke();
+            return;
+        }
+
+        System.Action onSegmentDissolved = () =>
+        {
+            segmentsToDissolve--;
+            if (segmentsToDissolve <= 0)
+            {
+                activeSegments.Clear();
+                onComplete?.Invoke();
+            }
+        };
+
         foreach (var segment in activeSegments)
         {
             if (segment != null)
             {
-                segment.TriggerTotalDeath();
+                segment.TriggerTotalDeath(onSegmentDissolved);
+            }
+            else
+            {
+                onSegmentDissolved();
             }
         }
-        activeSegments.Clear();
     }
 }

@@ -99,7 +99,7 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
         }
     }
 
-    private void Die()
+    protected virtual void Die()
     {
         if (!isDestructiblePart) return;
 
@@ -109,26 +109,6 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
         if (segmentCollider != null)
         {
             segmentCollider.enabled = false;
-            Destroy(segmentCollider.gameObject, 0.1f); // Ensure the physics engine totally removes it
-        }
-
-        // Clean up any arrows sticking out of this segment
-        StickingArrow[] attachedArrows = GetComponentsInChildren<StickingArrow>(true);
-        foreach (StickingArrow arrow in attachedArrows)
-        {
-            if (arrow != null)
-            {
-                Destroy(arrow.gameObject);
-            }
-        }
-
-        // Find any "ArrowAnchor" objects that the StickingArrow might have parented directly
-        foreach (Transform child in transform)
-        {
-            if (child.name.Contains("ArrowAnchor"))
-            {
-                Destroy(child.gameObject);
-            }
         }
 
         // Notify the body manager that this piece is gone so it can close the gap
@@ -142,8 +122,8 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
         DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
         if (dissolve != null)
         {
-            dissolve.TriggerDissolve();
-            Destroy(gameObject, 2f); // Give time for the visual effect to play
+            dissolve.TriggerDissolve(() => Destroy(gameObject));
+
         }
         else
         {
@@ -155,15 +135,21 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
     /// Called by the SegmentedDragonManager when the entire boss is defeated.
     /// Forces permanent pieces (Head, Legs, Tail) to finally dissolve.
     /// </summary>
-    public void TriggerTotalDeath()
+    public virtual void TriggerTotalDeath(System.Action onComplete)
     {
         if (segmentCollider != null)
         {
             segmentCollider.enabled = false;
         }
 
-        // You can trigger the DissolveEffect.cs directly here if you have a reference to it,
-        // otherwise Destroy(gameObject) will clean it up.
-        Destroy(gameObject);
+        DissolveEffect effect = GetComponentInChildren<DissolveEffect>();
+        if (effect != null)
+        {
+            effect.TriggerDissolve(onComplete);
+        }
+        else
+        {
+            onComplete?.Invoke();
+        }
     }
 }
