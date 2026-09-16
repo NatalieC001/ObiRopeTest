@@ -21,7 +21,7 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
     [Tooltip("Reference to the child mesh renderer (useful for triggering visual effects).")]
     [SerializeField] private Renderer segmentRenderer;
     [Tooltip("Reference to the child collider (useful for disabling physics upon death).")]
-    [SerializeField] private Collider segmentCollider;
+    [SerializeField] public Collider segmentCollider;
 
     [Tooltip("The physics layer this segment will be forced onto so arrows can detect it. Displayed here as a reminder!")]
     [SerializeField] private string targetLayer = "Enemy";
@@ -63,6 +63,22 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
         SegmentIndex = index;
     }
 
+    public void OnRopeAttached(MonoBehaviour rope)
+    {
+        if (dragonManager != null)
+        {
+            // Will pass up if manager has it locally
+        }
+    }
+
+    public void OnRopeDetached(MonoBehaviour rope)
+    {
+        if (dragonManager != null)
+        {
+            // Will pass up if manager has it locally
+        }
+    }
+
     public void OnArrowHit(float damage, Vector3 impactPoint, ElementTypeOB7 elementType)
     {
         TakeDamage(damage, impactPoint, elementType);
@@ -99,6 +115,21 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
         }
     }
 
+    public float GetSegmentSize()
+    {
+        Renderer r = segmentRenderer != null ? segmentRenderer : GetComponentInChildren<Renderer>();
+        if (r != null)
+        {
+            MeshFilter mf = r.GetComponent<MeshFilter>();
+            if (mf != null && mf.sharedMesh != null)
+            {
+                return mf.sharedMesh.bounds.size.z * mf.transform.lossyScale.z;
+            }
+            return r.bounds.size.z;
+        }
+        return 2.0f;
+    }
+
     protected virtual void Die()
     {
         if (!isDestructiblePart) return;
@@ -111,19 +142,36 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
             segmentCollider.enabled = false;
         }
 
+        // Clean up any arrows sticking out of this segment
+        StickingArrow[] attachedArrows = GetComponentsInChildren<StickingArrow>(true);
+        foreach (StickingArrow arrow in attachedArrows)
+        {
+            if (arrow != null)
+            {
+                Destroy(arrow.gameObject);
+            }
+        }
+
+        // Find any "ArrowAnchor" objects that the StickingArrow might have parented directly
+        foreach (Transform child in transform)
+        {
+            if (child.name.Contains("ArrowAnchor"))
+            {
+                Destroy(child.gameObject);
+            }
+        }
+
         // Notify the body manager that this piece is gone so it can close the gap
         if (dragonManager != null)
         {
             dragonManager.OnSegmentDestroyed(this);
         }
 
-        // If there is a DissolveEffect, let it play and destroy the object after a delay
-        // Otherwise, destroy immediately.
+        // Let it play and destroy the object via callback, keeping children intact until it finishes.
         DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
         if (dissolve != null)
         {
             dissolve.TriggerDissolve(() => Destroy(gameObject));
-
         }
         else
         {

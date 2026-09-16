@@ -378,4 +378,9 @@ public class SegmentedDragonManager : MonoBehaviour
             }
         }
     }
+
+    public bool IsTethered()
+    {
+        return false;
+    }
 }
