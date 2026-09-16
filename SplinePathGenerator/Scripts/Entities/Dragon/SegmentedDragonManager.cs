@@ -161,6 +161,7 @@ public class SegmentedDragonManager : MonoBehaviour
         SplineFollower follower = segmentObj.GetComponent<SplineFollower>();
         if (follower == null) follower = segmentObj.AddComponent<SplineFollower>();
 
+        // Try to get ANY DragonSegment type (including PermanentDragonSegment) that is already attached to the prefab!
         DragonSegment segment = segmentObj.GetComponent<DragonSegment>();
         if (segment == null) segment = segmentObj.AddComponent<DragonSegment>();
 
