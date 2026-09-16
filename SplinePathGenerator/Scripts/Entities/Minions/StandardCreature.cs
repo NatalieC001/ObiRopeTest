@@ -28,6 +28,7 @@ public class StandardCreature : MonoBehaviour
     [SerializeField] private string targetLayer = "Enemy";
 
     private CreatureStatusEffects statusEffects;
+    private DissolveEffect myDissolveEffect;
 
     private void Awake()
     {
@@ -44,6 +45,10 @@ public class StandardCreature : MonoBehaviour
 
         // Try to find the status effect component (optional, but recommended)
         statusEffects = GetComponent<CreatureStatusEffects>();
+
+        // Cache the true dissolve effect belonging to THIS creature's mesh hierarchy
+        // before any arrows hit it to ensure we don't accidentally grab an arrow's dissolve script later.
+        myDissolveEffect = transform.root.GetComponentInChildren<DissolveEffect>();
     }
 
     private void Start()
@@ -139,12 +144,11 @@ public class StandardCreature : MonoBehaviour
         }
 
         // 4. Trigger the main creature's visual dissolve effect
-        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
-        if (dissolve != null)
+        if (myDissolveEffect != null)
         {
             // We subscribe to the completion event. When the visual finishes, it deletes the object.
-            dissolve.OnDissolveCompleted += FinalizeDestruction;
-            dissolve.TriggerDissolve();
+            myDissolveEffect.OnDissolveCompleted += FinalizeDestruction;
+            myDissolveEffect.TriggerDissolve();
         }
         else
         {
@@ -156,20 +160,20 @@ public class StandardCreature : MonoBehaviour
     private void OnDestroy()
     {
         // Clean up the event listener to avoid memory leaks if destroyed prematurely
-        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
-        if (dissolve != null)
+        if (myDissolveEffect != null)
         {
-            dissolve.OnDissolveCompleted -= FinalizeDestruction;
+            myDissolveEffect.OnDissolveCompleted -= FinalizeDestruction;
         }
     }
 
     /// <summary>
     /// Called exactly when the visual dissolve finishes via callback.
-    /// Safely obliterates the root GameObject hierarchy (which takes the Mesh, Collider, and Arrows with it).
+    /// Safely obliterates the absolute root GameObject hierarchy (which takes the Mesh, Collider, and Arrows with it).
     /// </summary>
     private void FinalizeDestruction()
     {
         // This instantly removes it from the TrainingLevelManager's active tracking loop.
-        Destroy(gameObject);
+        // We use transform.root to guarantee the entire prefab hierarchy is wiped, even if this script is on a child.
+        Destroy(transform.root.gameObject);
     }
 }
