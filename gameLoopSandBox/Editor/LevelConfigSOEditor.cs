@@ -21,6 +21,7 @@ public class LevelConfigSOEditor : Editor
         EditorGUILayout.LabelField("Folder Paths for Picker", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(serializedObject.FindProperty("minionsFolderPath"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("bossesFolderPath"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("pathsFolderPath"));
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Waves", EditorStyles.boldLabel);
@@ -109,7 +110,7 @@ public class LevelConfigSOEditor : Editor
             TargetMovementType currentMoveType = (TargetMovementType)movementTypeProp.enumValueIndex;
             if (currentMoveType == TargetMovementType.SplinePathAsset)
             {
-                EditorGUILayout.PropertyField(charProp.FindPropertyRelative("movementAssetPrefab"), new GUIContent("Movement Asset (Prefab)"));
+                DrawPrefabSelectionRow("Movement Asset (Prefab)", charProp.FindPropertyRelative("movementAssetPrefab"), config.pathsFolderPath, config);
             }
         }
         else if (typeName.Contains("BossConfig"))

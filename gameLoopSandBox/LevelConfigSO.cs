@@ -84,6 +84,7 @@ public class LevelConfigSO : ScriptableObject
     [Header("Folder Paths for Picker")]
     public string minionsFolderPath = "Assets/Prefabs/Minions";
     public string bossesFolderPath = "Assets/Prefabs/Bosses";
+    public string pathsFolderPath = "Assets/Prefabs/Paths";
 
     [Header("Waves")]
     public List<WaveData> waves = new List<WaveData>();

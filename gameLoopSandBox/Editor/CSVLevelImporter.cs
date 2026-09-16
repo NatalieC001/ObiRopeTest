@@ -9,6 +9,7 @@ public class CSVLevelImporter : EditorWindow
     private TextAsset csvFile;
     private string minionsFolderPath = "Assets/Prefabs/Minions";
     private string bossesFolderPath = "Assets/Prefabs/Bosses";
+    private string pathsFolderPath = "Assets/Prefabs/Paths";
 
     [MenuItem("Archery Range/CSV Level Importer")]
     public static void ShowWindow()
@@ -25,6 +26,7 @@ public class CSVLevelImporter : EditorWindow
         csvFile = (TextAsset)EditorGUILayout.ObjectField("CSV File", csvFile, typeof(TextAsset), false);
         minionsFolderPath = EditorGUILayout.TextField("Minions Folder Path", minionsFolderPath);
         bossesFolderPath = EditorGUILayout.TextField("Bosses Folder Path", bossesFolderPath);
+        pathsFolderPath = EditorGUILayout.TextField("Paths Folder Path", pathsFolderPath);
 
         if (GUILayout.Button("Generate Levels"))
         {
@@ -159,6 +161,7 @@ public class CSVLevelImporter : EditorWindow
             levelConfig.levelOutroText = levelDataInfo.outroText;
             levelConfig.minionsFolderPath = minionsFolderPath;
             levelConfig.bossesFolderPath = bossesFolderPath;
+            levelConfig.pathsFolderPath = pathsFolderPath;
 
             levelConfig.waves.Clear();
 
