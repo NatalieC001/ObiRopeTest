@@ -28,7 +28,6 @@ public class StandardCreature : MonoBehaviour
     [SerializeField] private string targetLayer = "Enemy";
 
     private CreatureStatusEffects statusEffects;
-    private DissolveEffect myDissolveEffect;
 
     private void Awake()
     {
@@ -45,21 +44,19 @@ public class StandardCreature : MonoBehaviour
 
         // Try to find the status effect component (optional, but recommended)
         statusEffects = GetComponent<CreatureStatusEffects>();
-
-        // Cache the true dissolve effect belonging to THIS creature's mesh hierarchy
-        // before any arrows hit it to ensure we don't accidentally grab an arrow's dissolve script later.
-        // We use GetComponent on our own object first, and fallback to children to ensure we never
-        // grab a sibling's component inside a Swarm hierarchy.
-        myDissolveEffect = GetComponent<DissolveEffect>();
-        if (myDissolveEffect == null)
-        {
-            myDissolveEffect = GetComponentInChildren<DissolveEffect>();
-        }
     }
 
     private void Start()
     {
         health = maxHealth;
+
+        // Exactly mirror the DragonSegment intercept logic:
+        // We subscribe to the dissolve completion event right at the start.
+        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
+        if (dissolve != null)
+        {
+            dissolve.OnDissolveCompleted += FinalizeDestruction;
+        }
     }
 
     /// <summary>
@@ -149,38 +146,38 @@ public class StandardCreature : MonoBehaviour
             }
         }
 
-        // 4. Trigger the main creature's visual dissolve effect
-        if (myDissolveEffect != null)
+        // Explicitly command the segment's visual effect to start dissolving!
+        // This will eventually fire the OnDissolveCompleted event we subscribed to in Start,
+        // which will trigger FinalizeDestruction().
+        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
+        if (dissolve != null)
         {
-            // We subscribe to the completion event. When the visual finishes, it deletes the object.
-            myDissolveEffect.OnDissolveCompleted += FinalizeDestruction;
-            myDissolveEffect.TriggerDissolve();
+            dissolve.TriggerDissolve();
         }
         else
         {
-            // Fallback: If no DissolveEffect component exists, just destroy it immediately
+            // Fallback: If no DissolveEffect exists to fire the event, we just destroy it now
             FinalizeDestruction();
         }
     }
 
     private void OnDestroy()
     {
-        // Clean up the event listener to avoid memory leaks if destroyed prematurely
-        if (myDissolveEffect != null)
+        // Clean up the event listener to avoid memory leaks
+        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
+        if (dissolve != null)
         {
-            myDissolveEffect.OnDissolveCompleted -= FinalizeDestruction;
+            dissolve.OnDissolveCompleted -= FinalizeDestruction;
         }
     }
 
     /// <summary>
-    /// Called exactly when the visual dissolve finishes via callback.
-    /// Safely obliterates the GameObject hierarchy (which takes the Mesh, Collider, and Arrows with it).
+    /// Called EXACTLY when the visual dissolve finishes via callback.
+    /// Safely purges the segment from the tracking arrays and obliterates the GameObject hierarchy.
     /// </summary>
     private void FinalizeDestruction()
     {
-        // This instantly removes it from the TrainingLevelManager's active tracking loop.
-        // We destroy gameObject directly because this script sits on the Minion_Basic root.
-        // Doing this preserves the overall Swarm parent if this minion is part of a larger swarm.
+        // Permanently destroy the root object, which automatically takes the Mesh, Collider, and Arrows with it.
         Destroy(gameObject);
     }
 }
