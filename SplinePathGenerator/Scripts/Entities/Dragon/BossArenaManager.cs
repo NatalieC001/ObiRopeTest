@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 /// <summary>
 /// This script lives permanently in the Boss Level Scene.
-/// It holds references to environmental splines (which prefabs cannot do)
+/// It holds references to environmental splines (which prefabs cannot do) 
 /// and orchestrates the battle phases between the Boss and its minions.
 /// </summary>
 public class BossArenaManager : MonoBehaviour

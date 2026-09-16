@@ -21,7 +21,7 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
     [Tooltip("Reference to the child mesh renderer (useful for triggering visual effects).")]
     [SerializeField] private Renderer segmentRenderer;
     [Tooltip("Reference to the child collider (useful for disabling physics upon death).")]
-    [SerializeField] private Collider segmentCollider;
+    [SerializeField] public Collider segmentCollider;
 
     [Tooltip("The physics layer this segment will be forced onto so arrows can detect it. Displayed here as a reminder!")]
     [SerializeField] private string targetLayer = "Enemy";
@@ -63,6 +63,23 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
         SegmentIndex = index;
     }
 
+    public void OnRopeAttached(RopeArrow rope)
+    {
+        if (dragonManager != null)
+        {
+            dragonManager.HandleRopeAttached(this, rope);
+        }
+    }
+
+    // Called by RopeArrow when it is cleaned up / detached from this segment
+    public void OnRopeDetached(RopeArrow rope)
+    {
+        if (dragonManager != null)
+        {
+            dragonManager.ReleaseTetherFromSegment(this, rope);
+        }
+    }
+
     public void OnArrowHit(float damage, Vector3 impactPoint, ElementTypeOB7 elementType)
     {
         TakeDamage(damage, impactPoint, elementType);
@@ -71,7 +88,7 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
     /// <summary>
     /// Called when the player shoots this specific segment.
     /// </summary>
-    public void TakeDamage(float amount, Vector3 hitPoint, ElementTypeOB7 arrowType = ElementTypeOB7.Normal)
+    public virtual void TakeDamage(float amount, Vector3 hitPoint, ElementTypeOB7 arrowType = ElementTypeOB7.Normal)
     {
         // Pass damage up to the brain so the overall boss loses health and can trigger evasions!
         if (bossBrain != null)
@@ -99,63 +116,112 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
         }
     }
 
-    private void Die()
+    private void Start()
+    {
+        // For destructible body parts, we intercept the OnDissolveCompleted event right from the start.
+        // The DissolveEffect script naturally handles the arrow hit and plays the animation immediately.
+        // We just sit back and wait for it to finish, then we obliterate the root object and close the gap.
+        if (isDestructiblePart)
+        {
+            DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
+            if (dissolve != null)
+            {
+                dissolve.OnDissolveCompleted += FinalizeDestruction;
+            }
+        }
+    }
+
+    protected virtual void Die()
     {
         if (!isDestructiblePart) return;
 
-        Debug.Log($"<color=red>[DragonSegment] Segment {SegmentIndex} Destroyed!</color>");
+        Debug.Log($"<color=red>[DragonSegment] Segment {SegmentIndex} health reached 0!</color>");
 
-        // Disable physics immediately so arrows don't keep hitting the dying segment
+        // Disable physics immediately so arrows don't keep hitting it
         if (segmentCollider != null)
         {
             segmentCollider.enabled = false;
-            Destroy(segmentCollider.gameObject, 0.1f); // Ensure the physics engine totally removes it
         }
 
-        // Clean up any arrows sticking out of this segment
+        // Trigger dissolve on any arrows sticking out of this segment simultaneously.
         StickingArrow[] attachedArrows = GetComponentsInChildren<StickingArrow>(true);
         foreach (StickingArrow arrow in attachedArrows)
         {
             if (arrow != null)
             {
-                Destroy(arrow.gameObject);
+                DissolveEffect arrowDissolve = arrow.GetComponentInChildren<DissolveEffect>();
+                if (arrowDissolve != null)
+                {
+                    arrowDissolve.TriggerDissolve();
+                }
             }
         }
 
-        // Find any "ArrowAnchor" objects that the StickingArrow might have parented directly
-        foreach (Transform child in transform)
+        // Explicitly command the segment's visual effect to start dissolving!
+        // This will eventually fire the OnDissolveCompleted event we subscribed to in Start, 
+        // which will trigger FinalizeDestruction().
+        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
+        if (dissolve != null)
         {
-            if (child.name.Contains("ArrowAnchor"))
-            {
-                Destroy(child.gameObject);
-            }
+            dissolve.TriggerDissolve();
         }
+        else
+        {
+            // Fallback: If no DissolveEffect exists to fire the event, we just destroy it now
+            FinalizeDestruction();
+        }
+    }
 
-        // Notify the body manager that this piece is gone so it can close the gap
+    private void OnDestroy()
+    {
+        // Clean up the event listener to avoid memory leaks
+        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
+        if (dissolve != null)
+        {
+            dissolve.OnDissolveCompleted -= FinalizeDestruction;
+        }
+    }
+
+    /// <summary>
+    /// Called EXACTLY when the visual dissolve finishes via callback.
+    /// Safely purges the segment from the tracking arrays and obliterates the GameObject hierarchy.
+    /// </summary>
+    private void FinalizeDestruction()
+    {
+        // Tell the manager to wipe this piece from the tracking array and close the gap!
         if (dragonManager != null)
         {
             dragonManager.OnSegmentDestroyed(this);
         }
 
-        // If there is a DissolveEffect, let it play and destroy the object after a delay
-        // Otherwise, destroy immediately.
-        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
-        if (dissolve != null)
+        // Permanently destroy the root object, which automatically takes the Mesh, Collider, and Arrows with it.
+        Destroy(gameObject);
+    }
+
+    /// <summary>
+    /// Helper to grab the size of this segment in case needed externally.
+    /// Size is calculated based on bounding box.
+    /// </summary>
+    public float GetSegmentSize()
+    {
+        Renderer r = segmentRenderer != null ? segmentRenderer : GetComponentInChildren<Renderer>();
+        if (r != null)
         {
-            dissolve.TriggerDissolve();
-            Destroy(gameObject, 2f); // Give time for the visual effect to play
+            MeshFilter mf = r.GetComponent<MeshFilter>();
+            if (mf != null && mf.sharedMesh != null)
+            {
+                return mf.sharedMesh.bounds.size.z * mf.transform.lossyScale.z;
+            }
+            return r.bounds.size.z;
         }
-        else
-        {
-            Destroy(gameObject);
-        }
+        return 2.0f;
     }
 
     /// <summary>
     /// Called by the SegmentedDragonManager when the entire boss is defeated.
     /// Forces permanent pieces (Head, Legs, Tail) to finally dissolve.
     /// </summary>
-    public void TriggerTotalDeath()
+    public virtual void TriggerTotalDeath()
     {
         if (segmentCollider != null)
         {
