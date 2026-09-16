@@ -30,7 +30,7 @@ public class SegmentedDragonManager : MonoBehaviour
     public float totalBossPower { get; private set; }
 
     // Tracking list for body segments to monitor win condition
-    private List<DragonSegment> destructibleSegments = new List<DragonSegment>();
+    private System.Collections.Generic.List<DragonSegment> destructibleSegments = new System.Collections.Generic.List<DragonSegment>();
 
     // List tracking all live segments. Head is index 0.
     private List<DragonSegment> activeSegments = new List<DragonSegment>();
@@ -344,7 +344,7 @@ public class SegmentedDragonManager : MonoBehaviour
     /// Called by BossCreature when the overall health reaches 0.
     /// Commands all remaining permanent pieces (Head, Legs, Tail) to die.
     /// </summary>
-    public void TriggerTotalDeath(System.Action onComplete)
+        public void TriggerTotalDeath(System.Action onComplete)
     {
         Debug.Log("<color=red>[SegmentedDragonManager] The entire dragon is collapsing!</color>");
 
@@ -379,8 +379,5 @@ public class SegmentedDragonManager : MonoBehaviour
         }
     }
 
-    public bool IsTethered()
-    {
-        return false; // Safely stubbing out to allow tactical manager to compile locally in user environment
-    }
+    public bool IsTethered { get; set; } = false;
 }
