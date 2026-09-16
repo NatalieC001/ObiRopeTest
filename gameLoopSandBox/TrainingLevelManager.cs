@@ -137,6 +137,7 @@ public class TrainingLevelManager : MonoBehaviour
         if (levelFeedbackText != null)
         {
             levelFeedbackText.text = $"Level: {currentLevelConfig.levelName}\n{currentLevelConfig.levelIntroText}\n<size=70%>Shoot the Gong to begin!</size>";
+            levelFeedbackText.alpha = 1f; // Ensure text is visible
             Debug.Log($"[TrainingLevelManager] Showing Level Intro Text. Waiting 3.0s before Wave 1.");
         }
 
@@ -413,6 +414,7 @@ public class TrainingLevelManager : MonoBehaviour
         if (levelFeedbackText != null)
         {
             levelFeedbackText.text = $"{currentLevelConfig.levelOutroText}\n<size=70%>Level Time: {levelTimeTaken:F1}s\nShoot the Gong to continue!</size>";
+            levelFeedbackText.alpha = 1f; // Ensure text is visible
             Debug.Log($"[TrainingLevelManager] Showing Level Outro Text. Waiting for Gong trigger.");
         }
 
