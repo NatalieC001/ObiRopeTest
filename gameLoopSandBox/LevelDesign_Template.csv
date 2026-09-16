@@ -16,7 +16,8 @@ Level3_BossEncounter,Boss Incoming!,You survived!,Wave1,ClearAllTargets,0,3,5,15
 Level3_BossEncounter,Boss Incoming!,You survived!,Wave2,ClearAllTargets,0,0,0,10,1,1,SplinePathAsset,Electric
 Level3_BossEncounter,Boss Incoming!,You survived!,Wave2,ClearAllTargets,0,5,-5,12,1,1.5,CorkscrewMovement,Normal
 Level3_BossEncounter,Boss Incoming!,You survived!,Wave3,ClearAllTargets,0,0,0,20,1,1,BossDragonAsset,Normal
-Level3_BossEncounter,Boss Incoming!,You survived!,Wave3,ClearAllTargets,0,2,-10,10,1,1,SplinePathAsset,Fire
+Level3_BossEncounter,Boss Incoming!,You survived!,Wave3,ClearAllTargets,0,5,-10,10,1,1,SplinePathAsset,Fire
+Level3_BossEncounter,Boss Incoming!,You survived!,Wave3,ClearAllTargets,0,10,10,10,1,1,SplinePathAsset,Electric
 Level4_Gauntlet,The Gauntlet Begins!,Impressive!,Wave1,TimeBased,30,0,0,15,0.8,1.5,FishSwimMovement,Normal
 Level4_Gauntlet,The Gauntlet Begins!,Impressive!,Wave1,TimeBased,30,5,0,20,1,1.2,SplinePathAsset,Sticky
 Level4_Gauntlet,The Gauntlet Begins!,Impressive!,Wave2,ClearAllTargets,0,0,-8,10,1,1.5,SwoopAndRetreatMovement,Fire
@@ -27,5 +28,6 @@ Level5_FinalStand,Hold the Line!,Victory!,Wave1,TimeBased,45,0,0,10,1,1,SplinePa
 Level5_FinalStand,Hold the Line!,Victory!,Wave1,TimeBased,45,5,0,10,1,1,SplinePathAsset,Fire
 Level5_FinalStand,Hold the Line!,Victory!,Wave2,ClearAllTargets,0,0,-15,15,2,0.5,FigureEightMovement,Ice
 Level5_FinalStand,Hold the Line!,Victory!,Wave2,ClearAllTargets,0,3,15,15,2,0.5,FigureEightMovement,Ice
-Level5_FinalStand,Hold the Line!,Victory!,Wave3,ClearAllTargets,0,0,0,30,1,1,BossDragonAsset,Stasis
-Level5_FinalStand,Hold the Line!,Victory!,Wave3,ClearAllTargets,0,2,0,15,1,1,BossDragonAsset,Fire
+Level5_FinalStand,Hold the Line!,Victory!,Wave3,ClearAllTargets,0,0,0,15,1,1,SplinePathAsset,Stasis
+Level5_FinalStand,Hold the Line!,Victory!,Wave3,ClearAllTargets,0,4,-10,15,1,1,SplinePathAsset,Fire
+Level5_FinalStand,Hold the Line!,Victory!,Wave3,ClearAllTargets,0,12,0,30,1,1,BossDragonAsset,Ice

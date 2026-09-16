@@ -31,6 +31,7 @@ public enum TargetMovementType
 public abstract class CharacterConfigBase
 {
     public float spawnDelay;
+    public Vector3 spawnPositionOffset;
     public ElementTypeOB7 requiredArrowElement;
 }
 

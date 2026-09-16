@@ -67,6 +67,8 @@ public class LevelConfigSOEditor : Editor
             if (GUILayout.Button($"Remove Wave {i + 1}", GUILayout.Width(120)))
             {
                 wavesProp.DeleteArrayElementAtIndex(i);
+                EditorGUILayout.EndVertical();
+                break;
             }
 
             EditorGUILayout.EndVertical();
@@ -94,9 +96,10 @@ public class LevelConfigSOEditor : Editor
         if (typeName.Contains("MinionConfig"))
         {
             EditorGUILayout.LabelField($"Character {index + 1}: Minion", EditorStyles.boldLabel);
-            DrawPrefabSelectionRow("Prefab", charProp.FindPropertyRelative("prefab"), config.minionsFolderPath);
+            DrawPrefabSelectionRow("Prefab", charProp.FindPropertyRelative("prefab"), config.minionsFolderPath, config);
 
             EditorGUILayout.PropertyField(charProp.FindPropertyRelative("spawnPointPrefab"), new GUIContent("Spawn Point (Prefab)"));
+            EditorGUILayout.PropertyField(charProp.FindPropertyRelative("spawnPositionOffset"), new GUIContent("Position Offset"));
             EditorGUILayout.PropertyField(charProp.FindPropertyRelative("spawnDelay"), new GUIContent("Spawn Delay"));
             EditorGUILayout.PropertyField(charProp.FindPropertyRelative("requiredArrowElement"), new GUIContent("Element"));
 
@@ -112,9 +115,10 @@ public class LevelConfigSOEditor : Editor
         else if (typeName.Contains("BossConfig"))
         {
             EditorGUILayout.LabelField($"Character {index + 1}: Big Boss", EditorStyles.boldLabel);
-            DrawPrefabSelectionRow("Prefab", charProp.FindPropertyRelative("prefab"), config.bossesFolderPath);
+            DrawPrefabSelectionRow("Prefab", charProp.FindPropertyRelative("prefab"), config.bossesFolderPath, config);
 
             EditorGUILayout.PropertyField(charProp.FindPropertyRelative("spawnPointPrefab"), new GUIContent("Spawn Point (Prefab)"));
+            EditorGUILayout.PropertyField(charProp.FindPropertyRelative("spawnPositionOffset"), new GUIContent("Position Offset"));
             EditorGUILayout.PropertyField(charProp.FindPropertyRelative("spawnDelay"), new GUIContent("Spawn Delay"));
             EditorGUILayout.PropertyField(charProp.FindPropertyRelative("requiredArrowElement"), new GUIContent("Element"));
             EditorGUILayout.PropertyField(charProp.FindPropertyRelative("observationPathPrefab"), new GUIContent("Observation Path (Prefab)"));
@@ -128,41 +132,40 @@ public class LevelConfigSOEditor : Editor
         // Add a remove button for the character
         if (GUILayout.Button("Remove Character", GUILayout.Width(150)))
         {
-            // Note: In a real custom editor deleting from a SerializeReference array can sometimes be finicky,
-            // but standard DeleteArrayElementAtIndex works in modern Unity versions.
-            charProp.serializedObject.Update();
-            charProp.DeleteCommand();
-            charProp.serializedObject.ApplyModifiedProperties();
+            // Find the character's parent wave to remove correctly
+            string path = charProp.propertyPath;
+            string parentArrayPath = path.Substring(0, path.LastIndexOf(".Array.data["));
+            SerializedProperty charactersProp = charProp.serializedObject.FindProperty(parentArrayPath);
+
+            charactersProp.serializedObject.Update();
+            charactersProp.DeleteArrayElementAtIndex(index);
+            charactersProp.serializedObject.ApplyModifiedProperties();
             GUIUtility.ExitGUI();
         }
 
         EditorGUILayout.EndVertical();
     }
 
-    private void DrawPrefabSelectionRow(string label, SerializedProperty prefabProp, string searchFolderPath)
+    private void DrawPrefabSelectionRow(string label, SerializedProperty prefabProp, string searchFolderPath, LevelConfigSO config)
     {
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.PropertyField(prefabProp, new GUIContent(label));
 
         if (GUILayout.Button("Select", GUILayout.Width(70)))
         {
-            int controlID = EditorGUIUtility.GetControlID(FocusType.Passive);
-            // By showing the object picker we can set it to search for GameObjects
-            EditorGUIUtility.ShowObjectPicker<GameObject>(null, false, "", controlID);
+            // Store the property path to lookup later in the callback, avoiding SerializedProperty expiration
+            string propPath = prefabProp.propertyPath;
 
-            // Using ProjectBrowser is difficult through scripts, but we can set the search string to point inside the folder
-            // An advanced version would open a custom window. For simplicity, we use Unity's Object Picker but you'd
-            // typically have to manually narrow it to the folder. Since Unity's default picker doesn't natively support
-            // folder-restricting via API easily, a common trick is to prefix search with the folder name or use Search filter.
-            // A more robust approach for exact folder picking requires a custom EditorWindow.
-
-            // Since the user asked specifically to "open Minion folder" and "Select", another way is to focus the project window
-            // on that folder, but assigning still requires drag and drop.
-            // Let's use a custom Picker Window that we define next.
             PrefabPickerWindow.ShowPicker(searchFolderPath, (selectedPrefab) =>
             {
-                prefabProp.objectReferenceValue = selectedPrefab;
-                prefabProp.serializedObject.ApplyModifiedProperties();
+                SerializedObject serializedObj = new SerializedObject(config);
+                serializedObj.Update();
+                SerializedProperty propToUpdate = serializedObj.FindProperty(propPath);
+                if (propToUpdate != null)
+                {
+                    propToUpdate.objectReferenceValue = selectedPrefab;
+                    serializedObj.ApplyModifiedProperties();
+                }
             });
         }
         EditorGUILayout.EndHorizontal();

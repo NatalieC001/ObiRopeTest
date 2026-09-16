@@ -213,12 +213,12 @@ public class TrainingLevelManager : MonoBehaviour
             return;
         }
 
-        Vector3 spawnPos = spawnCenter.position;
+        Vector3 spawnPos = spawnCenter.position + config.spawnPositionOffset;
         Quaternion spawnRot = Quaternion.identity;
 
         if (config.spawnPointPrefab != null)
         {
-            GameObject spawnPoint = Instantiate(config.spawnPointPrefab, spawnCenter.position, Quaternion.identity);
+            GameObject spawnPoint = Instantiate(config.spawnPointPrefab, spawnPos, Quaternion.identity);
             spawnPos = spawnPoint.transform.position;
             spawnRot = spawnPoint.transform.rotation;
         }
@@ -270,12 +270,12 @@ public class TrainingLevelManager : MonoBehaviour
             return;
         }
 
-        Vector3 spawnPos = spawnCenter.position;
+        Vector3 spawnPos = spawnCenter.position + config.spawnPositionOffset;
         Quaternion spawnRot = Quaternion.identity;
 
         if (config.spawnPointPrefab != null)
         {
-            GameObject spawnPoint = Instantiate(config.spawnPointPrefab, spawnCenter.position, Quaternion.identity);
+            GameObject spawnPoint = Instantiate(config.spawnPointPrefab, spawnPos, Quaternion.identity);
             spawnPos = spawnPoint.transform.position;
             spawnRot = spawnPoint.transform.rotation;
         }
@@ -285,12 +285,12 @@ public class TrainingLevelManager : MonoBehaviour
 
         if (config.observationPathPrefab != null)
         {
-            Instantiate(config.observationPathPrefab, spawnCenter.position, Quaternion.identity);
+            Instantiate(config.observationPathPrefab, spawnCenter.position + config.spawnPositionOffset, Quaternion.identity);
         }
 
         if (config.escapePathPrefab != null)
         {
-            Instantiate(config.escapePathPrefab, spawnCenter.position, Quaternion.identity);
+            Instantiate(config.escapePathPrefab, spawnCenter.position + config.spawnPositionOffset, Quaternion.identity);
         }
 
         // If this is the Boss Dragon encounter, we need to wire it up!

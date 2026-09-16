@@ -88,6 +88,12 @@ public class CSVLevelImporter : EditorWindow
             float spawnDelay = 0f;
             float.TryParse(cols[6], out spawnDelay);
 
+            float posX = 0f;
+            float posZ = 0f;
+            float.TryParse(cols[7], out posX);
+            float.TryParse(cols[8], out posZ);
+            Vector3 spawnPositionOffset = new Vector3(posX, 0f, posZ);
+
             TargetMovementType movementBehavior = TargetMovementType.None;
             if (Enum.TryParse(cols[11].Trim(), true, out TargetMovementType moveEnum))
             {
@@ -106,6 +112,7 @@ public class CSVLevelImporter : EditorWindow
             {
                 BossConfig bossConfig = new BossConfig();
                 bossConfig.spawnDelay = spawnDelay;
+                bossConfig.spawnPositionOffset = spawnPositionOffset;
                 bossConfig.requiredArrowElement = requiredElement;
                 config = bossConfig;
             }
@@ -113,6 +120,7 @@ public class CSVLevelImporter : EditorWindow
             {
                 MinionConfig minionConfig = new MinionConfig();
                 minionConfig.spawnDelay = spawnDelay;
+                minionConfig.spawnPositionOffset = spawnPositionOffset;
                 minionConfig.requiredArrowElement = requiredElement;
                 minionConfig.movementType = movementBehavior;
                 config = minionConfig;
