@@ -346,6 +346,17 @@ public class TrainingLevelManager : MonoBehaviour
         return null; // Not found anywhere
     }
 
+    public void ForceCompleteWaveWithDelay(float delay)
+    {
+        StartCoroutine(ForceCompleteWaveRoutine(delay));
+    }
+
+    private IEnumerator ForceCompleteWaveRoutine(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        CompleteCurrentWave();
+    }
+
     private void CompleteCurrentWave()
     {
         isWaveActive = false;
