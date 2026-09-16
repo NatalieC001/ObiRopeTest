@@ -43,19 +43,19 @@ public class LevelDiagnosticTool : EditorWindow
                 if (config.vanillaTargetPrefab != null) {
                     writer.WriteLine($"  - Vanilla Target: {config.vanillaTargetPrefab.name}");
                 } else {
-                    writer.WriteLine($"  - Vanilla Target: MISSING! -> FIX: Open CSV Importer window, click 'Auto-Find Prefabs', and click Generate.");
+                    writer.WriteLine($"  - Vanilla Target: MISSING! -> FIX: Go to top menu 'Archery Range' -> click 'CSV Level Importer' -> click 'Auto-Find Prefabs in Project' -> click 'Generate Levels & Waves'.");
                 }
 
                 if (config.splinePathAssetPrefab != null) {
                     writer.WriteLine($"  - Spline Swarm:   {config.splinePathAssetPrefab.name}");
                 } else {
-                    writer.WriteLine($"  - Spline Swarm:   MISSING! -> FIX: Open CSV Importer window, click 'Auto-Find Prefabs', and click Generate.");
+                    writer.WriteLine($"  - Spline Swarm:   MISSING! -> FIX: Go to top menu 'Archery Range' -> click 'CSV Level Importer' -> click 'Auto-Find Prefabs in Project' -> click 'Generate Levels & Waves'.");
                 }
 
                 if (config.bossDragonPrefab != null) {
                     writer.WriteLine($"  - Boss Dragon:    {config.bossDragonPrefab.name}");
                 } else {
-                    writer.WriteLine($"  - Boss Dragon:    MISSING! -> FIX: Open CSV Importer window, click 'Auto-Find Prefabs', and click Generate.");
+                    writer.WriteLine($"  - Boss Dragon:    MISSING! -> FIX: Go to top menu 'Archery Range' -> click 'CSV Level Importer' -> click 'Auto-Find Prefabs in Project' -> click 'Generate Levels & Waves'.");
                 }
 
                 writer.WriteLine();
