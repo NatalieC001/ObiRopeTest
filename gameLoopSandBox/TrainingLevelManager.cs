@@ -283,14 +283,26 @@ public class TrainingLevelManager : MonoBehaviour
         GameObject bossObj = Instantiate(config.prefab, spawnPos, spawnRot);
         activeTargets.Add(bossObj);
 
-        if (config.observationPathPrefab != null)
+        if (config.observationPathPrefabs != null)
         {
-            Instantiate(config.observationPathPrefab, spawnCenter.position + config.spawnPositionOffset, Quaternion.identity);
+            foreach (var obsPath in config.observationPathPrefabs)
+            {
+                if (obsPath != null)
+                {
+                    Instantiate(obsPath, spawnCenter.position + config.spawnPositionOffset, Quaternion.identity);
+                }
+            }
         }
 
-        if (config.escapePathPrefab != null)
+        if (config.escapePathPrefabs != null)
         {
-            Instantiate(config.escapePathPrefab, spawnCenter.position + config.spawnPositionOffset, Quaternion.identity);
+            foreach (var escPath in config.escapePathPrefabs)
+            {
+                if (escPath != null)
+                {
+                    Instantiate(escPath, spawnCenter.position + config.spawnPositionOffset, Quaternion.identity);
+                }
+            }
         }
 
         // If this is the Boss Dragon encounter, we need to wire it up!

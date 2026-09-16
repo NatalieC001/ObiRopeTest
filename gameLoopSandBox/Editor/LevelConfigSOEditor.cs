@@ -121,8 +121,8 @@ public class LevelConfigSOEditor : Editor
             EditorGUILayout.PropertyField(charProp.FindPropertyRelative("spawnPositionOffset"), new GUIContent("Position Offset"));
             EditorGUILayout.PropertyField(charProp.FindPropertyRelative("spawnDelay"), new GUIContent("Spawn Delay"));
             EditorGUILayout.PropertyField(charProp.FindPropertyRelative("requiredArrowElement"), new GUIContent("Element"));
-            EditorGUILayout.PropertyField(charProp.FindPropertyRelative("observationPathPrefab"), new GUIContent("Observation Path (Prefab)"));
-            EditorGUILayout.PropertyField(charProp.FindPropertyRelative("escapePathPrefab"), new GUIContent("Escape Path (Prefab)"));
+            EditorGUILayout.PropertyField(charProp.FindPropertyRelative("observationPathPrefabs"), new GUIContent("Observation Paths (Prefabs)"));
+            EditorGUILayout.PropertyField(charProp.FindPropertyRelative("escapePathPrefabs"), new GUIContent("Escape Paths (Prefabs)"));
         }
         else
         {

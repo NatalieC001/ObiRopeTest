@@ -49,8 +49,8 @@ public class BossConfig : CharacterConfigBase
 {
     public GameObject prefab;
     public GameObject spawnPointPrefab;
-    public GameObject observationPathPrefab;
-    public GameObject escapePathPrefab;
+    public List<GameObject> observationPathPrefabs = new List<GameObject>();
+    public List<GameObject> escapePathPrefabs = new List<GameObject>();
 }
 
 [Serializable]
