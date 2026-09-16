@@ -3,9 +3,9 @@
 This document explains exactly how to set up exciting, varied encounters using the `LevelDesign_Template.csv`. By mixing different targets, movement types, elements, and modifiers, you can build everything from simple target practice to epic boss battles.
 
 ## 1. The Three Core Target Types
-When building a wave, you are choosing between three fundamental types of spawns. This is controlled by the `MovementBehavior` column.
+When building a wave, you are choosing between three fundamental types of spawns. This is controlled by the `MovementBehavior` column in your CSV.
 
-*   **Vanilla Targets:** Use standard movement types like `PingPongMovement`, `Rotator`, `CorkscrewMovement`, `FigureEightMovement`, `FishSwimMovement`, `SwoopAndRetreatMovement`, or `None` (Static). These spawn individual models (like the gong/target).
+*   **Vanilla Targets:** Use standard movement types like `PingPongMovement`, `Rotator`, `CorkscrewMovement`, `FigureEightMovement`, `FishSwimMovement`, `SwoopAndRetreatMovement`, or `None` (Static). These spawn individual standard models.
 *   **Spline Swarms:** Use `SplinePathAsset`. This spawns an entire pre-baked swarm of enemies on a custom track.
 *   **Boss Encounters:** Use `BossDragonAsset`. This spawns a massive, multi-phase boss.
 
@@ -14,7 +14,25 @@ When building a wave, you are choosing between three fundamental types of spawns
 
 ---
 
-## 2. Setting Up the CSV Exactly Right
+## 2. How The System Knows Which Prefab To Use (The Internal Logic)
+
+You might wonder: "I type 'BossDragonAsset' in the CSV, but how does the game know exactly *which* 3D model or prefab to load?"
+
+Here is exactly how the system connects your text file to the game files:
+
+*   **The Problem with CSVs:** A CSV is just a text file. It cannot hold 3D models or Unity Prefabs.
+*   **The Middleman (LevelConfigSO):** When you run the `CSV Level Importer`, it creates a Scriptable Object (`LevelConfigSO`) for each level. This object acts as the bridge. It holds the text data from the CSV *and* the actual physical references to the Unity Prefabs.
+*   **How the Importer Connects Them:**
+    1. Open the CSV Importer (`Archery Range -> CSV Level Importer`).
+    2. Click the **Auto-Find Prefabs in Project** button.
+    3. **What happens internally:** The script searches your entire Unity project folder for prefabs containing specific names. It looks for a file containing "Target" for the Vanilla slot, "Spline" for the Swarm slot, and "Boss" for the Dragon slot.
+    4. It then locks those files into the Importer window.
+    5. When you click **Generate Levels & Waves**, the importer saves those exact prefab files into the newly created `LevelConfigSO` files.
+*   **The Final Step (Runtime):** When you play the game, the `TrainingLevelManager` reads the `LevelConfigSO`. If the CSV says "Spawn a BossDragonAsset", the Manager looks at the `bossDragonPrefab` slot in the `LevelConfigSO` and spawns whatever object is sitting there.
+
+---
+
+## 3. Setting Up the CSV Exactly Right
 
 Here is the exact column breakdown for your `LevelDesign_Template.csv`:
 
@@ -34,7 +52,7 @@ Here is the exact column breakdown for your `LevelDesign_Template.csv`:
 
 ---
 
-## 3. Exciting Encounter Recipes (CSV Examples)
+## 4. Exciting Encounter Recipes (CSV Examples)
 
 Here are distinct examples of how to combine these settings for dynamic gameplay.
 
@@ -70,15 +88,17 @@ Level3_Boss,The Dragon Watches!,You survived!,Wave1,ClearAllTargets,0,0,0,10,1,1
 
 ---
 
-## 4. How to Fix Multiple Bosses Spawning
+## 5. How to Fix Multiple Bosses Spawning
 
 If you press Play and see 2 or 3 dragons stacked on top of each other, use the **Level Diagnostic Tool** to see exactly what is going wrong:
+
 1. Click `Archery Range -> Run Level Diagnostics` at the top of the Unity window.
 2. Read the `LevelDiagnosticReport.txt` that is generated.
 
 **The Fix:**
-You have a missing prefab in your level configuration, causing the wrong objects to spawn. You must fix the prefab assignments.
+You have a missing or incorrect prefab in your level configuration, causing the wrong objects to spawn. You must fix the prefab assignments by letting the computer find them automatically.
+
 1. Open the CSV Level Importer (`Archery Range -> CSV Level Importer`).
-2. Click the new `Auto-Find Prefabs in Project` button to assign the Vanilla, Spline, and Boss prefabs automatically.
+2. Click the `Auto-Find Prefabs in Project` button to assign the Vanilla, Spline, and Boss prefabs automatically.
 3. Click `Generate Levels & Waves`.
 4. Click `Archery Range -> Run Level Diagnostics` again to verify there are no WARNINGS in the text file.
