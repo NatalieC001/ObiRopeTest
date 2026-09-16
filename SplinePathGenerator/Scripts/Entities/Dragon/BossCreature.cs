@@ -335,5 +335,12 @@ public class BossCreature : MonoBehaviour
 
         // Clean up the main boss entity
         Destroy(gameObject, 1f);
+
+        // Notify the level manager to move on after a short delay so the dissolve can play
+        TrainingLevelManager levelManager = FindAnyObjectByType<TrainingLevelManager>();
+        if (levelManager != null)
+        {
+            levelManager.ForceCompleteWaveWithDelay(2f);
+        }
     }
 }
