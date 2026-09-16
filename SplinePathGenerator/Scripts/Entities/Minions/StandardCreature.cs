@@ -30,15 +30,6 @@ public class StandardCreature : MonoBehaviour, IArrowTarget
     private CreatureStatusEffects statusEffects;
     private MinionManager minionManager;
 
-    public void Initialize(MinionManager manager)
-    {
-        minionManager = manager;
-        if (minionManager != null)
-        {
-            minionManager.RegisterMinion(this);
-        }
-    }
-
     private void Awake()
     {
         // Force the physics layer so arrows detect this creature, even if the dev forgot to set it!
@@ -69,6 +60,14 @@ public class StandardCreature : MonoBehaviour, IArrowTarget
     private void Start()
     {
         health = maxHealth;
+
+        // Automatically find the Minion Manager and register this minion to the list.
+        // This ensures the minion is tracked no matter how it was spawned into the game!
+        minionManager = FindFirstObjectByType<MinionManager>();
+        if (minionManager != null)
+        {
+            minionManager.RegisterMinion(this);
+        }
 
         // Exactly mirror the DragonSegment intercept logic:
         // We subscribe to the dissolve completion event right at the start.

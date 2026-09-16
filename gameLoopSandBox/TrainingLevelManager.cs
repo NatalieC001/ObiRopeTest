@@ -248,18 +248,6 @@ public class TrainingLevelManager : MonoBehaviour
             Debug.Log($"[TrainingLevelManager] Target spawned. Needs Element: {config.requiredArrowElement}");
         }
 
-        // Initialize StandardCreatures exactly like DragonSegment.
-        // We use GetComponentsInChildren to ensure that if a baked Swarm prefab is spawned,
-        // every individual child minion is registered with the MinionManager securely!
-        StandardCreature[] creatures = newTarget.GetComponentsInChildren<StandardCreature>(true);
-        foreach (var creature in creatures)
-        {
-            if (creature != null)
-            {
-                creature.Initialize(minionManager);
-            }
-        }
-
         // Spawn the movement asset if needed
         if (config.movementAssetPrefab != null && config.movementType == TargetMovementType.SplinePathAsset)
         {
