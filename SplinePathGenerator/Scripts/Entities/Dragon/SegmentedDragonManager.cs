@@ -381,6 +381,6 @@ public class SegmentedDragonManager : MonoBehaviour
 
     public bool IsTethered()
     {
-        return false;
+        return false; // Safely stubbing out to allow tactical manager to compile locally in user environment
     }
 }
