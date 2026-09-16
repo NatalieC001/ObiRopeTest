@@ -1,16 +1,31 @@
 LevelName,LevelIntroText,LevelOutroText,WaveName,ProgressionType,WaveDuration,SpawnDelay,PosX,PosZ,ScaleModifier,SpeedModifier,MovementBehavior,RequiredElement
-Level0_Debug,Test the Dragon Boss!,Good luck!,Wave1,ClearAllTargets,0,0,0,10,1,1,BossDragonAsset,Normal
-Level1_Intro,Get your bow ready!,Great job!,Wave1,ClearAllTargets,0,0,0,10,1,1,None,Normal
-Level1_Intro,Get your bow ready!,Great job!,Wave2,ClearAllTargets,0,0,-5,10,1,1,None,Normal
-Level1_Intro,Get your bow ready!,Great job!,Wave2,ClearAllTargets,0,0,5,10,1,1,None,Normal
-Level1_Intro,Get your bow ready!,Great job!,Wave3,ClearAllTargets,0,0,0,15,1.2,1,None,Fire
-Level2_Gallery,Moving Targets!,Nice shooting!,Wave1,ClearAllTargets,0,0,0,15,1,1,PingPongMovement,Normal
-Level2_Gallery,Moving Targets!,Nice shooting!,Wave1,ClearAllTargets,0,0,5,20,1,1.5,PingPongMovement,Normal
-Level2_Gallery,Moving Targets!,Nice shooting!,Wave2,ClearAllTargets,0,0,-10,5,1,1.2,None,Electric
-Level2_Gallery,Moving Targets!,Nice shooting!,Wave2,ClearAllTargets,0,2,10,5,1,1.2,None,Electric
-Level3_Boss,Boss incoming!,You survived!,Wave1,TimeBased,20,0,-3,10,1,1,Rotator,Normal
-Level3_Boss,Boss incoming!,You survived!,Wave1,TimeBased,20,0,3,10,1,1,Rotator,Normal
-Level3_Boss,Boss incoming!,You survived!,Wave1,TimeBased,20,4,0,25,3,2,SwoopAndRetreatMovement,Fire
-Level4_Splines,Beautiful Shapes!,Perfect!,Wave1,TimeBased,20,0,0,15,1,0,SplinePathAsset,Normal
-Level4_Splines,Beautiful Shapes!,Perfect!,Wave2,ClearAllTargets,0,0,0,15,1,1,SplinePathAsset,Normal
-Level5_Dragon,The Dragon Awakens!,You slayed it!,Wave1,ClearAllTargets,0,0,0,10,1,1,BossDragonAsset,Normal
+Level1_Intro,Welcome to the Archery Range!,Great warmup!,Wave1,ClearAllTargets,0,0,0,10,1,1,None,Normal
+Level1_Intro,Welcome to the Archery Range!,Great warmup!,Wave1,ClearAllTargets,0,2,-5,10,1,1,None,Normal
+Level1_Intro,Welcome to the Archery Range!,Great warmup!,Wave2,ClearAllTargets,0,0,5,10,1,1,None,Normal
+Level1_Intro,Welcome to the Archery Range!,Great warmup!,Wave2,ClearAllTargets,0,1,-5,12,1,1.2,None,Fire
+Level1_Intro,Welcome to the Archery Range!,Great warmup!,Wave3,TimeBased,15,0,0,15,1,1,PingPongMovement,Normal
+Level1_Intro,Welcome to the Archery Range!,Great warmup!,Wave3,TimeBased,15,3,5,15,1,1,PingPongMovement,Electric
+Level2_Swarm,Incoming Swarm!,Nice defense!,Wave1,ClearAllTargets,0,0,0,10,1,1,SplinePathAsset,Normal
+Level2_Swarm,Incoming Swarm!,Nice defense!,Wave1,ClearAllTargets,0,5,0,10,1,1,SplinePathAsset,Normal
+Level2_Swarm,Incoming Swarm!,Nice defense!,Wave2,TimeBased,20,0,-10,5,1,1.5,Rotator,Normal
+Level2_Swarm,Incoming Swarm!,Nice defense!,Wave2,TimeBased,20,2,10,5,1,1.5,Rotator,Electric
+Level2_Swarm,Incoming Swarm!,Nice defense!,Wave3,ClearAllTargets,0,0,0,10,1.5,0.8,SwoopAndRetreatMovement,Fire
+Level2_Swarm,Incoming Swarm!,Nice defense!,Wave3,ClearAllTargets,0,4,0,12,1,1,SplinePathAsset,Normal
+Level3_BossEncounter,Boss Incoming!,You survived!,Wave1,ClearAllTargets,0,0,0,15,1,1,PingPongMovement,Normal
+Level3_BossEncounter,Boss Incoming!,You survived!,Wave1,ClearAllTargets,0,3,5,15,1,1,PingPongMovement,Fire
+Level3_BossEncounter,Boss Incoming!,You survived!,Wave2,ClearAllTargets,0,0,0,10,1,1,SplinePathAsset,Electric
+Level3_BossEncounter,Boss Incoming!,You survived!,Wave2,ClearAllTargets,0,5,-5,12,1,1.5,CorkscrewMovement,Normal
+Level3_BossEncounter,Boss Incoming!,You survived!,Wave3,ClearAllTargets,0,0,0,20,1,1,BossDragonAsset,Normal
+Level3_BossEncounter,Boss Incoming!,You survived!,Wave3,ClearAllTargets,0,2,-10,10,1,1,SplinePathAsset,Fire
+Level4_Gauntlet,The Gauntlet Begins!,Impressive!,Wave1,TimeBased,30,0,0,15,0.8,1.5,FishSwimMovement,Normal
+Level4_Gauntlet,The Gauntlet Begins!,Impressive!,Wave1,TimeBased,30,5,0,20,1,1.2,SplinePathAsset,Sticky
+Level4_Gauntlet,The Gauntlet Begins!,Impressive!,Wave2,ClearAllTargets,0,0,-8,10,1,1.5,SwoopAndRetreatMovement,Fire
+Level4_Gauntlet,The Gauntlet Begins!,Impressive!,Wave2,ClearAllTargets,0,2,8,10,1,1.5,SwoopAndRetreatMovement,Electric
+Level4_Gauntlet,The Gauntlet Begins!,Impressive!,Wave3,ClearAllTargets,0,0,0,25,1,1,BossDragonAsset,Electric
+Level4_Gauntlet,The Gauntlet Begins!,Impressive!,Wave3,ClearAllTargets,0,1,0,10,1,1,SplinePathAsset,Normal
+Level5_FinalStand,Hold the Line!,Victory!,Wave1,TimeBased,45,0,0,10,1,1,SplinePathAsset,Normal
+Level5_FinalStand,Hold the Line!,Victory!,Wave1,TimeBased,45,5,0,10,1,1,SplinePathAsset,Fire
+Level5_FinalStand,Hold the Line!,Victory!,Wave2,ClearAllTargets,0,0,-15,15,2,0.5,FigureEightMovement,Ice
+Level5_FinalStand,Hold the Line!,Victory!,Wave2,ClearAllTargets,0,3,15,15,2,0.5,FigureEightMovement,Ice
+Level5_FinalStand,Hold the Line!,Victory!,Wave3,ClearAllTargets,0,0,0,30,1,1,BossDragonAsset,Stasis
+Level5_FinalStand,Hold the Line!,Victory!,Wave3,ClearAllTargets,0,2,0,15,1,1,BossDragonAsset,Fire
