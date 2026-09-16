@@ -5,7 +5,7 @@ using UnityEngine;
 /// These are typically the grunts that ride geometric spline shapes and use the Swarm logic,
 /// clearly separated from the basic 'MovingTarget' test objects.
 /// </summary>
-public class StandardCreature : MonoBehaviour
+public class StandardCreature : MonoBehaviour, IArrowTarget
 {
     [System.Serializable]
     public struct ElementalModifier
@@ -57,6 +57,11 @@ public class StandardCreature : MonoBehaviour
         {
             dissolve.OnDissolveCompleted += FinalizeDestruction;
         }
+    }
+
+    public void OnArrowHit(float damage, Vector3 impactPoint, ElementTypeOB7 elementType)
+    {
+        TakeDamage(damage, impactPoint, elementType);
     }
 
     /// <summary>
@@ -177,7 +182,15 @@ public class StandardCreature : MonoBehaviour
     /// </summary>
     private void FinalizeDestruction()
     {
-        // Permanently destroy the root object, which automatically takes the Mesh, Collider, and Arrows with it.
-        Destroy(gameObject);
+        // Tell the manager to wipe this piece from the scene!
+        if (MinionManager.Instance != null)
+        {
+            MinionManager.Instance.OnMinionDestroyed(this);
+        }
+        else
+        {
+            // Fallback just in case
+            Destroy(gameObject);
+        }
     }
 }
