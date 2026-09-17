@@ -22,6 +22,7 @@ public class WaveSpawner : MonoBehaviour
     private List<GameObject> activeTargets = new List<GameObject>();
     private bool isWaveActive = false;
     private WaveDataSO currentWaveData;
+    private LevelConfigSO currentLevelConfig;
     private int currentWaveIndex;
     private int totalWaveCount;
 
@@ -84,6 +85,7 @@ public class WaveSpawner : MonoBehaviour
     {
         if (waveIndex >= levelConfig.waves.Count) return;
 
+        currentLevelConfig = levelConfig;
         currentWaveData = levelConfig.waves[waveIndex];
         currentWaveIndex = waveIndex;
         totalWaveCount = levelConfig.waves.Count;
@@ -219,30 +221,19 @@ public class WaveSpawner : MonoBehaviour
             spawnRot = Quaternion.LookRotation(directionToCenter);
         }
 
-        // Current Level Config is needed to resolve prefabs
-        // It's passed via the request, but we need to track it.
-        // Assuming progressionManager has the active level, we can peek at it,
-        // but for safety, we rely on the playlist index.
-        LevelConfigSO currentLevelConfig = null;
-        if (progressionManager != null && progressionManager.levelPlaylist.Count > 0)
+        if (currentLevelConfig == null || currentLevelConfig.vanillaTargetPrefab == null)
         {
-            // We assume progression manager tracks current index, but we can just use FindAnyObjectByType or similar
-            // As a fallback, we grab it from the event (we should have cached it).
-            // Let's rely on a cached reference.
+            Debug.LogError("[WaveSpawner] Vanilla Target Prefab is missing from LevelConfigSO!");
+            return;
         }
 
-        // To make this cleaner without modifying other scripts right now, we use a simple reflection or lookup.
-        // For standard vanilla spawning:
-        GameObject newTarget = null;
+        // Spawn actual prefab from the Config
+        GameObject newTarget = Instantiate(currentLevelConfig.vanillaTargetPrefab, spawnPos, spawnRot);
 
-        // (Note: The actual instantiation logic from TrainingLevelManager should be adapted here.
-        // For the sake of this sandbox, we create a placeholder if it's missing.)
-
-        // As a simple sandbox implementation, we just spawn a cube if no prefab is provided.
-        newTarget = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        newTarget.transform.position = spawnPos;
-        newTarget.transform.rotation = spawnRot;
-        newTarget.AddComponent<Rigidbody>().isKinematic = true;
+        // Apply Scaling
+        float finalScale = currentLevelConfig.globalScaleMultiplier * config.scaleModifier;
+        if (finalScale <= 0) finalScale = 1.0f;
+        newTarget.transform.localScale = Vector3.one * finalScale;
 
         activeTargets.Add(newTarget);
     }
