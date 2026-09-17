@@ -19,8 +19,9 @@ public class WaveSpawner : MonoBehaviour
     public Transform spawnCenter;
 
     // --- State ---
-    private List<GameObject> activeTargets = new List<GameObject>();
+    private List<GameObject> activeRootObjects = new List<GameObject>(); // Tracked purely to delete them at wave end
     private bool isWaveActive = false;
+    private bool currentWaveIsBoss = false;
     private WaveData currentWaveData;
     private LevelConfigSO currentLevelConfig;
     private int currentWaveIndex;
@@ -92,20 +93,22 @@ public class WaveSpawner : MonoBehaviour
         currentWaveIndex = waveIndex;
         totalWaveCount = levelConfig.waves.Count;
 
-        activeTargets.Clear();
+        activeRootObjects.Clear();
         spawnQueue.Clear();
         waveTimer = 0f;
         isWaveActive = true;
+        currentWaveIsBoss = false;
 
         // Queue all characters using absolute time to avoid Coroutine cascades
         float currentTime = Time.time;
-        bool isBossWave = false;
 
         foreach (var charConfig in currentWaveData.characters)
         {
-            if (charConfig is BossConfig)
+            if (charConfig is BossConfig boss)
             {
-                isBossWave = true;
+                currentWaveIsBoss = true;
+                InstantiateAndRegisterPaths(boss.observationPathPrefabs);
+                InstantiateAndRegisterPaths(boss.escapePathPrefabs);
             }
 
             spawnQueue.Add(new PendingSpawn
@@ -115,33 +118,19 @@ public class WaveSpawner : MonoBehaviour
             });
         }
 
-        if (isBossWave)
+        if (currentWaveIsBoss)
         {
-            Debug.Log($"[WaveSpawner] Boss Wave {waveIndex + 1}/{totalWaveCount} started. Spawning paths.");
-
-            // Extract Boss Paths and register them globally BEFORE the boss spawns
-            foreach (var charConfig in currentWaveData.characters)
-            {
-                if (charConfig is BossConfig boss)
-                {
-                    InstantiateAndRegisterPaths(boss.observationPathPrefabs);
-                    InstantiateAndRegisterPaths(boss.escapePathPrefabs);
-                }
-            }
-
+            Debug.Log($"[WaveSpawner] Boss Wave {waveIndex + 1}/{totalWaveCount} started. Tracking Boss Colliders on Enemy layer.");
             progressionManager.NotifyBossWaveStarted();
-            // We set wave active to false because Boss combat lifecycle is managed via BossArenaManager
-            isWaveActive = false;
         }
         else
         {
-            Debug.Log($"[WaveSpawner] Wave {waveIndex + 1}/{totalWaveCount} started. {spawnQueue.Count} targets queued.");
+            Debug.Log($"[WaveSpawner] Standard Wave {waveIndex + 1}/{totalWaveCount} started. {spawnQueue.Count} targets queued.");
         }
     }
 
     private void Update()
     {
-        // Spawning must process independently of wave logic so that Bosses (who set isWaveActive = false) still instantiate.
         ProcessSpawns();
 
         if (!isWaveActive) return;
@@ -162,10 +151,30 @@ public class WaveSpawner : MonoBehaviour
 
     private void UpdateWaveLogic()
     {
-        // Standard explicit cleanup of missing targets, per memory guidelines
-        activeTargets.RemoveAll(t => t == null);
+        // Explicitly clean up any totally destroyed root objects
+        activeRootObjects.RemoveAll(root => root == null);
 
-        bool allTargetsCleared = activeTargets.Count == 0 && spawnQueue.Count == 0;
+        // Count active enemies based exclusively on enabled physical colliders on the Enemy layer.
+        // This solves the bug where empty swarm roots linger after nested minions are dissolved.
+        int activeEnemyCount = 0;
+        int enemyLayer = LayerMask.NameToLayer("Enemy");
+
+        foreach (var root in activeRootObjects)
+        {
+            if (root != null)
+            {
+                Collider[] colliders = root.GetComponentsInChildren<Collider>(false); // Only get enabled colliders
+                foreach (var col in colliders)
+                {
+                    if (col.gameObject.layer == enemyLayer && col.enabled)
+                    {
+                        activeEnemyCount++;
+                    }
+                }
+            }
+        }
+
+        bool allTargetsCleared = (activeEnemyCount == 0) && (spawnQueue.Count == 0);
 
         if (currentWaveData.progressionType == WaveProgressionType.TimeBased)
         {
@@ -180,8 +189,13 @@ public class WaveSpawner : MonoBehaviour
         }
         else if (currentWaveData.progressionType == WaveProgressionType.ClearAllTargets)
         {
-            int targetsRemaining = activeTargets.Count + spawnQueue.Count;
-            OnWaveProgressUpdated?.Invoke($"Wave {currentWaveIndex + 1}/{totalWaveCount} | Targets Left: {targetsRemaining}");
+            int targetsRemaining = activeEnemyCount + spawnQueue.Count;
+
+            // Only update HUD if it's not a boss fight (Bosses usually have custom UI)
+            if (!currentWaveIsBoss)
+            {
+                OnWaveProgressUpdated?.Invoke($"Wave {currentWaveIndex + 1}/{totalWaveCount} | Targets Left: {targetsRemaining}");
+            }
 
             if (allTargetsCleared)
             {
@@ -196,23 +210,31 @@ public class WaveSpawner : MonoBehaviour
         CleanupTargets();
         spawnQueue.Clear();
 
-        Debug.Log($"[WaveSpawner] Wave {currentWaveIndex + 1} completed.");
         if (progressionManager != null)
         {
-            progressionManager.ReceiveWaveCompleted();
+            if (currentWaveIsBoss)
+            {
+                Debug.Log($"[WaveSpawner] Boss Wave {currentWaveIndex + 1} completed. Boss Defeated!");
+                progressionManager.ReceiveBossDefeated();
+            }
+            else
+            {
+                Debug.Log($"[WaveSpawner] Standard Wave {currentWaveIndex + 1} completed.");
+                progressionManager.ReceiveWaveCompleted();
+            }
         }
     }
 
     private void CleanupTargets()
     {
-        foreach (var target in activeTargets)
+        foreach (var root in activeRootObjects)
         {
-            if (target != null)
+            if (root != null)
             {
-                Destroy(target);
+                Destroy(root);
             }
         }
-        activeTargets.Clear();
+        activeRootObjects.Clear();
 
         if (pathManager != null)
         {
@@ -235,7 +257,7 @@ public class WaveSpawner : MonoBehaviour
                 GameObject spawnedPath = Instantiate(prefab, spawnCenter.position, Quaternion.identity);
 
                 // Track it locally so it can be cleaned up at wave end
-                activeTargets.Add(spawnedPath);
+                activeRootObjects.Add(spawnedPath);
 
                 // Register it with the global source of truth
                 if (pathManager != null)
@@ -285,14 +307,7 @@ public class WaveSpawner : MonoBehaviour
 
         GameObject spawnedEntity = Instantiate(prefabToSpawn, spawnPos, spawnRot);
 
-        if (config is MinionConfig)
-        {
-            activeTargets.Add(spawnedEntity);
-        }
-        else if (config is BossConfig)
-        {
-            // Boss wiring logic typically offloaded to BossArenaManager
-            Debug.Log("[WaveSpawner] Spawned Boss Entity.");
-        }
+        // Track the root object purely so we can forcefully delete it when the wave/level cleans up
+        activeRootObjects.Add(spawnedEntity);
     }
 }
