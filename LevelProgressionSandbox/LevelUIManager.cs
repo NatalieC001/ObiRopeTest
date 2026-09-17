@@ -34,6 +34,7 @@ public class LevelUIManager : MonoBehaviour
             progressionManager.OnLevelIntroReady += DisplayLevelIntro;
             progressionManager.OnLevelOutroReady += DisplayLevelOutro;
             progressionManager.OnCountdownUpdated += UpdateCountdownText;
+            progressionManager.OnWaveTransitionAlert += DisplayWaveTransitionAlert;
             progressionManager.OnCampaignComplete += DisplayCampaignComplete;
         }
 
@@ -56,6 +57,7 @@ public class LevelUIManager : MonoBehaviour
             progressionManager.OnLevelIntroReady -= DisplayLevelIntro;
             progressionManager.OnLevelOutroReady -= DisplayLevelOutro;
             progressionManager.OnCountdownUpdated -= UpdateCountdownText;
+            progressionManager.OnWaveTransitionAlert -= DisplayWaveTransitionAlert;
             progressionManager.OnCampaignComplete -= DisplayCampaignComplete;
         }
 
@@ -106,7 +108,8 @@ public class LevelUIManager : MonoBehaviour
 
     private void UpdateCountdownText(float timeLeft)
     {
-        if (levelFeedbackText != null)
+        // Don't overwrite the wave transition text if the timer is being used as a simple transition delay
+        if (levelFeedbackText != null && !levelFeedbackText.text.Contains("Cleared") && !levelFeedbackText.text.Contains("BOSS"))
         {
             // Show rounded up integer for cleaner countdown
             int secondsLeft = Mathf.CeilToInt(timeLeft);
@@ -118,6 +121,15 @@ public class LevelUIManager : MonoBehaviour
             {
                 levelFeedbackText.text = "<size=150%>GO!</size>";
             }
+            levelFeedbackText.alpha = 1f;
+        }
+    }
+
+    private void DisplayWaveTransitionAlert(string alertText)
+    {
+        if (levelFeedbackText != null)
+        {
+            levelFeedbackText.text = alertText;
             levelFeedbackText.alpha = 1f;
         }
     }

@@ -51,14 +51,47 @@ public class BossPathManager : MonoBehaviour
 
     // --- Query Methods for Bosses ---
 
+    /// <summary>
+    /// Fallback scan if the Spawner hasn't explicitly registered paths yet.
+    /// This fixes the 1-frame race condition where a Boss spawns before the paths are tracked!
+    /// </summary>
+    private void FallbackScanPaths()
+    {
+        PathTypeTag[] allTagsInScene = FindObjectsByType<PathTypeTag>(FindObjectsSortMode.None);
+        foreach (PathTypeTag tag in allTagsInScene)
+        {
+            if (!airborneObservationPaths.Contains(tag.gameObject) && !airborneEscapePaths.Contains(tag.gameObject) &&
+                !terrestrialObservationPaths.Contains(tag.gameObject) && !terrestrialEscapePaths.Contains(tag.gameObject))
+            {
+                RegisterPath(tag.gameObject);
+            }
+        }
+    }
+
     public List<GameObject> GetObservationPaths(PathTypeTag.PathType type)
     {
-        return type == PathTypeTag.PathType.Airborne ? new List<GameObject>(airborneObservationPaths) : new List<GameObject>(terrestrialObservationPaths);
+        List<GameObject> paths = type == PathTypeTag.PathType.Airborne ? new List<GameObject>(airborneObservationPaths) : new List<GameObject>(terrestrialObservationPaths);
+
+        if (paths.Count == 0)
+        {
+            FallbackScanPaths();
+            paths = type == PathTypeTag.PathType.Airborne ? new List<GameObject>(airborneObservationPaths) : new List<GameObject>(terrestrialObservationPaths);
+        }
+
+        return paths;
     }
 
     public List<GameObject> GetEscapePaths(PathTypeTag.PathType type)
     {
-        return type == PathTypeTag.PathType.Airborne ? new List<GameObject>(airborneEscapePaths) : new List<GameObject>(terrestrialEscapePaths);
+        List<GameObject> paths = type == PathTypeTag.PathType.Airborne ? new List<GameObject>(airborneEscapePaths) : new List<GameObject>(terrestrialEscapePaths);
+
+        if (paths.Count == 0)
+        {
+            FallbackScanPaths();
+            paths = type == PathTypeTag.PathType.Airborne ? new List<GameObject>(airborneEscapePaths) : new List<GameObject>(terrestrialEscapePaths);
+        }
+
+        return paths;
     }
 
     /// <summary>

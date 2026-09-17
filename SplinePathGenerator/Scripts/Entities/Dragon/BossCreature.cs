@@ -74,6 +74,19 @@ public class BossCreature : MonoBehaviour
         FindMouthTransform();
     }
 
+    private void Start()
+    {
+        // Boss anatomy spawns cleanly at root. It doesn't need to be forced onto a track immediately!
+        SegmentedDragonManager dragonBody = GetComponent<SegmentedDragonManager>();
+        if (dragonBody != null)
+        {
+            Debug.Log("[BossCreature] Instructing SegmentedDragonManager to spawn anatomy (freestyle initial placement)...");
+            dragonBody.InitializeDragon(null);
+        }
+
+        ChangePhase(BossPhase.Orchestrator);
+    }
+
     /// <summary>
     /// Dynamically searches all children (even deeply nested ones) for an object exactly named 'MouthTransform'.
     /// </summary>
@@ -95,18 +108,6 @@ public class BossCreature : MonoBehaviour
         Debug.LogWarning("[BossCreature] Could not find a child object named 'MouthTransform'. Breath attacks may fail!");
     }
 
-    private void Start()
-    {
-        // Boss initialization (spawning anatomy) is handled here natively rather than via the old BossArenaManager hack.
-        SegmentedDragonManager dragonBody = GetComponent<SegmentedDragonManager>();
-        if (dragonBody != null)
-        {
-            Debug.Log("[BossCreature] Instructing SegmentedDragonManager to spawn anatomy...");
-            dragonBody.InitializeDragon(null); // Anatomy spawns cleanly at root
-        }
-
-        ChangePhase(BossPhase.Orchestrator);
-    }
 
     private void ChangePhase(BossPhase newPhase)
     {

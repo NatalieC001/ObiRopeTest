@@ -40,6 +40,7 @@ public class LevelProgressionManager : MonoBehaviour
 
     // Fired to UI
     public event Action<LevelConfigSO> OnLevelIntroReady;
+    public event Action<string> OnWaveTransitionAlert;
     public event Action<float> OnCountdownUpdated;
     public event Action<string> OnLevelOutroReady;
     public event Action OnCampaignComplete;
@@ -166,7 +167,35 @@ public class LevelProgressionManager : MonoBehaviour
         {
             currentWaveIndex++;
             Debug.Log($"[LevelProgressionManager] Wave completed. Starting next sequence.");
-            StartNextWave(); // Instantly chain waves, no gong needed here
+
+            LevelConfigSO currentLevel = levelPlaylist[currentLevelIndex];
+
+            // Check what the next wave will be to display the correct text
+            if (currentWaveIndex < currentLevel.waves.Count)
+            {
+                bool isBossNext = false;
+                foreach (var character in currentLevel.waves[currentWaveIndex].characters)
+                {
+                    if (character is BossConfig)
+                    {
+                        isBossNext = true;
+                        break;
+                    }
+                }
+
+                if (isBossNext)
+                {
+                    OnWaveTransitionAlert?.Invoke("BOSS INCOMING!");
+                }
+                else
+                {
+                    OnWaveTransitionAlert?.Invoke($"Wave {currentWaveIndex} Cleared!");
+                }
+            }
+
+            // We borrow the countdown timer to add a short delay between waves so the player can read the alert
+            timer = 2.5f;
+            ChangeState(GameState.Countdown);
         }
     }
 

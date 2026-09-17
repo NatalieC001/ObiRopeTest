@@ -54,7 +54,7 @@ public abstract class BaseBossMovement : MonoBehaviour
     // --- Shared Path & Desire Logic ---
 
     /// <summary>
-    /// Requests the closest appropriate escape route from the manager based on the Boss's movement type.
+    /// Requests the closest appropriate escape route dynamically from the manager.
     /// </summary>
     protected GameObject FindNearestEscapeRoute(PathTypeTag.PathType movementType)
     {
@@ -63,9 +63,9 @@ public abstract class BaseBossMovement : MonoBehaviour
     }
 
     /// <summary>
-    /// Requests an observation path to circle around a specific crystal.
+    /// Requests an observation path dynamically to circle around a specific crystal.
     /// </summary>
-    protected GameObject GetObservationPath(PathTypeTag.PathType movementType)
+    public GameObject GetObservationPath(PathTypeTag.PathType movementType)
     {
         if (pathManager == null) return null;
 

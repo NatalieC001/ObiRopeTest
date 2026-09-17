@@ -49,7 +49,6 @@ public class AirborneBossMovement : BaseBossMovement
     {
         if (currentActivePath == null)
         {
-            // Specifically request an Airborne escape route
             currentActivePath = FindNearestEscapeRoute(PathTypeTag.PathType.Airborne);
         }
 
