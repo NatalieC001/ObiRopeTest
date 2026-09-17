@@ -60,8 +60,8 @@ If you rely on a `MinionManager` or a `BossArenaManager` to track kills, those s
 * Your Minions will still die and trigger their dissolves.
 * `WaveSpawner` simply counts how many targets are physically left in the scene to know when the wave is done.
 
-> [!warning] Boss Fights
-> If a Boss is spawned, `WaveSpawner` currently skips managing the wave and expects the `BossArenaManager` to eventually call `LevelProgressionManager.ReceiveBossDefeated()`. You may need to wire a Unity Event on your Boss death script to call that function!
+> [!info] Boss Fights
+> Bosses are now tracked seamlessly just like standard minions! When the Boss's destructible colliders on the `Enemy` layer are completely destroyed, the spawner will automatically trigger the Boss Defeated progression state.
 
 ---
 

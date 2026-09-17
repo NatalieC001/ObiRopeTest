@@ -31,6 +31,7 @@ public class WaveSpawner : MonoBehaviour
     private float waveTimer = 0f;
 
     private BossPathManager pathManager;
+    private List<Collider> colliderBuffer = new List<Collider>(); // Reusable buffer to prevent GC allocations per frame
 
     // --- Queue for delayed spawning (replacing Coroutines) ---
     private class PendingSpawn
@@ -163,8 +164,10 @@ public class WaveSpawner : MonoBehaviour
         {
             if (root != null)
             {
-                Collider[] colliders = root.GetComponentsInChildren<Collider>(false); // Only get enabled colliders
-                foreach (var col in colliders)
+                colliderBuffer.Clear();
+                root.GetComponentsInChildren<Collider>(false, colliderBuffer); // Use non-allocating list overload
+
+                foreach (var col in colliderBuffer)
                 {
                     if (col.gameObject.layer == enemyLayer && col.enabled)
                     {
