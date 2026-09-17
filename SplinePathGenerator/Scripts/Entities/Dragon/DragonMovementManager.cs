@@ -118,8 +118,16 @@ public class DragonMovementManager : MonoBehaviour
                 float range = newer.distanceTraveled - older.distanceTraveled;
                 float t = (newer.distanceTraveled - targetDistanceInHistory) / range;
 
-                segment.transform.position = Vector3.Lerp(newer.position, older.position, t);
-                segment.transform.rotation = Quaternion.Slerp(newer.rotation, older.rotation, t);
+                Vector3 newPos = Vector3.Lerp(newer.position, older.position, t);
+                Quaternion newRot = Quaternion.Slerp(newer.rotation, older.rotation, t);
+                Rigidbody rb = segment.GetComponent<Rigidbody>();
+                if (rb != null) {
+                    rb.MovePosition(newPos);
+                    rb.MoveRotation(newRot);
+                } else {
+                    segment.transform.position = newPos;
+                    segment.transform.rotation = newRot;
+                }
                 break;
             }
         }

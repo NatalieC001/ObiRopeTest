@@ -49,7 +49,14 @@ public class DissolveEffect : MonoBehaviour, IArrowTarget
     /// </summary>
     public void OnArrowHit(float damage, Vector3 impactPoint, ElementTypeOB7 elementType)
     {
-        // For simple targets we want this to dissolve immediately. 
+        DragonSegment dragonSegment = GetComponentInParent<DragonSegment>();
+        if (dragonSegment != null)
+        {
+            dragonSegment.TakeDamage(damage, impactPoint, elementType);
+            return;
+        }
+
+        // For simple targets we want this to dissolve immediately.
         // For objects with Health (like MovingTarget), disable this toggle in inspector and call TriggerDissolve() manually.
         if (dissolveImmediatelyOnHit && !isDissolving && gameObject.activeInHierarchy)
         {

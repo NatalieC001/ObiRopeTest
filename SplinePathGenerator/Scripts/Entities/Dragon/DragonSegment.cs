@@ -42,8 +42,13 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
         int layerIndex = LayerMask.NameToLayer(targetLayer);
         if (layerIndex != -1)
         {
-            gameObject.layer = layerIndex;
+            Collider[] allColliders = GetComponentsInChildren<Collider>(true);
+            foreach (Collider col in allColliders)
+            {
+                col.gameObject.layer = layerIndex;
+            }
 
+            gameObject.layer = layerIndex;
             // Also explicitly ensure the collider child is on the layer, as that's what physics actually hits
             if (segmentCollider != null)
             {
@@ -158,7 +163,7 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
         }
 
         // Explicitly command the segment's visual effect to start dissolving!
-        // This will eventually fire the OnDissolveCompleted event we subscribed to in Start, 
+        // This will eventually fire the OnDissolveCompleted event we subscribed to in Start,
         // which will trigger FinalizeDestruction().
         DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
         if (dissolve != null)

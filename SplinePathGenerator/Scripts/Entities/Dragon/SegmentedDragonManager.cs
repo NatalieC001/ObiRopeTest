@@ -269,7 +269,7 @@ public class SegmentedDragonManager : MonoBehaviour
     // Controls whether the Update loop forces rigid spacing. Disabled briefly when closing a gap.
     private bool isClosingGap = false;
     private float gapCloseTimer = 0f;
-    
+
 
     // When gap closing, segments blend from an inflated spacing value down to the normal spacing value
     private Dictionary<DragonSegment, float> currentSpacings = new Dictionary<DragonSegment, float>();
@@ -356,8 +356,16 @@ public class SegmentedDragonManager : MonoBehaviour
                     float range = newer.distanceTraveled - older.distanceTraveled;
                     float t = (newer.distanceTraveled - targetDistanceInHistory) / range; // 0 = at newer, 1 = at older
 
-                    segment.transform.position = Vector3.Lerp(newer.position, older.position, t);
-                    segment.transform.rotation = Quaternion.Slerp(newer.rotation, older.rotation, t);
+                    Vector3 newPos = Vector3.Lerp(newer.position, older.position, t);
+                    Quaternion newRot = Quaternion.Slerp(newer.rotation, older.rotation, t);
+                    Rigidbody rb = segment.GetComponent<Rigidbody>();
+                    if (rb != null) {
+                        rb.MovePosition(newPos);
+                        rb.MoveRotation(newRot);
+                    } else {
+                        segment.transform.position = newPos;
+                        segment.transform.rotation = newRot;
+                    }
                     break;
                 }
             }
@@ -499,8 +507,8 @@ public class SegmentedDragonManager : MonoBehaviour
 
         OnSegmentCountChanged?.Invoke(0);
 
-        // Schedule the root boss object (which holds BossCreature) to be destroyed exactly 
-        // after the longest child dissolve finishes. This guarantees the visual completes gracefully 
+        // Schedule the root boss object (which holds BossCreature) to be destroyed exactly
+        // after the longest child dissolve finishes. This guarantees the visual completes gracefully
         // AND the TrainingLevelManager detects the null object to advance the wave!
         Destroy(gameObject, longestDissolveDuration + 0.1f);
     }
