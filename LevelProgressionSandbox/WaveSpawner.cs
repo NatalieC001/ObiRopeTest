@@ -293,13 +293,13 @@ public class WaveSpawner : MonoBehaviour
 
         GameObject prefabToSpawn = null;
 
-        if (config is MinionConfig minion)
+        if (config is MinionConfig minionConfig)
         {
-            prefabToSpawn = minion.prefab;
+            prefabToSpawn = minionConfig.prefab;
         }
-        else if (config is BossConfig boss)
+        else if (config is BossConfig bossConfig)
         {
-            prefabToSpawn = boss.prefab;
+            prefabToSpawn = bossConfig.prefab;
         }
 
         if (prefabToSpawn == null)
@@ -318,10 +318,10 @@ public class WaveSpawner : MonoBehaviour
             // Find all actual minion entities within the spawned prefab (in case it's a nested swarm)
             StandardCreature[] spawnedMinions = spawnedEntity.GetComponentsInChildren<StandardCreature>();
 
-            foreach(StandardCreature minion in spawnedMinions)
+            foreach(StandardCreature creature in spawnedMinions)
             {
                 // Inject the MinionManager directly into the minion so it doesn't need singletons
-                minion.Initialize(minionManager);
+                creature.Initialize(minionManager);
 
                 // Track internally for progression
                 activeEnemyCount++;
