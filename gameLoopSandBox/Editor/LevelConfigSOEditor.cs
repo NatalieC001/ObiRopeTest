@@ -171,8 +171,17 @@ public class LevelConfigSOEditor : Editor
     private void DrawPrefabList(string listLabel, SerializedProperty listProp, string searchFolderPath, LevelConfigSO config)
     {
         EditorGUILayout.Space();
+
+        // Check if list is completely empty
+        bool isEmpty = listProp.arraySize == 0;
+        if (isEmpty)
+        {
+            GUI.backgroundColor = Color.red;
+        }
+
         EditorGUILayout.LabelField(listLabel, EditorStyles.boldLabel);
         EditorGUILayout.BeginVertical("box");
+        GUI.backgroundColor = Color.white; // Reset immediately for contents
 
         // Standard Unity list size control
         int newSize = EditorGUILayout.IntField("Size", listProp.arraySize);
@@ -186,7 +195,15 @@ public class LevelConfigSOEditor : Editor
         {
             SerializedProperty elementProp = listProp.GetArrayElementAtIndex(i);
 
-            EditorGUILayout.BeginHorizontal();
+            // Check if this specific element is null/missing
+            bool isMissing = elementProp.objectReferenceValue == null;
+            if (isMissing)
+            {
+                GUI.backgroundColor = Color.red;
+            }
+
+            EditorGUILayout.BeginHorizontal("box"); // Add box to apply background color
+            GUI.backgroundColor = Color.white; // Reset immediately so only background is red
             EditorGUILayout.PropertyField(elementProp, new GUIContent($"Element {i}"));
 
             if (GUILayout.Button("Select", GUILayout.Width(70)))
