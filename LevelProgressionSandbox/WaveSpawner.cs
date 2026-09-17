@@ -29,6 +29,8 @@ public class WaveSpawner : MonoBehaviour
     // Timer logic for TimeBased waves
     private float waveTimer = 0f;
 
+    private BossPathManager pathManager;
+
     // --- Queue for delayed spawning (replacing Coroutines) ---
     private class PendingSpawn
     {
@@ -57,6 +59,8 @@ public class WaveSpawner : MonoBehaviour
         {
             spawnCenter = this.transform;
         }
+
+        pathManager = FindFirstObjectByType<BossPathManager>();
     }
 
     private void OnDisable()
@@ -113,7 +117,18 @@ public class WaveSpawner : MonoBehaviour
 
         if (isBossWave)
         {
-            Debug.Log($"[WaveSpawner] Boss Wave {waveIndex + 1}/{totalWaveCount} started.");
+            Debug.Log($"[WaveSpawner] Boss Wave {waveIndex + 1}/{totalWaveCount} started. Spawning paths.");
+
+            // Extract Boss Paths and register them globally BEFORE the boss spawns
+            foreach (var charConfig in currentWaveData.characters)
+            {
+                if (charConfig is BossConfig boss)
+                {
+                    InstantiateAndRegisterPaths(boss.observationPathPrefabs);
+                    InstantiateAndRegisterPaths(boss.escapePathPrefabs);
+                }
+            }
+
             progressionManager.NotifyBossWaveStarted();
             // We set wave active to false because Boss combat lifecycle is managed via BossArenaManager
             isWaveActive = false;
@@ -198,6 +213,37 @@ public class WaveSpawner : MonoBehaviour
             }
         }
         activeTargets.Clear();
+
+        if (pathManager != null)
+        {
+            pathManager.ClearAllPaths();
+        }
+    }
+
+    private void InstantiateAndRegisterPaths(List<GameObject> pathPrefabs)
+    {
+        if (pathManager == null)
+        {
+            Debug.LogWarning("[WaveSpawner] No BossPathManager found in scene. Paths will be spawned but un-registered.");
+        }
+
+        foreach (var prefab in pathPrefabs)
+        {
+            if (prefab != null)
+            {
+                // Instantiate the path into the scene
+                GameObject spawnedPath = Instantiate(prefab, spawnCenter.position, Quaternion.identity);
+
+                // Track it locally so it can be cleaned up at wave end
+                activeTargets.Add(spawnedPath);
+
+                // Register it with the global source of truth
+                if (pathManager != null)
+                {
+                    pathManager.RegisterPath(spawnedPath);
+                }
+            }
+        }
     }
 
     private void SpawnCharacter(CharacterConfigBase config)
