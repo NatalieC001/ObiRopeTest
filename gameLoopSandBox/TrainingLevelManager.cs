@@ -363,10 +363,11 @@ public class TrainingLevelManager : MonoBehaviour
         // Check if player cleared the wave early
         bool allTargetsCleared = activeTargets.Count == 0 && pendingSpawns <= 0;
 
+        // Check if player cleared the wave early
         if (allTargetsCleared && isWaveActive && currentLevelConfig != null && currentWaveIndex < currentLevelConfig.waves.Count)
         {
             WaveDataSO currentWave = currentLevelConfig.waves[currentWaveIndex];
-            if (currentWave.progressionType == WaveProgressionType.EliminationBased)
+            if (currentWave.progressionType == WaveProgressionType.ClearAllTargets)
             {
                 Debug.Log($"[TrainingLevelManager] EXPLICIT WAVE CLEAR: All targets in wave {currentWaveIndex + 1} destroyed!");
                 CompleteCurrentWave();
