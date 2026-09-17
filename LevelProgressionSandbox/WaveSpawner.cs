@@ -20,10 +20,15 @@ public class WaveSpawner : MonoBehaviour
     public Transform spawnCenter;
 
     // --- State ---
-    private List<GameObject> activeRootObjects = new List<GameObject>(); // Tracked purely to delete them at wave end
     private bool isWaveActive = false;
     private bool currentWaveIsBoss = false;
     private WaveData currentWaveData;
+
+    // Tracks environmental paths instantiated exclusively for this wave so they can be destroyed
+    private List<GameObject> activePaths = new List<GameObject>();
+
+    // Tracks Swarm root objects to clean up their empty wrappers safely at the end of the wave
+    private List<GameObject> activeSwarmRoots = new List<GameObject>();
     private LevelConfigSO currentLevelConfig;
     private int currentWaveIndex;
     private int totalWaveCount;
@@ -102,7 +107,8 @@ public class WaveSpawner : MonoBehaviour
         currentWaveIndex = waveIndex;
         totalWaveCount = levelConfig.waves.Count;
 
-        activeRootObjects.Clear();
+        activePaths.Clear();
+        activeSwarmRoots.Clear();
         spawnQueue.Clear();
         waveTimer = 0f;
         isWaveActive = true;
@@ -161,9 +167,6 @@ public class WaveSpawner : MonoBehaviour
 
     private void UpdateWaveLogic()
     {
-        // Explicitly clean up any totally destroyed root objects (if any)
-        activeRootObjects.RemoveAll(root => root == null);
-
         bool allTargetsCleared = (activeEnemyCount == 0) && (spawnQueue.Count == 0);
 
         if (currentWaveData.progressionType == WaveProgressionType.TimeBased)
@@ -191,6 +194,17 @@ public class WaveSpawner : MonoBehaviour
             {
                 CompleteWave();
             }
+        }
+    }
+
+    /// <summary>
+    /// Explicitly called by MinionManager when a minion broadcasts its spawn event.
+    /// </summary>
+    public void NotifyTargetRegistered()
+    {
+        if (isWaveActive)
+        {
+            activeEnemyCount++;
         }
     }
 
@@ -230,14 +244,25 @@ public class WaveSpawner : MonoBehaviour
 
     private void CleanupTargets()
     {
-        foreach (var root in activeRootObjects)
+        // Clean up any empty Swarm Wrappers that remained after all children dissolved
+        foreach (var root in activeSwarmRoots)
         {
             if (root != null)
             {
                 Destroy(root);
             }
         }
-        activeRootObjects.Clear();
+        activeSwarmRoots.Clear();
+
+        // Clean up the environmental paths spawned for Bosses.
+        foreach (var path in activePaths)
+        {
+            if (path != null)
+            {
+                Destroy(path);
+            }
+        }
+        activePaths.Clear();
 
         if (pathManager != null)
         {
@@ -259,8 +284,8 @@ public class WaveSpawner : MonoBehaviour
                 // Instantiate the path into the scene
                 GameObject spawnedPath = Instantiate(prefab, spawnCenter.position, Quaternion.identity);
 
-                // Track it locally so it can be cleaned up at wave end
-                activeRootObjects.Add(spawnedPath);
+                // Track it locally so it can be physically destroyed at wave end
+                activePaths.Add(spawnedPath);
 
                 // Register it with the global source of truth
                 if (pathManager != null)
@@ -310,24 +335,13 @@ public class WaveSpawner : MonoBehaviour
 
         GameObject spawnedEntity = Instantiate(prefabToSpawn, spawnPos, spawnRot);
 
-        // Track the root object purely so we can forcefully delete it when the wave/level cleans up
-        activeRootObjects.Add(spawnedEntity);
+        // Ensure the root is tracked so empty swarm wrappers are cleaned up at wave end
+        activeSwarmRoots.Add(spawnedEntity);
 
-        if (config is MinionConfig)
-        {
-            // Find all actual minion entities within the spawned prefab (in case it's a nested swarm)
-            StandardCreature[] spawnedMinions = spawnedEntity.GetComponentsInChildren<StandardCreature>();
+        // Native self-registration handles the tracking logic now!
+        // StandardCreature will broadcast OnCreatureSpawned on Awake, which MinionManager catches to increment activeEnemyCount.
 
-            foreach(StandardCreature creature in spawnedMinions)
-            {
-                // Inject the MinionManager directly into the minion so it doesn't need singletons
-                creature.Initialize(minionManager);
-
-                // Track internally for progression
-                activeEnemyCount++;
-            }
-        }
-        else if (config is BossConfig)
+        if (config is BossConfig)
         {
             // Inject the WaveSpawner so the Boss can notify it upon death
             BossCreature boss = spawnedEntity.GetComponent<BossCreature>();
@@ -336,8 +350,8 @@ public class WaveSpawner : MonoBehaviour
                 boss.Initialize(this);
             }
 
-            // Track the boss so the wave doesn't end instantly
-            activeEnemyCount++;
+            // Bosses don't natively register through MinionManager yet, so we manually track the root entity
+            NotifyTargetRegistered();
         }
     }
 }

@@ -27,8 +27,10 @@ public class StandardCreature : MonoBehaviour
     [Tooltip("The physics layer this creature will be forced onto so arrows can detect it. Displayed here as a reminder!")]
     [SerializeField] private string targetLayer = "Enemy";
 
+    public static event System.Action<StandardCreature> OnCreatureSpawned;
+    public static event System.Action<StandardCreature> OnCreatureDied;
+
     private CreatureStatusEffects statusEffects;
-    private MinionManager myManager;
 
     private void Awake()
     {
@@ -47,22 +49,12 @@ public class StandardCreature : MonoBehaviour
         statusEffects = GetComponent<CreatureStatusEffects>();
     }
 
-    /// <summary>
-    /// Injected explicitly by the WaveSpawner when this object is instantiated.
-    /// Eliminates the need for brittle Singletons.
-    /// </summary>
-    public void Initialize(MinionManager manager)
-    {
-        myManager = manager;
-        if (myManager != null)
-        {
-            myManager.RegisterMinion(this);
-        }
-    }
-
     private void Start()
     {
         health = maxHealth;
+
+        // Self-register by broadcasting to the void. The MinionManager listens!
+        OnCreatureSpawned?.Invoke(this);
     }
 
     /// <summary>
@@ -147,16 +139,14 @@ public class StandardCreature : MonoBehaviour
 
     private void HandleDissolveCompleted()
     {
-        // Ping the injected manager that this minion has visually finished dying
-        // The manager handles tracking logic and physical scene destruction of the root
-        if (myManager != null)
-        {
-            myManager.OnMinionDestroyed(this);
-        }
-        else
-        {
-            Debug.LogWarning("[StandardCreature] Minion died but no manager was injected! Destroying self manually.");
-            Destroy(transform.root.gameObject);
-        }
+        // Simply destroy self. The OnDestroy event handles notifying the manager.
+        Destroy(gameObject);
+    }
+
+    private void OnDestroy()
+    {
+        // 4. Guarantee safety: Even if the minion is destroyed prematurely (e.g. Swarm root deleted),
+        // it MUST broadcast its death so the wave progression doesn't permanently soft-lock.
+        OnCreatureDied?.Invoke(this);
     }
 }

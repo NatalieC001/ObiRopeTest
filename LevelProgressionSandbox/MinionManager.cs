@@ -23,22 +23,32 @@ public class MinionManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Registers a newly spawned minion.
-    /// </summary>
-    public void RegisterMinion(StandardCreature minion)
+    private void OnEnable()
+    {
+        StandardCreature.OnCreatureSpawned += HandleCreatureSpawned;
+        StandardCreature.OnCreatureDied += HandleCreatureDied;
+    }
+
+    private void OnDisable()
+    {
+        StandardCreature.OnCreatureSpawned -= HandleCreatureSpawned;
+        StandardCreature.OnCreatureDied -= HandleCreatureDied;
+    }
+
+    private void HandleCreatureSpawned(StandardCreature minion)
     {
         if (minion != null && !activeMinions.Contains(minion))
         {
             activeMinions.Add(minion);
+
+            if (waveSpawner != null)
+            {
+                waveSpawner.NotifyTargetRegistered();
+            }
         }
     }
 
-    /// <summary>
-    /// Called EXACTLY when a minion's dissolve animation finishes.
-    /// Safely purges it from tracking, notifies the wave manager explicitly, and destroys it.
-    /// </summary>
-    public void OnMinionDestroyed(StandardCreature destroyedMinion)
+    private void HandleCreatureDied(StandardCreature destroyedMinion)
     {
         if (activeMinions.Contains(destroyedMinion))
         {
@@ -47,14 +57,14 @@ public class MinionManager : MonoBehaviour
 
         Debug.Log($"<color=magenta>[MinionManager] Minion destroyed. Remaining: {activeMinions.Count}</color>");
 
-        // Explicitly notify the WaveSpawner so it can evaluate wave completion instantly!
         if (waveSpawner != null)
         {
             waveSpawner.NotifyTargetDestroyed();
         }
 
-        // Permanently destroy the minion object.
-        // Root object cleanup is handled natively by the WaveSpawner at the end of the wave/level.
+        // Destroy the individual minion.
+        // We DO NOT destroy the root here because nested swarms share the same root.
+        // Empty swarm roots will be cleaned up safely by WaveSpawner at the end of the wave.
         if (destroyedMinion != null && destroyedMinion.gameObject != null)
         {
             Destroy(destroyedMinion.gameObject);
