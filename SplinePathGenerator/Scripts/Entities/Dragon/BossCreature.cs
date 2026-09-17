@@ -1,11 +1,11 @@
 using UnityEngine;
 
-/// <summary>NEEEEEWW
-/// The 'Brain' for an advanced Boss creature.
-/// It monitors health and battle state, and commands the TacticalBossSplineManager
-/// to make intelligent evasion choices (like jumping to escape splines) when threatened.
+/// <summary>
+/// The core Health and Phase 'Brain' for an advanced Boss creature.
+/// It monitors health and battle state, and commands the BaseBossMovement
+/// to make intelligent evasion choices when threatened.
 /// </summary>
-[RequireComponent(typeof(TacticalBossSplineManager))]
+[RequireComponent(typeof(BaseBossMovement))]
 public class BossCreature : MonoBehaviour
 {
     [System.Serializable]
@@ -47,93 +47,82 @@ public class BossCreature : MonoBehaviour
     public float staminaRechargeRate = 15f;
     private float currentStamina;
 
-    private TacticalBossSplineManager tacticalManager;
+    [Header("Anatomy Tracking")]
+    [Tooltip("Dynamically found on Awake. Used as the origin point for breath attacks or projectiles.")]
+    public Transform mouthTransform;
+
+    private BaseBossMovement movementSystem;
     private CreatureStatusEffects statusEffects;
     private float recentDamageAccumulator = 0f;
     private float damageDecayTimer = 0f;
 
-    // Used to track if the TrainingLevelManager properly initialized us, or if we were manually dragged into the scene for testing.
-    private bool isInitialized = false;
+    // Injected by WaveSpawner to explicitly report Boss death progression
+    private WaveSpawner waveSpawner;
+
+    public void Initialize(WaveSpawner spawner)
+    {
+        waveSpawner = spawner;
+    }
 
     private void Awake()
     {
-        tacticalManager = GetComponent<TacticalBossSplineManager>();
+        movementSystem = GetComponent<BaseBossMovement>();
         statusEffects = GetComponent<CreatureStatusEffects>();
         currentHealth = maxHealth;
         currentStamina = maxStamina;
+
+        FindMouthTransform();
+    }
+
+    /// <summary>
+    /// Dynamically searches all children (even deeply nested ones) for an object exactly named 'MouthTransform'.
+    /// </summary>
+    private void FindMouthTransform()
+    {
+        if (mouthTransform != null) return; // Already assigned in Inspector
+
+        Transform[] allChildren = GetComponentsInChildren<Transform>(true);
+        foreach (Transform t in allChildren)
+        {
+            if (t.name == "MouthTransform")
+            {
+                mouthTransform = t;
+                Debug.Log($"<color=green>[BossCreature] Successfully located MouthTransform on {t.parent.name}</color>");
+                return;
+            }
+        }
+
+        Debug.LogWarning("[BossCreature] Could not find a child object named 'MouthTransform'. Breath attacks may fail!");
     }
 
     private void Start()
     {
-        // If we were manually dragged into the scene for testing, we won't be initialized by the Level Manager.
-        // Let's self-register with the Arena Manager so we can generate our body and test!
-        if (!isInitialized)
-        {
-            BossArenaManager arena = FindAnyObjectByType<BossArenaManager>();
-            if (arena != null)
-            {
-                Debug.Log("<color=yellow>[BossCreature] Self-registering for Editor Testing mode!</color>");
-                arena.RegisterStrayBoss(this);
-            }
-            else
-            {
-                Debug.LogError("[BossCreature] Dragged into scene for testing, but no BossArenaManager found to provide tracks!");
-
-                // Fallback: If there's no Arena Manager, at least try to spawn the body parts using the component's own transform as a dummy track.
-                SegmentedDragonManager dragonBody = GetComponent<SegmentedDragonManager>();
-                if (dragonBody != null)
-                {
-                    Debug.LogWarning("[BossCreature] Attempting to initialize Dragon Body without a track just to show anatomy...");
-                    dragonBody.InitializeDragon(null);
-                }
-            }
-        }
-    }
-
-    /// <summary>
-    /// Called by the BossArenaManager when the boss is spawned.
-    /// Injects the scene's environmental splines.
-    /// </summary>
-    public void InitializeArena(BossArenaManager arena)
-    {
-        isInitialized = true;
-        currentPhase = BossPhase.Orchestrator;
-
-        if (arena.observationSpline == null)
-        {
-            Debug.LogError("[BossCreature] BossArenaManager is missing an Observation Spline! The dragon has no track to spawn on!");
-        }
-
-        tacticalManager.InitializeRoutes(arena.observationSpline, arena.tacticalEscapeRoutes);
-
-        // Also ensure the visual dragon body is spawned and attached to the starting track
+        // Boss initialization (spawning anatomy) is handled here natively rather than via the old BossArenaManager hack.
         SegmentedDragonManager dragonBody = GetComponent<SegmentedDragonManager>();
         if (dragonBody != null)
         {
             Debug.Log("[BossCreature] Instructing SegmentedDragonManager to spawn anatomy...");
-            dragonBody.InitializeDragon(arena.observationSpline);
+            dragonBody.InitializeDragon(null); // Anatomy spawns cleanly at root
+        }
+
+        ChangePhase(BossPhase.Orchestrator);
+    }
+
+    private void ChangePhase(BossPhase newPhase)
+    {
+        currentPhase = newPhase;
+        if (movementSystem != null)
+        {
+            movementSystem.OnPhaseChanged((int)newPhase);
         }
     }
 
-    /// <summary>
-    /// Called by the Arena Manager when minions drop below threshold.
-    /// </summary>
     public void EngagePlayer()
     {
-        currentPhase = BossPhase.Engaged;
-        // In a full implementation, this would point the dragon directly at the watchtower.
-        // For now, it enters the combat state.
+        ChangePhase(BossPhase.Engaged);
         Debug.Log("<color=magenta>[BossCreature] Phase 2: Dragon attacking player!</color>");
 
-        // Unhook from the spline so the dragon can freestyle toward the player
-        if (tacticalManager != null)
-        {
-            GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
-            if (playerObj != null)
-            {
-                tacticalManager.StartFreestylePursuit(playerObj.transform);
-            }
-        }
+        // Movement system now handles freestyle logic via OnPhaseChanged hooks
     }
 
     private void Update()
@@ -146,15 +135,6 @@ public class BossCreature : MonoBehaviour
             {
                 currentStamina = 0;
                 EnterExhaustedPhase();
-            }
-            else if (tacticalManager != null)
-            {
-                // Let the tactical manager handle the freestyle movement
-                GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
-                if (playerObj != null)
-                {
-                    tacticalManager.UpdateFreestylePursuit(playerObj.transform);
-                }
             }
         }
         else if (currentPhase == BossPhase.Recharging)
@@ -184,58 +164,53 @@ public class BossCreature : MonoBehaviour
 
     private void EnterExhaustedPhase()
     {
-        currentPhase = BossPhase.Exhausted;
+        ChangePhase(BossPhase.Exhausted);
         Debug.Log("<color=cyan>[BossCreature] Phase 3: Dragon is exhausted! Fleeing to recharge!</color>");
 
         // Permanently decay stamina so fights don't last forever
         maxStamina *= 0.7f;
         if (maxStamina < 20f) maxStamina = 20f; // Minimum stamina floor so it can still fight briefly
 
-        // Command the manager to flee through environmental splines
-        tacticalManager.StartEvasionRoutine();
+        // Command the movement system to flee
+        if (movementSystem != null)
+        {
+            movementSystem.ForceImmediateEvasion();
+        }
     }
 
     /// <summary>
-    /// Called by the Tactical Manager when the boss finishes an escape route
+    /// Called by the Movement System when the boss finishes an escape route
     /// and returns to the observation deck.
     /// </summary>
     public void BeginRecharging()
     {
-        currentPhase = BossPhase.Recharging;
+        ChangePhase(BossPhase.Recharging);
         Debug.Log("<color=cyan>[BossCreature] Phase 4: Recharging stamina on the observation deck!</color>");
     }
 
     /// <summary>
     /// Force the boss to begin evasive maneuvers immediately.
     /// Called by other systems (e.g. DragonSegment) when the boss is hit and should react instantly.
-    /// This was added to fix the CS1061 compile error and to ensure the dragon uses escape splines on hit.
     /// </summary>
     public void ForceImmediateEvasion()
     {
-        if (tacticalManager == null) tacticalManager = GetComponent<TacticalBossSplineManager>();
-        if (tacticalManager == null)
-        {
-            Debug.LogWarning("[BossCreature] ForceImmediateEvasion called but TacticalBossSplineManager not found.");
-            return;
-        }
-
         Debug.Log("<color=red>[BossCreature] ForceImmediateEvasion: ordering immediate tactical evasion.</color>");
 
-        // If the boss was orchestrating, engage first so movement routines behave correctly
         if (currentPhase == BossPhase.Orchestrator)
         {
             EngagePlayer();
         }
 
-        // Trigger the evasion routine on the tactical manager (this will use the configured escape splines)
-        tacticalManager.EvadeToEscapeRoute();
+        if (movementSystem != null)
+        {
+            movementSystem.ForceImmediateEvasion();
+        }
 
         // Reset accumulators so we don't re-trigger immediately
         recentDamageAccumulator = 0f;
         damageDecayTimer = 0f;
 
-        // Move into Exhausted state so tactical flow (recharge after route) is consistent
-        currentPhase = BossPhase.Exhausted;
+        ChangePhase(BossPhase.Exhausted);
     }
 
     /// <summary>
@@ -311,11 +286,7 @@ public class BossCreature : MonoBehaviour
         {
             Debug.Log("<color=red>[BossCreature] Threat level high! Ordering tactical evasion.</color>");
 
-            // Command the manager to jump to an environmental spline
-            tacticalManager.EvadeToEscapeRoute();
-
-            // Reset accumulator so it doesn't immediately evade again
-            recentDamageAccumulator = 0f;
+            ForceImmediateEvasion();
         }
     }
 
@@ -323,8 +294,17 @@ public class BossCreature : MonoBehaviour
     {
         Debug.Log("<color=red>[BossCreature] The Boss has been defeated!</color>");
 
+        // Ping the injected WaveSpawner so the level progression can cleanly move to Victory
+        if (waveSpawner != null)
+        {
+            waveSpawner.NotifyTargetDestroyed();
+        }
+
         // Stop movement
-        tacticalManager.enabled = false;
+        if (movementSystem != null)
+        {
+            movementSystem.enabled = false;
+        }
 
         // Command all indestructible pieces (Head, Legs, Tail) to dissolve
         SegmentedDragonManager dragonBody = GetComponent<SegmentedDragonManager>();

@@ -28,6 +28,7 @@ public class StandardCreature : MonoBehaviour
     [SerializeField] private string targetLayer = "Enemy";
 
     private CreatureStatusEffects statusEffects;
+    private MinionManager myManager;
 
     private void Awake()
     {
@@ -44,6 +45,19 @@ public class StandardCreature : MonoBehaviour
 
         // Try to find the status effect component (optional, but recommended)
         statusEffects = GetComponent<CreatureStatusEffects>();
+    }
+
+    /// <summary>
+    /// Injected explicitly by the WaveSpawner when this object is instantiated.
+    /// Eliminates the need for brittle Singletons.
+    /// </summary>
+    public void Initialize(MinionManager manager)
+    {
+        myManager = manager;
+        if (myManager != null)
+        {
+            myManager.RegisterMinion(this);
+        }
     }
 
     private void Start()
@@ -105,16 +119,44 @@ public class StandardCreature : MonoBehaviour
 
     protected virtual void Die()
     {
-        Debug.Log($"[StandardCreature] {gameObject.name} has died.");
+        Debug.Log($"[StandardCreature] {gameObject.name} has died. Triggering visuals.");
 
-        // Ensure we detach from any Dreamteck splines properly upon death
+        // 1. Instantly stop movement
         Dreamteck.Splines.SplineFollower follower = GetComponent<Dreamteck.Splines.SplineFollower>();
         if (follower != null)
         {
             follower.follow = false;
         }
 
-        // Trigger death effects here (dissolve, ragdoll, etc.)
-        Destroy(gameObject);
+        // Do NOT disable colliders prematurely!
+        // If we do, arrows will detach or stick to invisible objects.
+        // The visuals must complete first while holding the physical arrows.
+
+        // 2. Trigger Dissolve (if it exists), otherwise finalize death immediately.
+        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
+        if (dissolve != null)
+        {
+            dissolve.OnDissolveCompleted += HandleDissolveCompleted;
+            dissolve.StartDissolve();
+        }
+        else
+        {
+            HandleDissolveCompleted();
+        }
+    }
+
+    private void HandleDissolveCompleted()
+    {
+        // Ping the injected manager that this minion has visually finished dying
+        // The manager handles tracking logic and physical scene destruction of the root
+        if (myManager != null)
+        {
+            myManager.OnMinionDestroyed(this);
+        }
+        else
+        {
+            Debug.LogWarning("[StandardCreature] Minion died but no manager was injected! Destroying self manually.");
+            Destroy(transform.root.gameObject);
+        }
     }
 }
