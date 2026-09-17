@@ -21,7 +21,7 @@ public class WaveSpawner : MonoBehaviour
     // --- State ---
     private List<GameObject> activeTargets = new List<GameObject>();
     private bool isWaveActive = false;
-    private WaveDataSO currentWaveData;
+    private WaveData currentWaveData;
     private LevelConfigSO currentLevelConfig;
     private int currentWaveIndex;
     private int totalWaveCount;
@@ -32,7 +32,7 @@ public class WaveSpawner : MonoBehaviour
     // --- Queue for delayed spawning (replacing Coroutines) ---
     private class PendingSpawn
     {
-        public TargetSpawnConfig Config;
+        public CharacterConfigBase Config;
         public float TimeToSpawn;
     }
     private List<PendingSpawn> spawnQueue = new List<PendingSpawn>();
@@ -50,7 +50,6 @@ public class WaveSpawner : MonoBehaviour
         if (progressionManager != null)
         {
             progressionManager.OnWaveStartRequested += HandleWaveStartRequested;
-            progressionManager.OnBossStartRequested += HandleBossStartRequested;
             progressionManager.OnStateChanged += HandleStateChanged;
         }
 
@@ -65,7 +64,6 @@ public class WaveSpawner : MonoBehaviour
         if (progressionManager != null)
         {
             progressionManager.OnWaveStartRequested -= HandleWaveStartRequested;
-            progressionManager.OnBossStartRequested -= HandleBossStartRequested;
             progressionManager.OnStateChanged -= HandleStateChanged;
         }
     }
@@ -95,42 +93,43 @@ public class WaveSpawner : MonoBehaviour
         waveTimer = 0f;
         isWaveActive = true;
 
-        // Queue all targets using absolute time to avoid Coroutine cascades
+        // Queue all characters using absolute time to avoid Coroutine cascades
         float currentTime = Time.time;
-        foreach (var targetConfig in currentWaveData.targets)
+        bool isBossWave = false;
+
+        foreach (var charConfig in currentWaveData.characters)
         {
+            if (charConfig is BossConfig)
+            {
+                isBossWave = true;
+            }
+
             spawnQueue.Add(new PendingSpawn
             {
-                Config = targetConfig,
-                TimeToSpawn = currentTime + targetConfig.spawnDelay
+                Config = charConfig,
+                TimeToSpawn = currentTime + charConfig.spawnDelay
             });
         }
 
-        Debug.Log($"[WaveSpawner] Wave {waveIndex + 1}/{totalWaveCount} started. {spawnQueue.Count} targets queued.");
-    }
-
-    private void HandleBossStartRequested(LevelConfigSO levelConfig)
-    {
-        Debug.Log("[WaveSpawner] Boss requested. Spawning boss.");
-        isWaveActive = false; // Boss is handled differently (survival/kill)
-
-        // Spawn Boss via configuration (using TargetSpawnConfig with Boss Movement Type)
-        TargetSpawnConfig bossConfig = new TargetSpawnConfig
+        if (isBossWave)
         {
-            movementBehavior = TargetMovementType.BossDragonAsset,
-            spawnPosition = Vector3.zero,
-            scaleModifier = 1f,
-            speedModifier = 1f
-        };
-
-        SpawnComplexAsset(bossConfig, spawnCenter.position, Quaternion.identity, levelConfig);
+            Debug.Log($"[WaveSpawner] Boss Wave {waveIndex + 1}/{totalWaveCount} started.");
+            progressionManager.NotifyBossWaveStarted();
+            // We set wave active to false because Boss combat lifecycle is managed via BossArenaManager
+            isWaveActive = false;
+        }
+        else
+        {
+            Debug.Log($"[WaveSpawner] Wave {waveIndex + 1}/{totalWaveCount} started. {spawnQueue.Count} targets queued.");
+        }
     }
 
     private void Update()
     {
-        if (!isWaveActive) return;
-
+        // Spawning must process independently of wave logic so that Bosses (who set isWaveActive = false) still instantiate.
         ProcessSpawns();
+
+        if (!isWaveActive) return;
         UpdateWaveLogic();
     }
 
@@ -140,7 +139,7 @@ public class WaveSpawner : MonoBehaviour
         {
             if (Time.time >= spawnQueue[i].TimeToSpawn)
             {
-                SpawnTarget(spawnQueue[i].Config);
+                SpawnCharacter(spawnQueue[i].Config);
                 spawnQueue.RemoveAt(i);
             }
         }
@@ -201,9 +200,9 @@ public class WaveSpawner : MonoBehaviour
         activeTargets.Clear();
     }
 
-    private void SpawnTarget(TargetSpawnConfig config)
+    private void SpawnCharacter(CharacterConfigBase config)
     {
-        Vector3 spawnPos = spawnCenter.position + config.spawnPosition;
+        Vector3 spawnPos = spawnCenter.position + config.spawnPositionOffset;
 
         // VR Constraint: Ensure target never spawns below the ground (Y < 0 relative to center)
         if (spawnPos.y < spawnCenter.position.y)
@@ -221,39 +220,33 @@ public class WaveSpawner : MonoBehaviour
             spawnRot = Quaternion.LookRotation(directionToCenter);
         }
 
-        if (currentLevelConfig == null || currentLevelConfig.vanillaTargetPrefab == null)
+        GameObject prefabToSpawn = null;
+
+        if (config is MinionConfig minion)
         {
-            Debug.LogError("[WaveSpawner] Vanilla Target Prefab is missing from LevelConfigSO!");
-            return;
+            prefabToSpawn = minion.prefab;
         }
-
-        // Spawn actual prefab from the Config
-        GameObject newTarget = Instantiate(currentLevelConfig.vanillaTargetPrefab, spawnPos, spawnRot);
-
-        // Apply Scaling
-        float finalScale = currentLevelConfig.globalScaleMultiplier * config.scaleModifier;
-        if (finalScale <= 0) finalScale = 1.0f;
-        newTarget.transform.localScale = Vector3.one * finalScale;
-
-        activeTargets.Add(newTarget);
-    }
-
-    private void SpawnComplexAsset(TargetSpawnConfig config, Vector3 spawnPos, Quaternion spawnRot, LevelConfigSO levelConfig)
-    {
-        GameObject prefabToSpawn = config.movementBehavior == TargetMovementType.BossDragonAsset ? levelConfig.bossDragonPrefab : levelConfig.splinePathAssetPrefab;
+        else if (config is BossConfig boss)
+        {
+            prefabToSpawn = boss.prefab;
+        }
 
         if (prefabToSpawn == null)
         {
-            Debug.LogWarning($"[WaveSpawner] Missing prefab for {config.movementBehavior}. Skipping spawn.");
+            Debug.LogError($"[WaveSpawner] Prefab is missing from the Character Config!");
             return;
         }
 
-        GameObject complexTarget = Instantiate(prefabToSpawn, spawnPos, spawnRot);
-        activeTargets.Add(complexTarget);
+        GameObject spawnedEntity = Instantiate(prefabToSpawn, spawnPos, spawnRot);
 
-        if (config.movementBehavior == TargetMovementType.BossDragonAsset)
+        if (config is MinionConfig)
         {
-            // Boss setup logic here...
+            activeTargets.Add(spawnedEntity);
+        }
+        else if (config is BossConfig)
+        {
+            // Boss wiring logic typically offloaded to BossArenaManager
+            Debug.Log("[WaveSpawner] Spawned Boss Entity.");
         }
     }
 }

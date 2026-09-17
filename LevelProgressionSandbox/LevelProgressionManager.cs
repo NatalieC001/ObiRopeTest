@@ -46,7 +46,6 @@ public class LevelProgressionManager : MonoBehaviour
 
     // Fired to Spawner
     public event Action<LevelConfigSO, int> OnWaveStartRequested;
-    public event Action<LevelConfigSO> OnBossStartRequested;
 
     private void Start()
     {
@@ -140,16 +139,21 @@ public class LevelProgressionManager : MonoBehaviour
             ChangeState(GameState.WaveActive);
             OnWaveStartRequested?.Invoke(currentLevel, currentWaveIndex);
         }
-        else if (currentLevel.bossDragonPrefab != null)
-        {
-            // Waves are done, check for Boss
-            ChangeState(GameState.BossActive);
-            OnBossStartRequested?.Invoke(currentLevel);
-        }
         else
         {
-            // No waves left, no boss -> Level Complete
+            // No waves left -> Level Complete
             TriggerLevelVictory();
+        }
+    }
+
+    /// <summary>
+    /// Spawner can call this if it detects a Boss Config in the wave data, allowing the Manager to update UI/State.
+    /// </summary>
+    public void NotifyBossWaveStarted()
+    {
+        if (currentState == GameState.WaveActive)
+        {
+            ChangeState(GameState.BossActive);
         }
     }
 
