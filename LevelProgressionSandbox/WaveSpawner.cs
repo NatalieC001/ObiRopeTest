@@ -26,9 +26,6 @@ public class WaveSpawner : MonoBehaviour
 
     // Tracks environmental paths instantiated exclusively for this wave so they can be destroyed
     private List<GameObject> activePaths = new List<GameObject>();
-
-    // Tracks Swarm root objects to clean up their empty wrappers safely at the end of the wave
-    private List<GameObject> activeSwarmRoots = new List<GameObject>();
     private LevelConfigSO currentLevelConfig;
     private int currentWaveIndex;
     private int totalWaveCount;
@@ -108,7 +105,6 @@ public class WaveSpawner : MonoBehaviour
         totalWaveCount = levelConfig.waves.Count;
 
         activePaths.Clear();
-        activeSwarmRoots.Clear();
         spawnQueue.Clear();
         waveTimer = 0f;
         isWaveActive = true;
@@ -244,16 +240,6 @@ public class WaveSpawner : MonoBehaviour
 
     private void CleanupTargets()
     {
-        // Clean up any empty Swarm Wrappers that remained after all children dissolved
-        foreach (var root in activeSwarmRoots)
-        {
-            if (root != null)
-            {
-                Destroy(root);
-            }
-        }
-        activeSwarmRoots.Clear();
-
         // Clean up the environmental paths spawned for Bosses.
         foreach (var path in activePaths)
         {
@@ -335,11 +321,8 @@ public class WaveSpawner : MonoBehaviour
 
         GameObject spawnedEntity = Instantiate(prefabToSpawn, spawnPos, spawnRot);
 
-        // Ensure the root is tracked so empty swarm wrappers are cleaned up at wave end
-        activeSwarmRoots.Add(spawnedEntity);
-
-        // Native self-registration handles the tracking logic now!
-        // StandardCreature will broadcast OnCreatureSpawned on Awake, which MinionManager catches to increment activeEnemyCount.
+        // Native self-registration explicitly natively registers with MinionManager.
+        // MinionManager handles tracking active counts and physical destruction natively.
 
         if (config is BossConfig)
         {

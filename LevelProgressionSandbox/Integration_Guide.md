@@ -74,3 +74,54 @@ If you rely on a `MinionManager` or a `BossArenaManager` to track kills, those s
 6. When you clear all targets, the next wave starts instantly.
 
 If this works smoothly, congratulations! You can now safely delete `TrainingLevelManager.cs` from your project forever.
+
+---
+
+### Step 7: Minion & Swarm Prefab Blueprints
+To ensure your standard grunts and nested swarms can be shot by arrows, correctly drain health, and cleanly notify the progression manager when they die without leaving ghost colliders, your prefabs MUST look like this:
+
+#### Blueprint A: Single Minion
+This is for a standard enemy that rides a spline on its own.
+
+```text
+👹 [Prefab Root] Minion_Basic
+ ├── 📜 StandardCreature.cs       (The brain: tracks health and registers to MinionManager)
+ ├── 📜 SplineFollower.cs         (Handles movement along the path)
+ ├── 📜 CreatureStatusEffects.cs  (Handles Ice/Slow elemental reactions)
+ │
+ ├── 🧩 [Child] Mesh_Visual
+ │    ├── 🎨 SkinnedMeshRenderer
+ │    └── 📜 DissolveEffect.cs    (Visual death. Ensure 'Dissolve Immediately On Hit' is OFF!)
+ │
+ └── 🧩 [Child] Collider_Node     (Layer MUST be 'Enemy')
+      ├── 📜 BoxCollider
+      └── 📜 Rigidbody            (Kinematic)
+```
+
+> [!warning] Arrow Detection
+> For `StandardCreature` to receive arrow damage, it is best practice to either place the `Collider` directly on the Root object, or ensure your Arrow scripts use `GetComponentInParent<IArrowTarget>()` when hitting a child collider.
+
+#### Blueprint B: Nested Swarm
+This is for a single prefab that spawns multiple enemies riding the same spline in a formation.
+
+```text
+🐝 [Prefab Root] Swarm_Of_Bees
+ ├── 📜 SplineSwarmManager.cs     (Manages the local swarm spacing/timing)
+ ├── 📜 SplineFollower.cs         (The master follower moving the entire swarm group)
+ │
+ ├── 🧩 [Child] Bee_1             (This is the actual killable entity!)
+ │    ├── 📜 StandardCreature.cs
+ │    ├── 📜 CreatureStatusEffects.cs
+ │    ├── 🧩 Mesh_Visual
+ │    │    └── 📜 DissolveEffect.cs
+ │    └── 🧩 Collider_Node (Layer: Enemy)
+ │
+ ├── 🧩 [Child] Bee_2
+ │    ├── 📜 StandardCreature.cs
+ │    ├── 📜 CreatureStatusEffects.cs
+ │    ├── 🧩 Mesh_Visual
+ │    │    └── 📜 DissolveEffect.cs
+ │    └── 🧩 Collider_Node (Layer: Enemy)
+```
+
+In a nested swarm, the `WaveSpawner` will dynamically find `Bee_1` and `Bee_2`, registering both of them with the `MinionManager`. When they both die, the `WaveSpawner` will cleanly obliterate the `[Prefab Root] Swarm_Of_Bees` from the scene automatically!

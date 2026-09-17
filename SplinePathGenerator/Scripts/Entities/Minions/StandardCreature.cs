@@ -5,7 +5,7 @@ using UnityEngine;
 /// These are typically the grunts that ride geometric spline shapes and use the Swarm logic,
 /// clearly separated from the basic 'MovingTarget' test objects.
 /// </summary>
-public class StandardCreature : MonoBehaviour
+public class StandardCreature : MonoBehaviour, IArrowTarget
 {
     [System.Serializable]
     public struct ElementalModifier
@@ -27,10 +27,8 @@ public class StandardCreature : MonoBehaviour
     [Tooltip("The physics layer this creature will be forced onto so arrows can detect it. Displayed here as a reminder!")]
     [SerializeField] private string targetLayer = "Enemy";
 
-    public static event System.Action<StandardCreature> OnCreatureSpawned;
-    public static event System.Action<StandardCreature> OnCreatureDied;
-
     private CreatureStatusEffects statusEffects;
+    private MinionManager myManager;
 
     private void Awake()
     {
@@ -47,20 +45,29 @@ public class StandardCreature : MonoBehaviour
 
         // Try to find the status effect component (optional, but recommended)
         statusEffects = GetComponent<CreatureStatusEffects>();
+
+        // Native self-registration explicitly directly to the ONE manager.
+        myManager = FindFirstObjectByType<MinionManager>();
+        if (myManager != null)
+        {
+            myManager.RegisterMinion(this);
+        }
+        else
+        {
+            Debug.LogWarning($"[StandardCreature] No MinionManager found in scene. Wave tracking will fail for {gameObject.name}");
+        }
     }
 
     private void Start()
     {
         health = maxHealth;
-
-        // Self-register by broadcasting to the void. The MinionManager listens!
-        OnCreatureSpawned?.Invoke(this);
     }
 
     /// <summary>
     /// Called when the player shoots this creature.
+    /// Fulfills the IArrowTarget interface so StickingArrow can deal damage correctly.
     /// </summary>
-    public virtual void TakeDamage(float baseAmount, Vector3 hitPoint, ElementTypeOB7 arrowType = ElementTypeOB7.Normal)
+    public virtual void OnArrowHit(float baseAmount, Vector3 hitPoint, ElementTypeOB7 arrowType = ElementTypeOB7.Normal)
     {
         // 0. Trigger Status Effects (Slows, Freezes)
         if (statusEffects != null)
@@ -129,7 +136,7 @@ public class StandardCreature : MonoBehaviour
         if (dissolve != null)
         {
             dissolve.OnDissolveCompleted += HandleDissolveCompleted;
-            dissolve.StartDissolve();
+            dissolve.TriggerDissolve();
         }
         else
         {
@@ -139,14 +146,15 @@ public class StandardCreature : MonoBehaviour
 
     private void HandleDissolveCompleted()
     {
-        // Simply destroy self. The OnDestroy event handles notifying the manager.
-        Destroy(gameObject);
-    }
-
-    private void OnDestroy()
-    {
-        // 4. Guarantee safety: Even if the minion is destroyed prematurely (e.g. Swarm root deleted),
-        // it MUST broadcast its death so the wave progression doesn't permanently soft-lock.
-        OnCreatureDied?.Invoke(this);
+        // One Registration, One Manager, One Death Call.
+        // We ping the manager and let IT destroy us, preventing overlapping destruction logic.
+        if (myManager != null)
+        {
+            myManager.OnMinionDestroyed(this);
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
     }
 }
