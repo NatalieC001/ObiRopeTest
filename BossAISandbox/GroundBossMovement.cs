@@ -24,6 +24,15 @@ public class GroundBossMovement : BaseBossMovement
         }
     }
 
+    public override void ForceImmediateEvasion()
+    {
+        currentActivePath = FindNearestEscapeRoute(PathTypeTag.PathType.Terrestrial);
+        if (currentActivePath != null)
+        {
+            Debug.Log($"[{gameObject.name}] Ground movement immediately pathfinding to escape route: {currentActivePath.name}");
+        }
+    }
+
     private void ExecuteGroundEscape()
     {
         if (currentActivePath == null)

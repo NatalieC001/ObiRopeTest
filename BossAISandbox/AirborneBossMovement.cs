@@ -31,6 +31,20 @@ public class AirborneBossMovement : BaseBossMovement
         }
     }
 
+    public override void ForceImmediateEvasion()
+    {
+        currentActivePath = FindNearestEscapeRoute(PathTypeTag.PathType.Airborne);
+        if (currentActivePath != null)
+        {
+            Debug.Log($"[{gameObject.name}] Airborne movement immediately jumping to escape route: {currentActivePath.name}");
+            // Insert logic here to snap or lerp to the start of the escape path
+        }
+        else
+        {
+            Debug.LogWarning($"[{gameObject.name}] Tried to evade, but no Airborne escape routes were found by the BossPathManager!");
+        }
+    }
+
     private void ExecuteEscapeChoreography()
     {
         if (currentActivePath == null)

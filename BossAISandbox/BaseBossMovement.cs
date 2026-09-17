@@ -45,6 +45,12 @@ public abstract class BaseBossMovement : MonoBehaviour
         Debug.Log($"[{gameObject.name}] Movement system reacting to Phase {newPhase}");
     }
 
+    /// <summary>
+    /// Forces the movement system to jump to the nearest escape route immediately.
+    /// To be implemented by leaf classes (Airborne, Ground, Hybrid).
+    /// </summary>
+    public abstract void ForceImmediateEvasion();
+
     // --- Shared Path & Desire Logic ---
 
     /// <summary>

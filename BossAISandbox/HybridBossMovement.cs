@@ -28,6 +28,23 @@ public class HybridBossMovement : BaseBossMovement
         }
     }
 
+    public override void ForceImmediateEvasion()
+    {
+        if (currentHybridState == HybridState.Walking)
+        {
+            currentActivePath = FindNearestEscapeRoute(PathTypeTag.PathType.Terrestrial);
+        }
+        else
+        {
+            currentActivePath = FindNearestEscapeRoute(PathTypeTag.PathType.Airborne);
+        }
+
+        if (currentActivePath != null)
+        {
+            Debug.Log($"[{gameObject.name}] Hybrid movement immediately jumping to {currentHybridState} escape route: {currentActivePath.name}");
+        }
+    }
+
     private void TickWalkingMovement()
     {
         // Example: If escaping while on the ground, ask for Terrestrial routes
