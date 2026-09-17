@@ -45,40 +45,42 @@ public class MinionManager : MonoBehaviour
     /// </summary>
     public void OnMinionDestroyed(StandardCreature destroyedMinion)
     {
+        // Only process the death if the minion is actually registered.
+        // This completely prevents edge cases where rapid multi-hits send multiple death signals.
         if (activeMinions.Contains(destroyedMinion))
         {
             activeMinions.Remove(destroyedMinion);
-        }
 
-        Debug.Log($"<color=magenta>[MinionManager] Minion visually completed death sequence. Destroying object. Remaining globally: {activeMinions.Count}</color>");
+            Debug.Log($"<color=magenta>[MinionManager] Minion visually completed death sequence. Destroying object. Remaining globally: {activeMinions.Count}</color>");
 
-        // Explicitly notify the WaveSpawner so it can evaluate wave completion instantly!
-        if (waveSpawner != null)
-        {
-            waveSpawner.NotifyTargetDestroyed();
-        }
-
-        // ONE source of truth: The manager executes the final physical destruction of the specific minion GameObject.
-        if (destroyedMinion != null && destroyedMinion.gameObject != null)
-        {
-            // Cache the parent before we destroy this minion
-            Transform parentTransform = destroyedMinion.transform.parent;
-
-            // 1. Destroy the specific minion (and its nested meshes/colliders)
-            Destroy(destroyedMinion.gameObject);
-
-            // 2. Smart Cleanup: Check if the parent Swarm/Path is now completely empty
-            if (parentTransform != null)
+            // Explicitly notify the WaveSpawner so it can evaluate wave completion instantly!
+            if (waveSpawner != null)
             {
-                // We check if the parent has any remaining active minions in its hierarchy
-                StandardCreature[] remainingSiblings = parentTransform.GetComponentsInChildren<StandardCreature>(false);
+                waveSpawner.NotifyTargetDestroyed();
+            }
 
-                // If this destroyed minion was the absolute last one in the parent structure...
-                if (remainingSiblings == null || remainingSiblings.Length <= 1)
+            // ONE source of truth: The manager executes the final physical destruction of the specific minion GameObject.
+            if (destroyedMinion != null && destroyedMinion.gameObject != null)
+            {
+                // Cache the parent before we destroy this minion
+                Transform parentTransform = destroyedMinion.transform.parent;
+
+                // 1. Destroy the specific minion (and its nested meshes/colliders)
+                Destroy(destroyedMinion.gameObject);
+
+                // 2. Smart Cleanup: Check if the parent Swarm/Path is now completely empty
+                if (parentTransform != null)
                 {
-                    // Destroy the parent wrapper too, leaving zero garbage behind in the scene!
-                    Debug.Log($"<color=magenta>[MinionManager] Parent Swarm {parentTransform.name} is now empty. Destroying it!</color>");
-                    Destroy(parentTransform.gameObject);
+                    // We check if the parent has any remaining active minions in its hierarchy
+                    StandardCreature[] remainingSiblings = parentTransform.GetComponentsInChildren<StandardCreature>(false);
+
+                    // If this destroyed minion was the absolute last one in the parent structure...
+                    if (remainingSiblings == null || remainingSiblings.Length <= 1)
+                    {
+                        // Destroy the parent wrapper too, leaving zero garbage behind in the scene!
+                        Debug.Log($"<color=magenta>[MinionManager] Parent Swarm {parentTransform.name} is now empty. Destroying it!</color>");
+                        Destroy(parentTransform.gameObject);
+                    }
                 }
             }
         }

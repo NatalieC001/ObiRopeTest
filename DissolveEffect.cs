@@ -49,8 +49,23 @@ public class DissolveEffect : MonoBehaviour, IArrowTarget
     /// </summary>
     public void OnArrowHit(float damage, Vector3 impactPoint, ElementTypeOB7 elementType)
     {
-        // For simple targets we want this to dissolve immediately. 
-        // For objects with Health (like MovingTarget), disable this toggle in inspector and call TriggerDissolve() manually.
+        // Try to forward the damage to a creature brain first!
+        // We check GetComponentInParent so it finds the brain even if DissolveEffect is nested on a child mesh.
+        StandardCreature minionBrain = GetComponentInParent<StandardCreature>();
+        if (minionBrain != null)
+        {
+            minionBrain.TakeDamage(damage, impactPoint, elementType);
+            return; // The brain will call TriggerDissolve() manually when health hits 0.
+        }
+
+        BossCreature bossBrain = GetComponentInParent<BossCreature>();
+        if (bossBrain != null)
+        {
+            bossBrain.TakeDamage(damage, impactPoint, elementType);
+            return; // The boss handles its own phase changes and death.
+        }
+
+        // If no brain exists (e.g. hitting a simple target), rely on the manual toggle.
         if (dissolveImmediatelyOnHit && !isDissolving && gameObject.activeInHierarchy)
         {
             TriggerDissolve();

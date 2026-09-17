@@ -5,7 +5,7 @@ using UnityEngine;
 /// These are typically the grunts that ride geometric spline shapes and use the Swarm logic,
 /// clearly separated from the basic 'MovingTarget' test objects.
 /// </summary>
-public class StandardCreature : MonoBehaviour, IArrowTarget
+public class StandardCreature : MonoBehaviour
 {
     [System.Serializable]
     public struct ElementalModifier
@@ -29,6 +29,7 @@ public class StandardCreature : MonoBehaviour, IArrowTarget
 
     private CreatureStatusEffects statusEffects;
     private MinionManager myManager;
+    private bool isDead = false;
 
     private void Awake()
     {
@@ -65,10 +66,12 @@ public class StandardCreature : MonoBehaviour, IArrowTarget
 
     /// <summary>
     /// Called when the player shoots this creature.
-    /// Fulfills the IArrowTarget interface so StickingArrow can deal damage correctly.
+    /// Triggered natively by the nested DissolveEffect forwarding the damage.
     /// </summary>
-    public virtual void OnArrowHit(float baseAmount, Vector3 hitPoint, ElementTypeOB7 arrowType = ElementTypeOB7.Normal)
+    public virtual void TakeDamage(float baseAmount, Vector3 hitPoint, ElementTypeOB7 arrowType = ElementTypeOB7.Normal)
     {
+        if (isDead) return; // Prevent double-triggering if hit again during the dissolve animation
+
         // 0. Trigger Status Effects (Slows, Freezes)
         if (statusEffects != null)
         {
@@ -110,7 +113,7 @@ public class StandardCreature : MonoBehaviour, IArrowTarget
 
         Debug.Log($"[StandardCreature] {gameObject.name} hit by {arrowType} arrow. Took {actualDamage} damage. Health remaining: {health}");
 
-        if (health <= 0)
+        if (health <= 0 && !isDead)
         {
             Die();
         }
@@ -118,6 +121,7 @@ public class StandardCreature : MonoBehaviour, IArrowTarget
 
     protected virtual void Die()
     {
+        isDead = true;
         Debug.Log($"[StandardCreature] {gameObject.name} has died. Triggering visuals.");
 
         // 1. Instantly stop movement
