@@ -6,6 +6,7 @@ using System.Collections.Generic;
 /// This script lives permanently in the Boss Level Scene.
 /// It holds references to environmental splines (which prefabs cannot do) 
 /// and orchestrates the battle phases between the Boss and its minions.
+// We can consider this a placeholder script because I think that we will make the Dragons. Have their own AI, and brain. And they're going to manage their own splines. That they can find within the scene. This is already partially created through the level. Scriptable objects. Where we can see the observation paths and also the escape paths arrays. Already providing. Paths to the scene when it's instantiated. If there's multiple busses. I think it's quite OK that they share the paths. So we can consider the script as mostly. Unneeded unless we were testing a prototype in the scene without the wish to. Create the CVS for the level loading.
 /// </summary>
 public class BossArenaManager : MonoBehaviour
 {
