@@ -174,14 +174,22 @@ public class LevelConfigSOEditor : Editor
         EditorGUILayout.LabelField(listLabel, EditorStyles.boldLabel);
         EditorGUILayout.BeginVertical("box");
 
+        // Standard Unity list size control
+        int newSize = EditorGUILayout.IntField("Size", listProp.arraySize);
+        if (newSize < 0) newSize = 0;
+        if (newSize != listProp.arraySize)
+        {
+            listProp.arraySize = newSize;
+        }
+
         for (int i = 0; i < listProp.arraySize; i++)
         {
             SerializedProperty elementProp = listProp.GetArrayElementAtIndex(i);
 
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.PropertyField(elementProp, new GUIContent($"Path {i + 1}"));
+            EditorGUILayout.PropertyField(elementProp, new GUIContent($"Element {i}"));
 
-            if (GUILayout.Button("Select", GUILayout.Width(60)))
+            if (GUILayout.Button("Select", GUILayout.Width(70)))
             {
                 string propPath = elementProp.propertyPath;
                 PrefabPickerWindow.ShowPicker(searchFolderPath, (selectedPrefab) =>
@@ -196,32 +204,7 @@ public class LevelConfigSOEditor : Editor
                     }
                 });
             }
-
-            if (GUILayout.Button("X", GUILayout.Width(30)))
-            {
-                listProp.DeleteArrayElementAtIndex(i);
-                EditorGUILayout.EndHorizontal();
-                break;
-            }
             EditorGUILayout.EndHorizontal();
-        }
-
-        if (GUILayout.Button("Add Path from Folder"))
-        {
-            string listPropPath = listProp.propertyPath;
-            PrefabPickerWindow.ShowPicker(searchFolderPath, (selectedPrefab) =>
-            {
-                SerializedObject serializedObj = new SerializedObject(config);
-                serializedObj.Update();
-                SerializedProperty listPropToUpdate = serializedObj.FindProperty(listPropPath);
-                if (listPropToUpdate != null)
-                {
-                    listPropToUpdate.arraySize++;
-                    SerializedProperty newElement = listPropToUpdate.GetArrayElementAtIndex(listPropToUpdate.arraySize - 1);
-                    newElement.objectReferenceValue = selectedPrefab;
-                    serializedObj.ApplyModifiedProperties();
-                }
-            });
         }
 
         EditorGUILayout.EndVertical();
