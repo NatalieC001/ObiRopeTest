@@ -346,6 +346,34 @@ public class TrainingLevelManager : MonoBehaviour
         return null; // Not found anywhere
     }
 
+    /// <summary>
+    /// Explicitly removes a target from the tracking list and re-evaluates the wave progression state.
+    /// This avoids relying solely on brittle null-checks inside the Update loop.
+    /// </summary>
+    public void NotifyTargetDestroyed(GameObject destroyedTarget)
+    {
+        if (activeTargets.Contains(destroyedTarget))
+        {
+            activeTargets.Remove(destroyedTarget);
+        }
+
+        // Clean up list of destroyed targets so we always have an accurate count just in case
+        activeTargets.RemoveAll(t => t == null);
+
+        // Check if player cleared the wave early
+        bool allTargetsCleared = activeTargets.Count == 0 && pendingSpawns <= 0;
+
+        if (allTargetsCleared && isWaveActive && currentLevelConfig != null && currentWaveIndex < currentLevelConfig.waves.Count)
+        {
+            WaveData currentWave = currentLevelConfig.waves[currentWaveIndex];
+            if (currentWave.progressionType == WaveProgressionType.ClearAllTargets)
+            {
+                Debug.Log($"[TrainingLevelManager] EXPLICIT WAVE CLEAR: All targets in wave {currentWaveIndex + 1} destroyed!");
+                CompleteCurrentWave();
+            }
+        }
+    }
+
     private void CompleteCurrentWave()
     {
         isWaveActive = false;

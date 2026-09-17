@@ -5,7 +5,7 @@ using UnityEngine;
 /// These are typically the grunts that ride geometric spline shapes and use the Swarm logic,
 /// clearly separated from the basic 'MovingTarget' test objects.
 /// </summary>
-public class StandardCreature : MonoBehaviour
+public class StandardCreature : MonoBehaviour, IArrowTarget
 {
     [System.Serializable]
     public struct ElementalModifier
@@ -27,15 +27,32 @@ public class StandardCreature : MonoBehaviour
     [Tooltip("The physics layer this creature will be forced onto so arrows can detect it. Displayed here as a reminder!")]
     [SerializeField] private string targetLayer = "Enemy";
 
+    [Tooltip("Reference to the child mesh renderer (useful for triggering visual effects).")]
+    [SerializeField] private Renderer minionRenderer;
+
+    [Tooltip("Reference to the child collider (useful for disabling physics upon death).")]
+    [SerializeField] private Collider minionCollider;
+
     private CreatureStatusEffects statusEffects;
+    private MinionManager minionManager;
+    private Dreamteck.Splines.SplineFollower follower;
 
     private void Awake()
     {
+        follower = GetComponent<Dreamteck.Splines.SplineFollower>();
+
         // Force the physics layer so arrows detect this creature, even if the dev forgot to set it!
         int layerIndex = LayerMask.NameToLayer(targetLayer);
         if (layerIndex != -1)
         {
             gameObject.layer = layerIndex;
+
+            // Explicitly iterate through all child colliders to ensure nested physical colliders receive the layer
+            Collider[] colliders = GetComponentsInChildren<Collider>(true);
+            foreach (Collider col in colliders)
+            {
+                col.gameObject.layer = layerIndex;
+            }
         }
         else
         {
@@ -49,6 +66,25 @@ public class StandardCreature : MonoBehaviour
     private void Start()
     {
         health = maxHealth;
+
+        // Try to find and register to a manager universally
+        minionManager = Object.FindAnyObjectByType<MinionManager>();
+        if (minionManager != null)
+        {
+            minionManager.RegisterMinion(this);
+        }
+
+        // Intercept the OnDissolveCompleted event right from the start.
+        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
+        if (dissolve != null)
+        {
+            dissolve.OnDissolveCompleted += FinalizeDestruction;
+        }
+    }
+
+    public void OnArrowHit(float damage, Vector3 impactPoint, ElementTypeOB7 elementType)
+    {
+        TakeDamage(damage, impactPoint, elementType);
     }
 
     /// <summary>
@@ -107,14 +143,72 @@ public class StandardCreature : MonoBehaviour
     {
         Debug.Log($"[StandardCreature] {gameObject.name} has died.");
 
+        // Disable physics immediately so arrows don't keep hitting it
+        if (minionCollider != null)
+        {
+            minionCollider.enabled = false;
+        }
+
         // Ensure we detach from any Dreamteck splines properly upon death
-        Dreamteck.Splines.SplineFollower follower = GetComponent<Dreamteck.Splines.SplineFollower>();
         if (follower != null)
         {
             follower.follow = false;
         }
 
-        // Trigger death effects here (dissolve, ragdoll, etc.)
-        Destroy(gameObject);
+        // Trigger dissolve on any arrows sticking out of this minion simultaneously.
+        StickingArrow[] attachedArrows = GetComponentsInChildren<StickingArrow>(true);
+        foreach (StickingArrow arrow in attachedArrows)
+        {
+            if (arrow != null)
+            {
+                DissolveEffect arrowDissolve = arrow.GetComponentInChildren<DissolveEffect>();
+                if (arrowDissolve != null)
+                {
+                    arrowDissolve.TriggerDissolve();
+                }
+            }
+        }
+
+        // Explicitly command the minion's visual effect to start dissolving!
+        // This will eventually fire the OnDissolveCompleted event we subscribed to in Start,
+        // which will trigger FinalizeDestruction().
+        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
+        if (dissolve != null)
+        {
+            dissolve.TriggerDissolve();
+        }
+        else
+        {
+            // Fallback: If no DissolveEffect exists to fire the event, we just destroy it now
+            FinalizeDestruction();
+        }
+    }
+
+    private void OnDestroy()
+    {
+        // Clean up the event listener to avoid memory leaks
+        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
+        if (dissolve != null)
+        {
+            dissolve.OnDissolveCompleted -= FinalizeDestruction;
+        }
+    }
+
+    /// <summary>
+    /// Called EXACTLY when the visual dissolve finishes via callback.
+    /// Safely purges the minion from the manager and obliterates the GameObject hierarchy.
+    /// </summary>
+    private void FinalizeDestruction()
+    {
+        // Tell the manager to wipe this minion!
+        if (minionManager != null)
+        {
+            minionManager.OnMinionDestroyed(this);
+        }
+        else
+        {
+            // Fallback if there is no manager in the scene
+            Destroy(gameObject);
+        }
     }
 }
