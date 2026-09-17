@@ -49,8 +49,9 @@ public class DissolveEffect : MonoBehaviour, IArrowTarget
     /// </summary>
     public void OnArrowHit(float damage, Vector3 impactPoint, ElementTypeOB7 elementType)
     {
-        // Try to forward the damage to a creature brain first!
-        // We check GetComponentInParent so it finds the brain even if DissolveEffect is nested on a child mesh.
+        // Try to forward the damage to a standard minion brain first.
+        // StandardCreature does NOT implement IArrowTarget natively to avoid collider conflicts,
+        // so this effect component catches it and forwards it.
         StandardCreature minionBrain = GetComponentInParent<StandardCreature>();
         if (minionBrain != null)
         {
@@ -58,14 +59,10 @@ public class DissolveEffect : MonoBehaviour, IArrowTarget
             return; // The brain will call TriggerDissolve() manually when health hits 0.
         }
 
-        BossCreature bossBrain = GetComponentInParent<BossCreature>();
-        if (bossBrain != null)
-        {
-            bossBrain.TakeDamage(damage, impactPoint, elementType);
-            return; // The boss handles its own phase changes and death.
-        }
+        // Note: We DO NOT forward to BossCreature here!
+        // Bosses use DragonSegment, which already natively implements IArrowTarget and handles its own health.
 
-        // If no brain exists (e.g. hitting a simple target), rely on the manual toggle.
+        // If no minion brain exists (e.g. hitting a simple target), rely on the manual toggle.
         if (dissolveImmediatelyOnHit && !isDissolving && gameObject.activeInHierarchy)
         {
             TriggerDissolve();
