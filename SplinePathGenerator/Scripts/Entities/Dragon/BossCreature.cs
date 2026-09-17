@@ -56,6 +56,14 @@ public class BossCreature : MonoBehaviour
     private float recentDamageAccumulator = 0f;
     private float damageDecayTimer = 0f;
 
+    // Injected by WaveSpawner to explicitly report Boss death progression
+    private WaveSpawner waveSpawner;
+
+    public void Initialize(WaveSpawner spawner)
+    {
+        waveSpawner = spawner;
+    }
+
     private void Awake()
     {
         movementSystem = GetComponent<BaseBossMovement>();
@@ -285,6 +293,12 @@ public class BossCreature : MonoBehaviour
     private void Die()
     {
         Debug.Log("<color=red>[BossCreature] The Boss has been defeated!</color>");
+
+        // Ping the injected WaveSpawner so the level progression can cleanly move to Victory
+        if (waveSpawner != null)
+        {
+            waveSpawner.NotifyTargetDestroyed();
+        }
 
         // Stop movement
         if (movementSystem != null)

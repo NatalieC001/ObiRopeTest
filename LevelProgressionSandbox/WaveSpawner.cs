@@ -13,6 +13,7 @@ public class WaveSpawner : MonoBehaviour
 {
     [Header("Dependencies")]
     public LevelProgressionManager progressionManager;
+    public MinionManager minionManager;
 
     [Header("Spawn Settings")]
     [Tooltip("The central point where targets are spawned around. If null, uses this object's position.")]
@@ -27,11 +28,13 @@ public class WaveSpawner : MonoBehaviour
     private int currentWaveIndex;
     private int totalWaveCount;
 
+    // Explicit tracking driven by MinionManager
+    private int activeEnemyCount = 0;
+
     // Timer logic for TimeBased waves
     private float waveTimer = 0f;
 
     private BossPathManager pathManager;
-    private List<Collider> colliderBuffer = new List<Collider>(); // Reusable buffer to prevent GC allocations per frame
 
     // --- Queue for delayed spawning (replacing Coroutines) ---
     private class PendingSpawn
@@ -60,6 +63,11 @@ public class WaveSpawner : MonoBehaviour
         if (spawnCenter == null)
         {
             spawnCenter = this.transform;
+        }
+
+        if (minionManager == null)
+        {
+            minionManager = FindFirstObjectByType<MinionManager>();
         }
 
         pathManager = FindFirstObjectByType<BossPathManager>();
@@ -99,6 +107,7 @@ public class WaveSpawner : MonoBehaviour
         waveTimer = 0f;
         isWaveActive = true;
         currentWaveIsBoss = false;
+        activeEnemyCount = 0;
 
         // Queue all characters using absolute time to avoid Coroutine cascades
         float currentTime = Time.time;
@@ -152,30 +161,8 @@ public class WaveSpawner : MonoBehaviour
 
     private void UpdateWaveLogic()
     {
-        // Explicitly clean up any totally destroyed root objects
+        // Explicitly clean up any totally destroyed root objects (if any)
         activeRootObjects.RemoveAll(root => root == null);
-
-        // Count active enemies based exclusively on enabled physical colliders on the Enemy layer.
-        // This solves the bug where empty swarm roots linger after nested minions are dissolved.
-        int activeEnemyCount = 0;
-        int enemyLayer = LayerMask.NameToLayer("Enemy");
-
-        foreach (var root in activeRootObjects)
-        {
-            if (root != null)
-            {
-                colliderBuffer.Clear();
-                root.GetComponentsInChildren<Collider>(false, colliderBuffer); // Use non-allocating list overload
-
-                foreach (var col in colliderBuffer)
-                {
-                    if (col.gameObject.layer == enemyLayer && col.enabled)
-                    {
-                        activeEnemyCount++;
-                    }
-                }
-            }
-        }
 
         bool allTargetsCleared = (activeEnemyCount == 0) && (spawnQueue.Count == 0);
 
@@ -204,6 +191,19 @@ public class WaveSpawner : MonoBehaviour
             {
                 CompleteWave();
             }
+        }
+    }
+
+    /// <summary>
+    /// Explicitly called by MinionManager when a minion dies and dissolves.
+    /// </summary>
+    public void NotifyTargetDestroyed()
+    {
+        if (isWaveActive)
+        {
+            activeEnemyCount--;
+            if (activeEnemyCount < 0) activeEnemyCount = 0;
+            Debug.Log($"[WaveSpawner] Target destroyed. Remaining: {activeEnemyCount}");
         }
     }
 
@@ -312,5 +312,32 @@ public class WaveSpawner : MonoBehaviour
 
         // Track the root object purely so we can forcefully delete it when the wave/level cleans up
         activeRootObjects.Add(spawnedEntity);
+
+        if (config is MinionConfig)
+        {
+            // Find all actual minion entities within the spawned prefab (in case it's a nested swarm)
+            StandardCreature[] spawnedMinions = spawnedEntity.GetComponentsInChildren<StandardCreature>();
+
+            foreach(StandardCreature minion in spawnedMinions)
+            {
+                // Inject the MinionManager directly into the minion so it doesn't need singletons
+                minion.Initialize(minionManager);
+
+                // Track internally for progression
+                activeEnemyCount++;
+            }
+        }
+        else if (config is BossConfig)
+        {
+            // Inject the WaveSpawner so the Boss can notify it upon death
+            BossCreature boss = spawnedEntity.GetComponent<BossCreature>();
+            if (boss != null)
+            {
+                boss.Initialize(this);
+            }
+
+            // Track the boss so the wave doesn't end instantly
+            activeEnemyCount++;
+        }
     }
 }
