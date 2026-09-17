@@ -47,6 +47,10 @@ public class BossCreature : MonoBehaviour
     public float staminaRechargeRate = 15f;
     private float currentStamina;
 
+    [Header("Anatomy Tracking")]
+    [Tooltip("Dynamically found on Awake. Used as the origin point for breath attacks or projectiles.")]
+    public Transform mouthTransform;
+
     private TacticalBossSplineManager tacticalManager;
     private CreatureStatusEffects statusEffects;
     private float recentDamageAccumulator = 0f;
@@ -61,6 +65,29 @@ public class BossCreature : MonoBehaviour
         statusEffects = GetComponent<CreatureStatusEffects>();
         currentHealth = maxHealth;
         currentStamina = maxStamina;
+
+        FindMouthTransform();
+    }
+
+    /// <summary>
+    /// Dynamically searches all children (even deeply nested ones) for an object exactly named 'MouthTransform'.
+    /// </summary>
+    private void FindMouthTransform()
+    {
+        if (mouthTransform != null) return; // Already assigned in Inspector
+
+        Transform[] allChildren = GetComponentsInChildren<Transform>(true);
+        foreach (Transform t in allChildren)
+        {
+            if (t.name == "MouthTransform")
+            {
+                mouthTransform = t;
+                Debug.Log($"<color=green>[BossCreature] Successfully located MouthTransform on {t.parent.name}</color>");
+                return;
+            }
+        }
+
+        Debug.LogWarning("[BossCreature] Could not find a child object named 'MouthTransform'. Breath attacks may fail!");
     }
 
     private void Start()

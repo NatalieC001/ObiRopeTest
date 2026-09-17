@@ -65,7 +65,8 @@ To ensure the Dragon functions perfectly with the new movement system and your e
  ├── 🧩 [Child] Head_Segment
  │    ├── 📜 PermanentDragonSegment.cs (Invulnerable, passes damage to main BossCreature)
  │    ├── 📜 Collider (Layer: Enemy)
- │    └── 🎨 Mesh_Visual
+ │    ├── 🎨 Mesh_Visual
+ │    └── 🎯 MouthTransform            (Empty transform facing forward for breath attacks)
  │
  ├── 🧩 [Child] Body_Segment_1 (Destructible)
  │    ├── 📜 DragonSegment.cs          (Can be destroyed to trigger dissolve)
