@@ -107,14 +107,38 @@ public class StandardCreature : MonoBehaviour
     {
         Debug.Log($"[StandardCreature] {gameObject.name} has died.");
 
-        // Ensure we detach from any Dreamteck splines properly upon death
+        // 1. Instantly stop movement
         Dreamteck.Splines.SplineFollower follower = GetComponent<Dreamteck.Splines.SplineFollower>();
         if (follower != null)
         {
             follower.follow = false;
         }
 
-        // Trigger death effects here (dissolve, ragdoll, etc.)
+        // 2. Instantly disable all colliders.
+        // This is CRITICAL because the new WaveSpawner tracks wave completion by counting active Enemy colliders.
+        Collider[] allColliders = GetComponentsInChildren<Collider>();
+        foreach (Collider col in allColliders)
+        {
+            col.enabled = false;
+        }
+
+        // 3. Trigger Dissolve (if it exists), otherwise destroy immediately.
+        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
+        if (dissolve != null)
+        {
+            dissolve.OnDissolveCompleted += HandleDissolveCompleted;
+            dissolve.StartDissolve();
+        }
+        else
+        {
+            HandleDissolveCompleted();
+        }
+    }
+
+    private void HandleDissolveCompleted()
+    {
+        // Clean up the object entirely after visuals finish.
+        // Because the colliders were disabled earlier, WaveSpawner already knows this enemy is dead.
         Destroy(gameObject);
     }
 }
