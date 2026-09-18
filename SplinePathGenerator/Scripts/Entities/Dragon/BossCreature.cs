@@ -19,6 +19,7 @@ public class BossCreature : MonoBehaviour
     private CreatureStatusEffects statusEffects;
     private BossPathManager pathManager;
 
+    private bool isFullyInitialized = false;
     private float decisionTimer = 0f;
     private const float decisionTickRate = 1f;
 
@@ -84,6 +85,13 @@ public class BossCreature : MonoBehaviour
         breathController = GetComponent<ElementalBreathController>();
         regenerator = GetComponent<RegeneratorController>();
         statusEffects = GetComponent<CreatureStatusEffects>();
+
+        // Hide the boss mesh immediately to prevent flashing at 0,0,0
+        Renderer[] renderers = GetComponentsInChildren<Renderer>();
+        foreach (Renderer r in renderers)
+        {
+            r.enabled = false;
+        }
 
         requestBroker = FindFirstObjectByType<MinionRequestBroker>();
         eventBus = FindFirstObjectByType<BossEventBus>();
@@ -208,6 +216,13 @@ public class BossCreature : MonoBehaviour
             Dreamteck.Splines.SplineComputer startingSpline = initialPath != null ? initialPath.GetComponentInChildren<Dreamteck.Splines.SplineComputer>() : null;
             Debug.Log($"[BossCreature] Instructing SegmentedDragonManager to spawn anatomy. Initial spline: {(startingSpline != null ? startingSpline.name : "none")}");
             dragonBody.InitializeDragon(startingSpline);
+        }
+
+        // Restore mesh visibility now that we are positioned
+        Renderer[] allRenderers = GetComponentsInChildren<Renderer>();
+        foreach (Renderer r in allRenderers)
+        {
+            r.enabled = true;
         }
 
         // Give the evaluator time to think, ensuring its first state matches what it wants to do!

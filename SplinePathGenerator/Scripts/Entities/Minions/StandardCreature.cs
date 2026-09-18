@@ -61,6 +61,12 @@ public class StandardCreature : MonoBehaviour, IArrowTarget
 
         // Try to find the status effect component (optional, but recommended)
         statusEffects = GetComponent<CreatureStatusEffects>();
+        // Register natively with MinionManager in Awake to fix 1-frame wave spawning bugs
+        MinionManager minionManager = FindFirstObjectByType<MinionManager>();
+        if (minionManager != null)
+        {
+            minionManager.RegisterMinion(this);
+        }
     }
 
     private void Start()
@@ -144,8 +150,27 @@ public class StandardCreature : MonoBehaviour, IArrowTarget
         if (dissolve != null)
         {
             dissolve.TriggerDissolve(() => {
-                Destroy(gameObject);
+                NotifyManagersOfDeath();
             });
+        }
+        else
+        {
+            NotifyManagersOfDeath();
+        }
+    }
+
+    private void NotifyManagersOfDeath()
+    {
+        BossEventBus eventBus = FindFirstObjectByType<BossEventBus>();
+        if (eventBus != null)
+        {
+            eventBus.TriggerBossMinionDied(gameObject);
+        }
+
+        MinionManager minionManager = FindFirstObjectByType<MinionManager>();
+        if (minionManager != null)
+        {
+            minionManager.OnMinionDestroyed(this);
         }
         else
         {
