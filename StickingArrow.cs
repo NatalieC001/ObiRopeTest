@@ -17,6 +17,8 @@ public enum ArrowElementType
 
 public enum ArrowCategory { Normal, Rope }
 
+// NEW: Changes 1 of 1:
+// 1. Updated CleanupWallArrowRoutine() to pass CleanupArrow as a callback to DissolveEffect.
 public class StickingArrow : MonoBehaviour
 {
     public ArrowCategory arrowCategory = ArrowCategory.Normal;
@@ -231,6 +233,7 @@ public class StickingArrow : MonoBehaviour
 
         if (effect != null && !isDestroying)
         {
+            // NEW: 1. Trigger visuals and wait for callback instead of hardcoded wait.
             effect.TriggerDissolve(CleanupArrow);
             yield break;
         }

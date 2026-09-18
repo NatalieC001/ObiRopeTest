@@ -6,6 +6,11 @@ using Dreamteck.Splines;
 /// Handles segment health and reports destruction to the main SegmentedDragonManager.
 /// </summary>
 [RequireComponent(typeof(SplineFollower))]
+// NEW: Changes 4 of 4:
+// 1. Added private bool isDead to prevent double-triggering.
+// 2. Updated Awake() to force all nested colliders onto the Enemy layer automatically.
+// 3. Updated TakeDamage() to check isDead and Die() to set isDead.
+// 4. Updated Die() to pass FinalizeDestruction as a callback to DissolveEffect.
 public class DragonSegment : MonoBehaviour, IArrowTarget
 {
     [Header("Segment Stats")]
@@ -33,6 +38,7 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
     // The index of this segment in the manager's list (Head = 0)
     public int SegmentIndex { get; set; }
     public SplineFollower Follower => follower;
+    // NEW: 1. Prevent double death triggering
     private bool isDead = false;
 
 
@@ -44,6 +50,7 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
         int layerIndex = LayerMask.NameToLayer(targetLayer);
         if (layerIndex != -1)
         {
+            // NEW: 2. Automatically apply Enemy layer to all child colliders to fix hit detection.
             Collider[] allColliders = GetComponentsInChildren<Collider>(true);
             foreach (Collider col in allColliders)
             {
@@ -156,6 +163,7 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
         DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
         if (dissolve != null)
         {
+            // NEW: 4. Passing callback to decoupled visual effect.
             dissolve.TriggerDissolve(FinalizeDestruction);
         }
         else

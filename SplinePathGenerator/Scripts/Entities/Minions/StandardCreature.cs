@@ -5,6 +5,12 @@ using UnityEngine;
 /// These are typically the grunts that ride geometric spline shapes and use the Swarm logic,
 /// clearly separated from the basic 'MovingTarget' test objects.
 /// </summary>
+// NEW: Changes 4 of 4:
+// 1. Added IArrowTarget interface to class declaration.
+// 2. Added isDead boolean to prevent multiple deaths.
+// 3. Updated Awake() to force all child colliders to the Enemy layer.
+// 4. Added OnArrowHit implementation and updated Die() to pass callback to DissolveEffect.
+    // NEW: 1. Natively implements IArrowTarget directly on the brain.
 public class StandardCreature : MonoBehaviour, IArrowTarget
 {
     [System.Serializable]
@@ -29,6 +35,7 @@ public class StandardCreature : MonoBehaviour, IArrowTarget
 
     private CreatureStatusEffects statusEffects;
 
+    // NEW: 2. Tracking death state.
     private bool isDead = false;
 
     private void Awake()
@@ -40,6 +47,7 @@ public class StandardCreature : MonoBehaviour, IArrowTarget
             gameObject.layer = layerIndex;
 
             // Explicitly iterate through all child colliders to ensure nested physical colliders receive the layer
+            // NEW: 3. Automatic nested collider layer assignment to fix hit detection.
             Collider[] colliders = GetComponentsInChildren<Collider>(true);
             foreach (Collider col in colliders)
             {
@@ -63,6 +71,7 @@ public class StandardCreature : MonoBehaviour, IArrowTarget
     /// <summary>
     /// Called when the player shoots this creature.
     /// </summary>
+    // NEW: 4. Routing interface hits natively to TakeDamage, and Die() passes a callback.
     public void OnArrowHit(float damage, Vector3 impactPoint, ElementTypeOB7 elementType)
     {
 

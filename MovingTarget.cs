@@ -13,6 +13,8 @@ public struct ElementVisualConfig
     public Material elementMaterial;
 }
 
+// NEW: Changes 1 of 1:
+// 1. Updated TakeDamage() to call effect.TriggerDissolve with a null callback.
 public class MovingTarget : MonoBehaviour, IArrowTarget
 {
     [Header("Element Configuration")]
@@ -278,6 +280,7 @@ public class MovingTarget : MonoBehaviour, IArrowTarget
             DissolveEffect[] dissolveComponents = GetComponentsInChildren<DissolveEffect>();
             foreach (DissolveEffect effect in dissolveComponents)
             {
+                // NEW: 1. Passing null callback to decoupled DissolveEffect
                 effect.TriggerDissolve(null); // Now delegates to DissolveManager
             }
 

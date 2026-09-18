@@ -5,12 +5,16 @@ using UnityEngine;
 /// It overrides standard death logic to ensure it can NEVER be destroyed mid-fight,
 /// but still takes damage and relays it to the boss. It only dies when TriggerTotalDeath is called.
 /// </summary>
+// NEW: Changes 2 of 2:
+// 1. Removed reflection hack from Start().
+// 2. Updated TriggerTotalDeath() to pass Destroy callback to DissolveEffect.
 public class PermanentDragonSegment : DragonSegment
 {
     private void Start()
     {
         // Force this to be indestructible just in case the manager didn't catch it
         isDestructiblePart = false;
+        // NEW: 1. Removed complex reflection code that used to disable old dissolve logic here.
     }
 
     protected override void Die()
@@ -31,6 +35,7 @@ public class PermanentDragonSegment : DragonSegment
         if (dissolve != null)
         {
             // Trigger visual effect, then destroy the object
+            // NEW: 2. Passing lambda callback to destroy object after visuals finish.
             dissolve.TriggerDissolve(() =>
             {
                 Destroy(gameObject);

@@ -5,6 +5,11 @@ using UnityEngine;
 /// ATTACH TO: The GameObject that should dissolve (Enemies, Targets, or the Arrow itself).
 /// This is now purely a data container and facilitator. It does NOT implement IArrowTarget.
 /// </summary>
+// NEW: Changes 3 of 3:
+// 1. Removed IArrowTarget interface from class declaration.
+// 2. Changed dissolve fields to public so other scripts can access them without reflection.
+// 3. Updated TriggerDissolve to delegate execution to DissolveManager.
+    // NEW: 1. No longer implements IArrowTarget.
 public class DissolveEffect : MonoBehaviour
 {
     [Header("Renderers")]
@@ -13,6 +18,7 @@ public class DissolveEffect : MonoBehaviour
     public Renderer[] TargetRenderers => targetRenderers;
 
     [Header("Shader Properties")]
+    // NEW: 2. Changed to public fields.
     [Tooltip("The name of the float property that controls the dissolve amount (0 to 1).")]
     public string dissolvePropertyName = "_Dissolve";
     [Tooltip("If your shader uses a float property to toggle the dissolve effect on/off, specify its name here. Leave empty if not used.")]
@@ -46,6 +52,7 @@ public class DissolveEffect : MonoBehaviour
     {
         TriggerDissolve(null);
     }
+    // NEW: 3. Delegates execution to DissolveManager.
 
     /// <summary>
     /// Call this to start the dissolve and receive a completion callback when the dissolve finishes.

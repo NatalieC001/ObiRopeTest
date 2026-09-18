@@ -8,6 +8,9 @@ using System.Collections.Generic;
 /// Handles instantiating the segments along the spline, maintaining their spacing,
 /// and shrinking/closing gaps smoothly when segments are destroyed.
 /// </summary>
+// NEW: Changes 2 of 2:
+// 1. Updated UpdateSegmentSpacing() to use Rigidbody.MovePosition.
+// 2. Updated TriggerTotalDeath() to read public dissolveDuration directly instead of using Reflection.
 public class SegmentedDragonManager : MonoBehaviour
 {
     [Header("Dragon Anatomy Prefabs")]
@@ -358,6 +361,7 @@ public class SegmentedDragonManager : MonoBehaviour
 
                     Vector3 newPos = Vector3.Lerp(newer.position, older.position, t);
                     Quaternion newRot = Quaternion.Slerp(newer.rotation, older.rotation, t);
+                    // NEW: 1. Moving using physics to prevent arrow tunneling.
                     Rigidbody rb = segment.GetComponent<Rigidbody>();
                     if (rb != null) {
                         rb.MovePosition(newPos);
@@ -485,6 +489,7 @@ public class SegmentedDragonManager : MonoBehaviour
                 DissolveEffect dissolve = segment.GetComponentInChildren<DissolveEffect>();
                 if (dissolve != null)
                 {
+                    // NEW: 2. Directly accessing public property without Reflection.
                     float duration = dissolve.dissolveDuration;
                     if (duration > longestDissolveDuration) longestDissolveDuration = duration;
                 }

@@ -7,6 +7,10 @@ using UnityEngine;
 /// A centralized manager responsible for handling the visual dissolve effect of objects in the scene.
 /// This decouples the visual effect coroutines from the objects being destroyed.
 /// </summary>
+// NEW: Changes 1 of 1:
+// 1. Entirely new class created to act as a decoupled singleton manager for dissolve effects.
+
+    // NEW: 1. This entire class handles coroutines independently of dying objects.
 public class DissolveManager : MonoBehaviour
 {
     private static DissolveManager instance;
