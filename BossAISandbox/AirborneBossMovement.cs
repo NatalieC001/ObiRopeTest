@@ -28,10 +28,13 @@ public class AirborneBossMovement : BaseBossMovement
     [Header("Mode State")]
     public MovementMode currentMode = MovementMode.Spline;
 
+    [Header("Movement Speed")]
+    [Tooltip("The core unified speed the boss flies at, whether on a spline or in freestyle mode.")]
+    public float baseFlightSpeed = 15f;
+
     [Header("Freestyle Tuning")]
     public float bodyUndulationRate = 2f;
     public float coilTightness = 5f;
-    public float glideSpeed = 10f;
     public float minTurnRadius = 3f;
     public float blendDuration = 2f;
 
@@ -126,14 +129,14 @@ public class AirborneBossMovement : BaseBossMovement
 
     private void UpdateFreestyleMode()
     {
-        // Calculate base freestyle speed based on intent
+        // Use unified base speed, with minor multipliers based on the intensity of the action
         switch (currentIntent)
         {
-            case FreestyleIntent.Pursue: freestyleSpeed = 15f; break;
-            case FreestyleIntent.Swoop: freestyleSpeed = 25f; break;
-            case FreestyleIntent.Withdraw: freestyleSpeed = glideSpeed; break;
+            case FreestyleIntent.Pursue: freestyleSpeed = baseFlightSpeed; break;
+            case FreestyleIntent.Swoop: freestyleSpeed = baseFlightSpeed * 1.5f; break;
+            case FreestyleIntent.Withdraw: freestyleSpeed = baseFlightSpeed * 0.8f; break;
             case FreestyleIntent.Stillhold: freestyleSpeed = 0f; break;
-            case FreestyleIntent.Bank: freestyleSpeed = 12f; break;
+            case FreestyleIntent.Bank: freestyleSpeed = baseFlightSpeed * 0.7f; break;
         }
 
         // Apply element slow/freeze multiplier
