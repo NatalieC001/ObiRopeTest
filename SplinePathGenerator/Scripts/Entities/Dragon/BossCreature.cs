@@ -130,8 +130,16 @@ public class BossCreature : MonoBehaviour
                 // Select a random valid observation path
                 initialPath = obsPaths[Random.Range(0, obsPaths.Count)];
 
-                // Force the boss to instantly snap to the start of this path
-                transform.position = initialPath.transform.position;
+                // Snap to the actual first point of the spline, avoiding 0,0,0 if the prefab root is offset
+                Dreamteck.Splines.SplineComputer spline = initialPath.GetComponentInChildren<Dreamteck.Splines.SplineComputer>();
+                if (spline != null)
+                {
+                    transform.position = spline.EvaluatePosition(0.0);
+                }
+                else
+                {
+                    transform.position = initialPath.transform.position;
+                }
 
                 if (movementManager != null)
                 {
@@ -141,7 +149,32 @@ public class BossCreature : MonoBehaviour
             }
             else
             {
-                Debug.LogWarning("[BossCreature] Start: No Airborne Observation paths found in BossPathManager! Spawning freely.");
+                // Fallback: If no airborne paths exist, graciously grab whatever is available to prevent spawning at 0,0,0
+                System.Collections.Generic.List<GameObject> anyPaths = pathManager.GetObservationPaths(PathTypeTag.PathType.Terrestrial);
+                if (anyPaths.Count > 0)
+                {
+                    Debug.LogWarning("[BossCreature] Start: No Airborne Observation paths found! Graciously falling back to a Terrestrial path. Please fix the level configuration.");
+                    initialPath = anyPaths[Random.Range(0, anyPaths.Count)];
+
+                    Dreamteck.Splines.SplineComputer spline = initialPath.GetComponentInChildren<Dreamteck.Splines.SplineComputer>();
+                    if (spline != null)
+                    {
+                        transform.position = spline.EvaluatePosition(0.0);
+                    }
+                    else
+                    {
+                        transform.position = initialPath.transform.position;
+                    }
+
+                    if (movementManager != null)
+                    {
+                        movementManager.RequestReturnToCoil(initialPath);
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning("[BossCreature] Start: No Observation paths of ANY type found in BossPathManager! Spawning freely at 0,0,0.");
+                }
             }
         }
         else
