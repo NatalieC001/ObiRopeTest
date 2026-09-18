@@ -116,7 +116,12 @@ public class BossCreature : MonoBehaviour
         }
     }
 
-    private void Start()
+    private System.Collections.IEnumerator Start()
+    {
+        yield return StartCoroutine(InitializeBossRoutine());
+    }
+
+    private System.Collections.IEnumerator InitializeBossRoutine()
     {
         currentPhase = BossPhase.Orchestrator;
 
@@ -124,6 +129,20 @@ public class BossCreature : MonoBehaviour
         if (pathManager != null)
         {
             // Directly query the scene-level BossPathManager for an Observation path
+
+            // Allow up to 2 seconds for paths to register (resolving WaveSpawner race conditions)
+            float timeout = 2.0f;
+            while (pathManager.GetObservationPaths(PathTypeTag.PathType.Airborne).Count == 0 && pathManager.GetObservationPaths(PathTypeTag.PathType.Terrestrial).Count == 0 && timeout > 0f)
+            {
+                timeout -= Time.deltaTime;
+                yield return null;
+            }
+
+            if (timeout <= 0f)
+            {
+                Debug.LogWarning("[BossCreature] Timed out waiting for Observation paths to register! Level data might be missing them entirely.");
+            }
+
             System.Collections.Generic.List<GameObject> obsPaths = pathManager.GetObservationPaths(PathTypeTag.PathType.Airborne);
             if (obsPaths.Count > 0)
             {
