@@ -5,10 +5,30 @@ using UnityEngine;
 /// It monitors health and battle state, and commands the TacticalBossSplineManager
 /// to make intelligent evasion choices (like jumping to escape splines) when threatened.
 /// </summary>
-[RequireComponent(typeof(TacticalBossSplineManager))]
+[RequireComponent(typeof(AirborneBossMovement))]
 public class BossCreature : MonoBehaviour
 {
-    [System.Serializable]
+
+    private BossEventBus eventBus;
+    private DesireEvaluator desireEvaluator;
+    private EnvironmentTagRegistry tagRegistry;
+    private AirborneBossMovement movementManager;
+    private ElementalBreathController breathController;
+    private MinionRequestBroker requestBroker;
+    private RegeneratorController regenerator;
+    private CreatureStatusEffects statusEffects;
+
+
+    private float decisionTimer = 0f;
+    private const float decisionTickRate = 1f;
+
+    public HealthCrystal LastThreatenedCrystal { get; private set; }
+    private float crystalThreatTimeout = 0f;
+
+    // Track minion power deduction
+    public int lostMinionCount = 0;
+
+[System.Serializable]
     public struct ElementalModifier
     {
         public ElementTypeOB7 arrowType;
@@ -47,8 +67,8 @@ public class BossCreature : MonoBehaviour
     public float staminaRechargeRate = 15f;
     private float currentStamina;
 
-    private TacticalBossSplineManager tacticalManager;
-    private CreatureStatusEffects statusEffects;
+
+
     private float recentDamageAccumulator = 0f;
     private float damageDecayTimer = 0f;
 
@@ -57,10 +77,39 @@ public class BossCreature : MonoBehaviour
 
     private void Awake()
     {
-        tacticalManager = GetComponent<TacticalBossSplineManager>();
+        movementManager = GetComponent<AirborneBossMovement>();
+        breathController = GetComponent<ElementalBreathController>();
+        regenerator = GetComponent<RegeneratorController>();
         statusEffects = GetComponent<CreatureStatusEffects>();
+
+        requestBroker = FindFirstObjectByType<MinionRequestBroker>();
+        eventBus = FindFirstObjectByType<BossEventBus>();
+        desireEvaluator = FindFirstObjectByType<DesireEvaluator>();
+        tagRegistry = FindFirstObjectByType<EnvironmentTagRegistry>();
+
+        if (eventBus != null)
+        {
+            eventBus.OnBossDamaged += OnBossDamagedInterrupt;
+            eventBus.OnCrystalDamaged += OnCrystalDamagedInterrupt;
+            eventBus.OnCrystalDestroyed += OnCrystalDestroyedInterrupt;
+            eventBus.OnBossMinionDied += OnMinionDiedInterrupt;
+            eventBus.OnBossStatusEnded += OnStatusEndedInterrupt;
+        }
+
         currentHealth = maxHealth;
         currentStamina = maxStamina;
+    }
+
+    private void OnDestroy()
+    {
+        if (eventBus != null)
+        {
+            eventBus.OnBossDamaged -= OnBossDamagedInterrupt;
+            eventBus.OnCrystalDamaged -= OnCrystalDamagedInterrupt;
+            eventBus.OnCrystalDestroyed -= OnCrystalDestroyedInterrupt;
+            eventBus.OnBossMinionDied -= OnMinionDiedInterrupt;
+            eventBus.OnBossStatusEnded -= OnStatusEndedInterrupt;
+        }
     }
 
     private void Start()
@@ -104,7 +153,6 @@ public class BossCreature : MonoBehaviour
             Debug.LogError("[BossCreature] BossArenaManager is missing an Observation Spline! The dragon has no track to spawn on!");
         }
 
-        tacticalManager.InitializeRoutes(arena.observationSpline, arena.tacticalEscapeRoutes);
 
         // Also ensure the visual dragon body is spawned and attached to the starting track
         SegmentedDragonManager dragonBody = GetComponent<SegmentedDragonManager>();
@@ -126,19 +174,36 @@ public class BossCreature : MonoBehaviour
         Debug.Log("<color=magenta>[BossCreature] Phase 2: Dragon attacking player!</color>");
 
         // Unhook from the spline so the dragon can freestyle toward the player
-        if (tacticalManager != null)
+        if (movementManager != null)
         {
             GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
             if (playerObj != null)
             {
-                tacticalManager.StartFreestylePursuit(playerObj.transform);
+                            if (playerObj != null)
+            {
+                if (movementManager != null) movementManager.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Pursue, playerObj.transform.position);
+            }
             }
         }
     }
 
     private void Update()
     {
-        // Handle Phase 2 Stamina Drain
+
+        if (crystalThreatTimeout > 0f)
+        {
+            crystalThreatTimeout -= Time.deltaTime;
+            if (crystalThreatTimeout <= 0f) LastThreatenedCrystal = null;
+        }
+
+        decisionTimer -= Time.deltaTime;
+        if (decisionTimer <= 0f)
+        {
+            decisionTimer = decisionTickRate;
+            EvaluateDesires();
+        }
+
+// Handle Phase 2 Stamina Drain
         if (currentPhase == BossPhase.Engaged)
         {
             currentStamina -= staminaDrainRate * Time.deltaTime;
@@ -147,13 +212,13 @@ public class BossCreature : MonoBehaviour
                 currentStamina = 0;
                 EnterExhaustedPhase();
             }
-            else if (tacticalManager != null)
+            else if (movementManager != null)
             {
                 // Let the tactical manager handle the freestyle movement
                 GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
                 if (playerObj != null)
                 {
-                    tacticalManager.UpdateFreestylePursuit(playerObj.transform);
+                    if (movementManager != null) movementManager.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Pursue, playerObj.transform.position);
                 }
             }
         }
@@ -192,7 +257,7 @@ public class BossCreature : MonoBehaviour
         if (maxStamina < 20f) maxStamina = 20f; // Minimum stamina floor so it can still fight briefly
 
         // Command the manager to flee through environmental splines
-        tacticalManager.StartEvasionRoutine();
+        // movementManager.ForceImmediateEvasion();
     }
 
     /// <summary>
@@ -212,8 +277,7 @@ public class BossCreature : MonoBehaviour
     /// </summary>
     public void ForceImmediateEvasion()
     {
-        if (tacticalManager == null) tacticalManager = GetComponent<TacticalBossSplineManager>();
-        if (tacticalManager == null)
+        if (movementManager == null)
         {
             Debug.LogWarning("[BossCreature] ForceImmediateEvasion called but TacticalBossSplineManager not found.");
             return;
@@ -228,7 +292,7 @@ public class BossCreature : MonoBehaviour
         }
 
         // Trigger the evasion routine on the tactical manager (this will use the configured escape splines)
-        tacticalManager.EvadeToEscapeRoute();
+        movementManager.ForceImmediateEvasion();
 
         // Reset accumulators so we don't re-trigger immediately
         recentDamageAccumulator = 0f;
@@ -241,6 +305,85 @@ public class BossCreature : MonoBehaviour
     /// <summary>
     /// Called when the player shoots the boss.
     /// </summary>
+
+    public void EvaluateDesires()
+    {
+        if (desireEvaluator == null || tagRegistry == null) return;
+
+        DesireResult result = desireEvaluator.Evaluate(this, tagRegistry);
+
+        if (movementManager != null)
+        {
+            if (result.StrongestDesire == DesireType.CrystalDefense && LastThreatenedCrystal != null)
+            {
+                EnvironmentTag loop = tagRegistry.GetNearestTag(LastThreatenedCrystal.transform.position, EnvironmentTag.TagType.ObservationLoop);
+                if (loop != null)
+                {
+                    movementManager.RequestReturnToCoil(loop.gameObject);
+                }
+
+                if (breathController != null)
+                {
+                    breathController.FireBreath(BreathType.Fire, result.TargetPosition);
+                }
+
+                if (requestBroker != null)
+                {
+                    requestBroker.RequestMinions(SpawnIntent.DefendCrystal, LastThreatenedCrystal.transform.position);
+                }
+            }
+            else if (result.StrongestDesire == DesireType.Regeneration)
+            {
+                if (regenerator != null && result.TargetTransform != null)
+                {
+                    HealthCrystal crystal = result.TargetTransform.GetComponentInParent<HealthCrystal>();
+                    if (crystal != null)
+                    {
+                        regenerator.BeginRegeneration(crystal);
+                    }
+                }
+            }
+            else if (result.StrongestDesire == DesireType.Survival)
+            {
+                movementManager.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Withdraw, transform.position + Vector3.up * 30f);
+            }
+        }
+    }
+
+    private void OnBossDamagedInterrupt(BossCreature boss, ElementTypeOB7 type)
+    {
+        if (boss == this) EvaluateDesires();
+    }
+
+    private void OnCrystalDamagedInterrupt(HealthCrystal crystal)
+    {
+        LastThreatenedCrystal = crystal;
+        crystalThreatTimeout = 5f;
+        EvaluateDesires();
+    }
+
+    private void OnCrystalDestroyedInterrupt(HealthCrystal crystal)
+    {
+        if (LastThreatenedCrystal == crystal) LastThreatenedCrystal = null;
+        EvaluateDesires();
+    }
+
+    private void OnMinionDiedInterrupt(GameObject minion)
+    {
+        lostMinionCount++;
+        EvaluateDesires();
+    }
+
+    private void OnStatusEndedInterrupt()
+    {
+        EvaluateDesires();
+    }
+
+    public float GetCurrentHealthPct()
+    {
+        return maxHealth > 0 ? currentHealth / maxHealth : 0f;
+    }
+
     public void TakeDamage(float baseAmount, Vector3 hitPoint, ElementTypeOB7 arrowType = ElementTypeOB7.Normal)
     {
         // 0. Trigger Status Effects (Slows, Freezes)
@@ -248,6 +391,8 @@ public class BossCreature : MonoBehaviour
         {
             statusEffects.ApplyElementalEffect(arrowType);
         }
+
+        if (eventBus != null) eventBus.TriggerBossDamaged(this, arrowType);
 
         // 1. Calculate actual damage based on elemental weaknesses/resistances
         float actualDamage = baseAmount;
@@ -312,7 +457,7 @@ public class BossCreature : MonoBehaviour
             Debug.Log("<color=red>[BossCreature] Threat level high! Ordering tactical evasion.</color>");
 
             // Command the manager to jump to an environmental spline
-            tacticalManager.EvadeToEscapeRoute();
+            movementManager.ForceImmediateEvasion();
 
             // Reset accumulator so it doesn't immediately evade again
             recentDamageAccumulator = 0f;
@@ -324,7 +469,7 @@ public class BossCreature : MonoBehaviour
         Debug.Log("<color=red>[BossCreature] The Boss has been defeated!</color>");
 
         // Stop movement
-        tacticalManager.enabled = false;
+        if (movementManager != null) movementManager.enabled = false;
 
         // Command all indestructible pieces (Head, Legs, Tail) to dissolve
         SegmentedDragonManager dragonBody = GetComponent<SegmentedDragonManager>();
