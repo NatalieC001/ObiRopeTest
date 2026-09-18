@@ -96,15 +96,33 @@ public class AirborneBossMovement : BaseBossMovement
 
     private void UpdateTetherStruggle()
     {
-        // Continuously update the struggle target so the dragon keeps fighting dynamically.
-        // It will actively try to pursue the player, creating tension on the rope while
-        // aggressively facing the player.
+        // Calculate the struggle point dynamically based on the boss's mental state (Phase/Health)
         GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
 
-        if (playerObj != null)
+        if (playerObj != null && bossBrain != null)
         {
-            // Aggressively try to eat the player while chained!
-            freestyleTargetPosition = playerObj.transform.position;
+            Vector3 playerPos = playerObj.transform.position;
+            Vector3 toPlayer = (playerPos - transform.position).normalized;
+
+            // Panicking: Low health or rapidly damaged
+            if (bossBrain.currentPhase == BossCreature.BossPhase.Exhausted || bossBrain.GetCurrentHealthPct() < 0.25f)
+            {
+                // Thrash away and upward to snap the rope tight
+                freestyleTargetPosition = transform.position - toPlayer * 6f + Vector3.up * 4f;
+            }
+            // Aggressive: Healthy and ready to fight
+            else if (bossBrain.currentPhase == BossCreature.BossPhase.Engaged)
+            {
+                // Dive at the player
+                freestyleTargetPosition = playerPos + toPlayer * -2f + Vector3.up * 1.5f;
+            }
+            // Orchestrating / Recharging
+            else
+            {
+                // Climb and circle to build tension in the rope, keeping distance
+                Vector3 side = Vector3.Cross(toPlayer, Vector3.up);
+                freestyleTargetPosition = transform.position + side * 7f + Vector3.up * 6f - toPlayer * 2f;
+            }
         }
         else
         {
@@ -247,7 +265,19 @@ public class AirborneBossMovement : BaseBossMovement
         else
         {
             Debug.LogWarning($"[{gameObject.name}] Tried to evade, but no Airborne escape routes were found!");
-            RequestFreestyleIntent(FreestyleIntent.Withdraw, transform.position + Vector3.up * 50f);
+
+            // Withdraw gracefully using the player's position to angle away
+            GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+            if (playerObj != null)
+            {
+                Vector3 awayFromPlayer = (transform.position - playerObj.transform.position).normalized;
+                awayFromPlayer.y = 0; // Keep evasion horizontal
+                RequestFreestyleIntent(FreestyleIntent.Withdraw, transform.position + awayFromPlayer * 30f + Vector3.up * 20f);
+            }
+            else
+            {
+                RequestFreestyleIntent(FreestyleIntent.Withdraw, transform.position + transform.forward * 30f + Vector3.up * 20f);
+            }
         }
     }
 

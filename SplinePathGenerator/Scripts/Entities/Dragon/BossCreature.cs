@@ -67,7 +67,13 @@ public class BossCreature : MonoBehaviour
     public float staminaRechargeRate = 15f;
     private float currentStamina;
 
+    // Injected by WaveSpawner to explicitly report Boss death progression
+    private WaveSpawner waveSpawner;
 
+    public void Initialize(WaveSpawner spawner)
+    {
+        waveSpawner = spawner;
+    }
 
     private float recentDamageAccumulator = 0f;
     private float damageDecayTimer = 0f;
@@ -338,7 +344,17 @@ public class BossCreature : MonoBehaviour
             }
             else if (result.StrongestDesire == DesireType.Survival)
             {
-                movementManager.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Withdraw, transform.position + Vector3.up * 30f);
+                GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+                if (playerObj != null)
+                {
+                    Vector3 awayFromPlayer = (transform.position - playerObj.transform.position).normalized;
+                    awayFromPlayer.y = 0;
+                    movementManager.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Withdraw, transform.position + awayFromPlayer * 30f + Vector3.up * 20f);
+                }
+                else
+                {
+                    movementManager.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Withdraw, transform.position + Vector3.up * 30f);
+                }
             }
         }
     }
@@ -460,6 +476,27 @@ public class BossCreature : MonoBehaviour
     private void Die()
     {
         Debug.Log("<color=red>[BossCreature] The Boss has been defeated!</color>");
+
+        // Ping the injected WaveSpawner so the level progression can cleanly move to Victory.
+        // Fall back to a scene search if the boss was manually placed (not spawned via WaveSpawner).
+        WaveSpawner spawnerToNotify = waveSpawner;
+        if (spawnerToNotify == null)
+        {
+            spawnerToNotify = FindFirstObjectByType<WaveSpawner>();
+            if (spawnerToNotify != null)
+            {
+                Debug.Log("[BossCreature] WaveSpawner not injected — found it via scene search.");
+            }
+        }
+
+        if (spawnerToNotify != null)
+        {
+            spawnerToNotify.NotifyTargetDestroyed();
+        }
+        else
+        {
+            Debug.LogWarning("[BossCreature] No WaveSpawner found — level progression cannot advance after boss death!");
+        }
 
         // Stop movement
         if (movementManager != null) movementManager.enabled = false;
