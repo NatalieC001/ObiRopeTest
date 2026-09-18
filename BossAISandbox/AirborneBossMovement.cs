@@ -37,6 +37,12 @@ public class AirborneBossMovement : BaseBossMovement
     public float coilTightness = 5f;
     public float minTurnRadius = 3f;
 
+    [Header("Tether Struggle Setup")]
+    [Tooltip("The local offset direction the dragon tries to pull when tethered (e.g. up and away).")]
+    public Vector3 tetherStruggleDirection = new Vector3(0f, 5f, 5f);
+    [Tooltip("How far the dragon tries to push past the anchor point to create tension.")]
+    public float tetherStruggleDistance = 15f;
+
     private SplineFollower splineFollower;
     private CreatureStatusEffects statusEffects;
     private GameObject currentActivePath;
@@ -83,7 +89,21 @@ public class AirborneBossMovement : BaseBossMovement
 
         if (isTethered)
         {
+            UpdateTetherStruggle();
             ApplyTetherRubberBand();
+        }
+    }
+
+    private void UpdateTetherStruggle()
+    {
+        // Continuously update the struggle target so the dragon keeps fighting dynamically,
+        // rather than arriving at the initial point and stopping.
+        SegmentedDragonManager dragonManager = GetComponent<SegmentedDragonManager>();
+        if (dragonManager != null && dragonManager.TetherAnchorTransform != null)
+        {
+            // Try to pull away from the anchor point based on the configured direction
+            Vector3 worldStruggleDirection = transform.TransformDirection(tetherStruggleDirection.normalized);
+            freestyleTargetPosition = dragonManager.TetherAnchorTransform.position + (worldStruggleDirection * tetherStruggleDistance);
         }
     }
 
@@ -224,8 +244,12 @@ public class AirborneBossMovement : BaseBossMovement
     {
         base.HandleTetherAttached();
 
+        // Convert the configurable local struggle direction into world space based on the dragon's current orientation
+        Vector3 worldStruggleDirection = transform.TransformDirection(tetherStruggleDirection.normalized);
+        Vector3 struggleTarget = transform.position + (worldStruggleDirection * tetherStruggleDistance);
+
         // Force into freestyle mode so the boss actively wrestles/struggles rather than rigidly following a spline
-        RequestFreestyleIntent(FreestyleIntent.Pursue, transform.position + transform.forward * 5f + Vector3.up * 5f);
+        RequestFreestyleIntent(FreestyleIntent.Pursue, struggleTarget);
     }
 
     private void ApplyTetherRubberBand()
