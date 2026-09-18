@@ -17,7 +17,7 @@ public class BossCreature : MonoBehaviour
     private MinionRequestBroker requestBroker;
     private RegeneratorController regenerator;
     private CreatureStatusEffects statusEffects;
-
+    private BossPathManager pathManager;
 
     private float decisionTimer = 0f;
     private const float decisionTickRate = 1f;
@@ -28,7 +28,7 @@ public class BossCreature : MonoBehaviour
     // Track minion power deduction
     public int lostMinionCount = 0;
 
-[System.Serializable]
+    [System.Serializable]
     public struct ElementalModifier
     {
         public ElementTypeOB7 arrowType;
@@ -67,13 +67,16 @@ public class BossCreature : MonoBehaviour
     public float staminaRechargeRate = 15f;
     private float currentStamina;
 
+    // Injected by WaveSpawner to explicitly report Boss death progression
+    private WaveSpawner waveSpawner;
 
+    public void Initialize(WaveSpawner spawner)
+    {
+        waveSpawner = spawner;
+    }
 
     private float recentDamageAccumulator = 0f;
     private float damageDecayTimer = 0f;
-
-    // Used to track if the TrainingLevelManager properly initialized us, or if we were manually dragged into the scene for testing.
-    private bool isInitialized = false;
 
     private void Awake()
     {
@@ -86,6 +89,7 @@ public class BossCreature : MonoBehaviour
         eventBus = FindFirstObjectByType<BossEventBus>();
         desireEvaluator = FindFirstObjectByType<DesireEvaluator>();
         tagRegistry = FindFirstObjectByType<EnvironmentTagRegistry>();
+        pathManager = FindFirstObjectByType<BossPathManager>();
 
         if (eventBus != null)
         {
@@ -112,55 +116,102 @@ public class BossCreature : MonoBehaviour
         }
     }
 
-    private void Start()
+    private System.Collections.IEnumerator Start()
     {
-        // If we were manually dragged into the scene for testing, we won't be initialized by the Level Manager.
-        // Let's self-register with the Arena Manager so we can generate our body and test!
-        if (!isInitialized)
+        yield return StartCoroutine(InitializeBossRoutine());
+    }
+
+    private System.Collections.IEnumerator InitializeBossRoutine()
+    {
+        currentPhase = BossPhase.Orchestrator;
+
+        GameObject initialPath = null;
+        if (pathManager != null)
         {
-            BossArenaManager arena = FindAnyObjectByType<BossArenaManager>();
-            if (arena != null)
+            // Directly query the scene-level BossPathManager for an Observation path
+
+            // Allow up to 2 seconds for paths to register (resolving WaveSpawner race conditions)
+            float timeout = 2.0f;
+            while (pathManager.GetObservationPaths(PathTypeTag.PathType.Airborne).Count == 0 && pathManager.GetObservationPaths(PathTypeTag.PathType.Terrestrial).Count == 0 && timeout > 0f)
             {
-                Debug.Log("<color=yellow>[BossCreature] Self-registering for Editor Testing mode!</color>");
-                arena.RegisterStrayBoss(this);
+                timeout -= Time.deltaTime;
+                yield return null;
+            }
+
+            if (timeout <= 0f)
+            {
+                Debug.LogWarning("[BossCreature] Timed out waiting for Observation paths to register! Level data might be missing them entirely.");
+            }
+
+            System.Collections.Generic.List<GameObject> obsPaths = pathManager.GetObservationPaths(PathTypeTag.PathType.Airborne);
+            if (obsPaths.Count > 0)
+            {
+                // Select a random valid observation path
+                initialPath = obsPaths[Random.Range(0, obsPaths.Count)];
+
+                // Snap to the actual first point of the spline, avoiding 0,0,0 if the prefab root is offset
+                Dreamteck.Splines.SplineComputer spline = initialPath.GetComponentInChildren<Dreamteck.Splines.SplineComputer>();
+                if (spline != null)
+                {
+                    transform.position = spline.EvaluatePosition(0.0);
+                }
+                else
+                {
+                    transform.position = initialPath.transform.position;
+                }
+
+                if (movementManager != null)
+                {
+                    // Instruct the movement manager to begin following it
+                    movementManager.RequestReturnToCoil(initialPath);
+                }
             }
             else
             {
-                Debug.LogError("[BossCreature] Dragged into scene for testing, but no BossArenaManager found to provide tracks!");
-
-                // Fallback: If there's no Arena Manager, at least try to spawn the body parts using the component's own transform as a dummy track.
-                SegmentedDragonManager dragonBody = GetComponent<SegmentedDragonManager>();
-                if (dragonBody != null)
+                // Fallback: If no airborne paths exist, graciously grab whatever is available to prevent spawning at 0,0,0
+                System.Collections.Generic.List<GameObject> anyPaths = pathManager.GetObservationPaths(PathTypeTag.PathType.Terrestrial);
+                if (anyPaths.Count > 0)
                 {
-                    Debug.LogWarning("[BossCreature] Attempting to initialize Dragon Body without a track just to show anatomy...");
-                    dragonBody.InitializeDragon(null);
+                    Debug.LogWarning("[BossCreature] Start: No Airborne Observation paths found! Graciously falling back to a Terrestrial path. Please fix the level configuration.");
+                    initialPath = anyPaths[Random.Range(0, anyPaths.Count)];
+
+                    Dreamteck.Splines.SplineComputer spline = initialPath.GetComponentInChildren<Dreamteck.Splines.SplineComputer>();
+                    if (spline != null)
+                    {
+                        transform.position = spline.EvaluatePosition(0.0);
+                    }
+                    else
+                    {
+                        transform.position = initialPath.transform.position;
+                    }
+
+                    if (movementManager != null)
+                    {
+                        movementManager.RequestReturnToCoil(initialPath);
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning("[BossCreature] Start: No Observation paths of ANY type found in BossPathManager! Spawning freely at 0,0,0.");
                 }
             }
         }
-    }
-
-    /// <summary>
-    /// Called by the BossArenaManager when the boss is spawned.
-    /// Injects the scene's environmental splines.
-    /// </summary>
-    public void InitializeArena(BossArenaManager arena)
-    {
-        isInitialized = true;
-        currentPhase = BossPhase.Orchestrator;
-
-        if (arena.observationSpline == null)
+        else
         {
-            Debug.LogError("[BossCreature] BossArenaManager is missing an Observation Spline! The dragon has no track to spawn on!");
+            Debug.LogError("[BossCreature] Start: BossPathManager is missing from the scene!");
         }
 
-
-        // Also ensure the visual dragon body is spawned and attached to the starting track
+        // Spawn anatomy
         SegmentedDragonManager dragonBody = GetComponent<SegmentedDragonManager>();
         if (dragonBody != null)
         {
-            Debug.Log("[BossCreature] Instructing SegmentedDragonManager to spawn anatomy...");
-            dragonBody.InitializeDragon(arena.observationSpline);
+            Dreamteck.Splines.SplineComputer startingSpline = initialPath != null ? initialPath.GetComponentInChildren<Dreamteck.Splines.SplineComputer>() : null;
+            Debug.Log($"[BossCreature] Instructing SegmentedDragonManager to spawn anatomy. Initial spline: {(startingSpline != null ? startingSpline.name : "none")}");
+            dragonBody.InitializeDragon(startingSpline);
         }
+
+        // Give the evaluator time to think, ensuring its first state matches what it wants to do!
+        EvaluateDesires();
     }
 
     /// <summary>
@@ -179,10 +230,10 @@ public class BossCreature : MonoBehaviour
             GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
             if (playerObj != null)
             {
-                            if (playerObj != null)
-            {
-                if (movementManager != null) movementManager.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Pursue, playerObj.transform.position);
-            }
+                if (playerObj != null)
+                {
+                    if (movementManager != null) movementManager.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Pursue, playerObj.transform.position);
+                }
             }
         }
     }
@@ -203,7 +254,7 @@ public class BossCreature : MonoBehaviour
             EvaluateDesires();
         }
 
-// Handle Phase 2 Stamina Drain
+        // Handle Phase 2 Stamina Drain
         if (currentPhase == BossPhase.Engaged)
         {
             currentStamina -= staminaDrainRate * Time.deltaTime;
@@ -345,7 +396,17 @@ public class BossCreature : MonoBehaviour
             }
             else if (result.StrongestDesire == DesireType.Survival)
             {
-                movementManager.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Withdraw, transform.position + Vector3.up * 30f);
+                GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+                if (playerObj != null)
+                {
+                    Vector3 awayFromPlayer = (transform.position - playerObj.transform.position).normalized;
+                    awayFromPlayer.y = 0;
+                    movementManager.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Withdraw, transform.position + awayFromPlayer * 30f + Vector3.up * 20f);
+                }
+                else
+                {
+                    movementManager.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Withdraw, transform.position + Vector3.up * 30f);
+                }
             }
         }
     }
@@ -467,6 +528,27 @@ public class BossCreature : MonoBehaviour
     private void Die()
     {
         Debug.Log("<color=red>[BossCreature] The Boss has been defeated!</color>");
+
+        // Ping the injected WaveSpawner so the level progression can cleanly move to Victory.
+        // Fall back to a scene search if the boss was manually placed (not spawned via WaveSpawner).
+        WaveSpawner spawnerToNotify = waveSpawner;
+        if (spawnerToNotify == null)
+        {
+            spawnerToNotify = FindFirstObjectByType<WaveSpawner>();
+            if (spawnerToNotify != null)
+            {
+                Debug.Log("[BossCreature] WaveSpawner not injected — found it via scene search.");
+            }
+        }
+
+        if (spawnerToNotify != null)
+        {
+            spawnerToNotify.NotifyTargetDestroyed();
+        }
+        else
+        {
+            Debug.LogWarning("[BossCreature] No WaveSpawner found — level progression cannot advance after boss death!");
+        }
 
         // Stop movement
         if (movementManager != null) movementManager.enabled = false;
