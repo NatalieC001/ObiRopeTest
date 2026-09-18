@@ -58,12 +58,6 @@ public class AirborneBossMovement : BaseBossMovement
 
     protected override void TickMovement()
     {
-        if (isTethered)
-        {
-            ApplyTetherRubberBand();
-            return;
-        }
-
         // Apply global speed multiplier from Status Effects
         if (statusEffects != null)
         {
@@ -81,6 +75,11 @@ public class AirborneBossMovement : BaseBossMovement
             case MovementMode.BlendingToSpline:
                 UpdateBlendingMode();
                 break;
+        }
+
+        if (isTethered)
+        {
+            ApplyTetherRubberBand();
         }
     }
 
@@ -203,8 +202,30 @@ public class AirborneBossMovement : BaseBossMovement
         }
     }
 
+    public override void HandleTetherAttached()
+    {
+        base.HandleTetherAttached();
+
+        // Force into freestyle mode so the boss actively wrestles/struggles rather than rigidly following a spline
+        RequestFreestyleIntent(FreestyleIntent.Pursue, transform.position + transform.forward * 5f + Vector3.up * 5f);
+    }
+
     private void ApplyTetherRubberBand()
     {
         // Limit flight to tether radius.
+        SegmentedDragonManager dragonManager = GetComponent<SegmentedDragonManager>();
+        if (dragonManager != null && dragonManager.IsTethered && dragonManager.TetherAnchorTransform != null)
+        {
+            Vector3 anchorPos = dragonManager.TetherAnchorTransform.position;
+            float maxRadius = dragonManager.TetherMaxLength;
+
+            float distanceToAnchor = Vector3.Distance(transform.position, anchorPos);
+            if (distanceToAnchor > maxRadius && maxRadius > 0f)
+            {
+                // Clamp the root object's position so it can't stretch past the chain length
+                Vector3 directionFromAnchor = (transform.position - anchorPos).normalized;
+                transform.position = anchorPos + directionFromAnchor * maxRadius;
+            }
+        }
     }
 }
