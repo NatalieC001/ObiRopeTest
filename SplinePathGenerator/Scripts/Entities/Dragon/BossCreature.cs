@@ -72,9 +72,6 @@ public class BossCreature : MonoBehaviour
     private float recentDamageAccumulator = 0f;
     private float damageDecayTimer = 0f;
 
-    // Used to track if the TrainingLevelManager properly initialized us, or if we were manually dragged into the scene for testing.
-    private bool isInitialized = false;
-
     private void Awake()
     {
         movementManager = GetComponent<AirborneBossMovement>();
@@ -114,53 +111,38 @@ public class BossCreature : MonoBehaviour
 
     private void Start()
     {
-        // If we were manually dragged into the scene for testing, we won't be initialized by the Level Manager.
-        // Let's self-register with the Arena Manager so we can generate our body and test!
-        if (!isInitialized)
+        currentPhase = BossPhase.Orchestrator;
+
+        GameObject initialPath = null;
+        if (movementManager != null)
         {
-            BossArenaManager arena = FindAnyObjectByType<BossArenaManager>();
-            if (arena != null)
+            // At the start of the level, the boss asks the manager for an Observation path to orbit on
+            initialPath = movementManager.GetObservationPath(PathTypeTag.PathType.Airborne);
+            if (initialPath != null)
             {
-                Debug.Log("<color=yellow>[BossCreature] Self-registering for Editor Testing mode!</color>");
-                arena.RegisterStrayBoss(this);
+                // Force the boss to instantly snap to the start of this path
+                transform.position = initialPath.transform.position;
+
+                // Instruct the movement manager to begin following it
+                movementManager.RequestReturnToCoil(initialPath);
             }
             else
             {
-                Debug.LogError("[BossCreature] Dragged into scene for testing, but no BossArenaManager found to provide tracks!");
-
-                // Fallback: If there's no Arena Manager, at least try to spawn the body parts using the component's own transform as a dummy track.
-                SegmentedDragonManager dragonBody = GetComponent<SegmentedDragonManager>();
-                if (dragonBody != null)
-                {
-                    Debug.LogWarning("[BossCreature] Attempting to initialize Dragon Body without a track just to show anatomy...");
-                    dragonBody.InitializeDragon(null);
-                }
+                Debug.LogWarning("[BossCreature] Start: No Airborne Observation paths found in BossPathManager! Spawning freely.");
             }
         }
-    }
 
-    /// <summary>
-    /// Called by the BossArenaManager when the boss is spawned.
-    /// Injects the scene's environmental splines.
-    /// </summary>
-    public void InitializeArena(BossArenaManager arena)
-    {
-        isInitialized = true;
-        currentPhase = BossPhase.Orchestrator;
-
-        if (arena.observationSpline == null)
-        {
-            Debug.LogError("[BossCreature] BossArenaManager is missing an Observation Spline! The dragon has no track to spawn on!");
-        }
-
-
-        // Also ensure the visual dragon body is spawned and attached to the starting track
+        // Spawn anatomy
         SegmentedDragonManager dragonBody = GetComponent<SegmentedDragonManager>();
         if (dragonBody != null)
         {
-            Debug.Log("[BossCreature] Instructing SegmentedDragonManager to spawn anatomy...");
-            dragonBody.InitializeDragon(arena.observationSpline);
+            Dreamteck.Splines.SplineComputer startingSpline = initialPath != null ? initialPath.GetComponentInChildren<Dreamteck.Splines.SplineComputer>() : null;
+            Debug.Log($"[BossCreature] Instructing SegmentedDragonManager to spawn anatomy. Initial spline: {(startingSpline != null ? startingSpline.name : "none")}");
+            dragonBody.InitializeDragon(startingSpline);
         }
+
+        // Give the evaluator time to think, ensuring its first state matches what it wants to do!
+        EvaluateDesires();
     }
 
     /// <summary>
