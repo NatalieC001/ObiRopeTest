@@ -30,7 +30,7 @@ public class AirborneBossMovement : BaseBossMovement
 
     [Header("Movement Speed")]
     [Tooltip("The core unified speed the boss flies at, whether on a spline or in freestyle mode.")]
-    public float baseFlightSpeed = 15f;
+    public float baseFlightSpeed = 3f;
 
     [Header("Freestyle Tuning")]
     public float bodyUndulationRate = 2f;
@@ -53,8 +53,9 @@ public class AirborneBossMovement : BaseBossMovement
     private float freestyleSpeed;
     private float currentSpeedMultiplier = 1f;
 
-    protected virtual void Awake()
+    protected override void Awake()
     {
+        base.Awake(); // Assuming BaseBossMovement has Awake
         splineFollower = GetComponent<SplineFollower>();
         statusEffects = GetComponent<CreatureStatusEffects>();
     }
@@ -123,7 +124,8 @@ public class AirborneBossMovement : BaseBossMovement
         if (splineFollower != null)
         {
             splineFollower.follow = true;
-            splineFollower.followSpeed = splineFollower.followSpeed * currentSpeedMultiplier; // Modified by stasis/ice
+            // Unify the spline speed with the exposed baseFlightSpeed
+            splineFollower.followSpeed = baseFlightSpeed * currentSpeedMultiplier; // Modified by stasis/ice
         }
     }
 

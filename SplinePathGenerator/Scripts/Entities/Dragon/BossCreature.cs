@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>NEEEEEWW
 /// The 'Brain' for an advanced Boss creature.
-/// It monitors health and battle state, and commands the AirborneBossMovement
+/// It monitors health and battle state, and commands the TacticalBossSplineManager
 /// to make intelligent evasion choices (like jumping to escape splines) when threatened.
 /// </summary>
 [RequireComponent(typeof(AirborneBossMovement))]
@@ -28,7 +28,7 @@ public class BossCreature : MonoBehaviour
     // Track minion power deduction
     public int lostMinionCount = 0;
 
-    [System.Serializable]
+[System.Serializable]
     public struct ElementalModifier
     {
         public ElementTypeOB7 arrowType;
@@ -67,11 +67,13 @@ public class BossCreature : MonoBehaviour
     public float staminaRechargeRate = 15f;
     private float currentStamina;
 
-    // Injected by WaveSpawner to explicitly report Boss death progression
-    private WaveSpawner waveSpawner;
+
 
     private float recentDamageAccumulator = 0f;
     private float damageDecayTimer = 0f;
+
+    // Used to track if the TrainingLevelManager properly initialized us, or if we were manually dragged into the scene for testing.
+    private bool isInitialized = false;
 
     private void Awake()
     {
@@ -112,35 +114,63 @@ public class BossCreature : MonoBehaviour
 
     private void Start()
     {
-        // Boss anatomy spawns cleanly at root. It doesn't need to be forced onto a track immediately!
-        SegmentedDragonManager dragonBody = GetComponent<SegmentedDragonManager>();
-        if (dragonBody != null)
+        // If we were manually dragged into the scene for testing, we won't be initialized by the Level Manager.
+        // Let's self-register with the Arena Manager so we can generate our body and test!
+        if (!isInitialized)
         {
-            // Try to get the SplineComputer already assigned to this root's SplineFollower.
-            // AirborneBossMovement.Start() will assign it in the same frame or next frame;
-            // passing null here is safe — SegmentedDragonManager handles null gracefully by
-            // placing all segments at the root spawn position until the spline is provided via SwitchToNewSpline().
-            Dreamteck.Splines.SplineFollower rootFollower = GetComponent<Dreamteck.Splines.SplineFollower>();
-            Dreamteck.Splines.SplineComputer initialSpline = rootFollower != null ? rootFollower.spline : null;
+            BossArenaManager arena = FindAnyObjectByType<BossArenaManager>();
+            if (arena != null)
+            {
+                Debug.Log("<color=yellow>[BossCreature] Self-registering for Editor Testing mode!</color>");
+                arena.RegisterStrayBoss(this);
+            }
+            else
+            {
+                Debug.LogError("[BossCreature] Dragged into scene for testing, but no BossArenaManager found to provide tracks!");
 
-            Debug.Log($"[BossCreature] Instructing SegmentedDragonManager to spawn anatomy. Initial spline: {(initialSpline != null ? initialSpline.name : "none — segments will cluster at spawn position until first path is assigned")}");
-            dragonBody.InitializeDragon(initialSpline);
+                // Fallback: If there's no Arena Manager, at least try to spawn the body parts using the component's own transform as a dummy track.
+                SegmentedDragonManager dragonBody = GetComponent<SegmentedDragonManager>();
+                if (dragonBody != null)
+                {
+                    Debug.LogWarning("[BossCreature] Attempting to initialize Dragon Body without a track just to show anatomy...");
+                    dragonBody.InitializeDragon(null);
+                }
+            }
         }
-
-        currentPhase = BossPhase.Orchestrator;
-    }
-
-    public void Initialize(WaveSpawner spawner)
-    {
-        waveSpawner = spawner;
     }
 
     /// <summary>
-    /// Called by the Spawner or internal logic when minions drop below threshold.
+    /// Called by the BossArenaManager when the boss is spawned.
+    /// Injects the scene's environmental splines.
+    /// </summary>
+    public void InitializeArena(BossArenaManager arena)
+    {
+        isInitialized = true;
+        currentPhase = BossPhase.Orchestrator;
+
+        if (arena.observationSpline == null)
+        {
+            Debug.LogError("[BossCreature] BossArenaManager is missing an Observation Spline! The dragon has no track to spawn on!");
+        }
+
+
+        // Also ensure the visual dragon body is spawned and attached to the starting track
+        SegmentedDragonManager dragonBody = GetComponent<SegmentedDragonManager>();
+        if (dragonBody != null)
+        {
+            Debug.Log("[BossCreature] Instructing SegmentedDragonManager to spawn anatomy...");
+            dragonBody.InitializeDragon(arena.observationSpline);
+        }
+    }
+
+    /// <summary>
+    /// Called by the Arena Manager when minions drop below threshold.
     /// </summary>
     public void EngagePlayer()
     {
         currentPhase = BossPhase.Engaged;
+        // In a full implementation, this would point the dragon directly at the watchtower.
+        // For now, it enters the combat state.
         Debug.Log("<color=magenta>[BossCreature] Phase 2: Dragon attacking player!</color>");
 
         // Unhook from the spline so the dragon can freestyle toward the player
@@ -149,7 +179,10 @@ public class BossCreature : MonoBehaviour
             GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
             if (playerObj != null)
             {
-                movementManager.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Pursue, playerObj.transform.position);
+                            if (playerObj != null)
+            {
+                if (movementManager != null) movementManager.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Pursue, playerObj.transform.position);
+            }
             }
         }
     }
@@ -170,7 +203,7 @@ public class BossCreature : MonoBehaviour
             EvaluateDesires();
         }
 
-        // Handle Phase 2 Stamina Drain
+// Handle Phase 2 Stamina Drain
         if (currentPhase == BossPhase.Engaged)
         {
             currentStamina -= staminaDrainRate * Time.deltaTime;
@@ -185,7 +218,7 @@ public class BossCreature : MonoBehaviour
                 GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
                 if (playerObj != null)
                 {
-                    movementManager.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Pursue, playerObj.transform.position);
+                    if (movementManager != null) movementManager.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Pursue, playerObj.transform.position);
                 }
             }
         }
@@ -223,10 +256,8 @@ public class BossCreature : MonoBehaviour
         maxStamina *= 0.7f;
         if (maxStamina < 20f) maxStamina = 20f; // Minimum stamina floor so it can still fight briefly
 
-        if (movementManager != null)
-        {
-            movementManager.ForceImmediateEvasion();
-        }
+        // Command the manager to flee through environmental splines
+        // movementManager.ForceImmediateEvasion();
     }
 
     /// <summary>
@@ -242,12 +273,13 @@ public class BossCreature : MonoBehaviour
     /// <summary>
     /// Force the boss to begin evasive maneuvers immediately.
     /// Called by other systems (e.g. DragonSegment) when the boss is hit and should react instantly.
+    /// This was added to fix the CS1061 compile error and to ensure the dragon uses escape splines on hit.
     /// </summary>
     public void ForceImmediateEvasion()
     {
         if (movementManager == null)
         {
-            Debug.LogWarning("[BossCreature] ForceImmediateEvasion called but AirborneBossMovement not found.");
+            Debug.LogWarning("[BossCreature] ForceImmediateEvasion called but TacticalBossSplineManager not found.");
             return;
         }
 
@@ -269,6 +301,10 @@ public class BossCreature : MonoBehaviour
         // Move into Exhausted state so tactical flow (recharge after route) is consistent
         currentPhase = BossPhase.Exhausted;
     }
+
+    /// <summary>
+    /// Called when the player shoots the boss.
+    /// </summary>
 
     public void EvaluateDesires()
     {
@@ -420,7 +456,11 @@ public class BossCreature : MonoBehaviour
         {
             Debug.Log("<color=red>[BossCreature] Threat level high! Ordering tactical evasion.</color>");
 
-            ForceImmediateEvasion();
+            // Command the manager to jump to an environmental spline
+            movementManager.ForceImmediateEvasion();
+
+            // Reset accumulator so it doesn't immediately evade again
+            recentDamageAccumulator = 0f;
         }
     }
 
@@ -428,32 +468,8 @@ public class BossCreature : MonoBehaviour
     {
         Debug.Log("<color=red>[BossCreature] The Boss has been defeated!</color>");
 
-        // Ping the injected WaveSpawner so the level progression can cleanly move to Victory.
-        // Fall back to a scene search if the boss was manually placed (not spawned via WaveSpawner).
-        WaveSpawner spawnerToNotify = waveSpawner;
-        if (spawnerToNotify == null)
-        {
-            spawnerToNotify = FindFirstObjectByType<WaveSpawner>();
-            if (spawnerToNotify != null)
-            {
-                Debug.Log("[BossCreature] WaveSpawner not injected — found it via scene search.");
-            }
-        }
-
-        if (spawnerToNotify != null)
-        {
-            spawnerToNotify.NotifyTargetDestroyed();
-        }
-        else
-        {
-            Debug.LogWarning("[BossCreature] No WaveSpawner found — level progression cannot advance after boss death!");
-        }
-
         // Stop movement
-        if (movementManager != null)
-        {
-            movementManager.enabled = false;
-        }
+        if (movementManager != null) movementManager.enabled = false;
 
         // Command all indestructible pieces (Head, Legs, Tail) to dissolve
         SegmentedDragonManager dragonBody = GetComponent<SegmentedDragonManager>();

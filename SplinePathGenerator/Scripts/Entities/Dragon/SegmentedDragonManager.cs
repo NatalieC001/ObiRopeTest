@@ -47,8 +47,6 @@ public class SegmentedDragonManager : MonoBehaviour
     public bool IsTethered { get; private set; } = false;
     public Transform TetherAnchorTransform { get; private set; } = null;
     public float TetherMaxLength { get; private set; } = 0f;
-    private DragonSegment currentTetheredSegment = null;
-    private float tetheredSegmentDistanceInHistory = 0f;
 
     /// <summary>
     /// Event invoked whenever the number of active segments changes (passes new remaining count).
@@ -226,27 +224,16 @@ public class SegmentedDragonManager : MonoBehaviour
 
         currentTether = rope;
         IsTethered = true;
-        currentTetheredSegment = segment;
 
         TetherAnchorTransform = rope.GetTailTransform();
 
         if (TetherAnchorTransform != null)
         {
-            // Max Radius is the chain length (sum of gaps) from the head to this tethered segment
-            TetherMaxLength = spacingManager != null ? spacingManager.GetTargetDistanceForSegment(segment) : segment.SegmentIndex * segmentSpacing;
-            tetheredSegmentDistanceInHistory = headTotalDistance - TetherMaxLength;
+            TetherMaxLength = Vector3.Distance(transform.position, TetherAnchorTransform.position);
         }
         else
         {
             TetherMaxLength = 0f;
-            tetheredSegmentDistanceInHistory = 0f;
-        }
-
-        // Notify the base movement system to start struggling
-        BaseBossMovement movement = GetComponent<BaseBossMovement>();
-        if (movement != null)
-        {
-            movement.HandleTetherAttached();
         }
 
         Debug.Log($"<color=cyan>[SegmentedDragonManager] Tether attached to segment {segment.SegmentIndex}. MaxLength: {TetherMaxLength:F2}</color>");
@@ -262,14 +249,6 @@ public class SegmentedDragonManager : MonoBehaviour
             IsTethered = false;
             TetherAnchorTransform = null;
             TetherMaxLength = 0f;
-            currentTetheredSegment = null;
-            tetheredSegmentDistanceInHistory = 0f;
-
-            BaseBossMovement movement = GetComponent<BaseBossMovement>();
-            if (movement != null)
-            {
-                movement.HandleTetherDetached();
-            }
         }
     }
 
@@ -318,14 +297,6 @@ public class SegmentedDragonManager : MonoBehaviour
             });
 
             float maxNeededHistoryDistance = spacingManager != null ? spacingManager.GetTotalDragonLength() * 2f : segmentSpacing * activeSegments.Count * 2f;
-
-            // If tethered, we need to keep enough history back to the anchor point, which the head can walk far away from
-            if (IsTethered && TetherAnchorTransform != null)
-            {
-                float extraHistoryForTether = (headTotalDistance - tetheredSegmentDistanceInHistory) + maxNeededHistoryDistance;
-                maxNeededHistoryDistance = Mathf.Max(maxNeededHistoryDistance, extraHistoryForTether);
-            }
-
             if (headTotalDistance - positionHistory[positionHistory.Count - 1].distanceTraveled > maxNeededHistoryDistance)
             {
                 positionHistory.RemoveAt(positionHistory.Count - 1);
@@ -372,34 +343,6 @@ public class SegmentedDragonManager : MonoBehaviour
             }
 
             float targetDistanceInHistory = headTotalDistance - requiredDistanceBehindHead;
-
-            if (IsTethered && currentTetheredSegment != null && TetherAnchorTransform != null)
-            {
-                if (segment == currentTetheredSegment)
-                {
-                    // Force the tethered segment to strictly match the anchor point!
-                    Rigidbody rb = segment.GetComponent<Rigidbody>();
-                    if (rb != null) {
-                        rb.MovePosition(TetherAnchorTransform.position);
-                        rb.MoveRotation(TetherAnchorTransform.rotation);
-                    } else {
-                        segment.transform.position = TetherAnchorTransform.position;
-                        segment.transform.rotation = TetherAnchorTransform.rotation;
-                    }
-                    continue; // Skip breadcrumb logic for the clamped segment
-                }
-                else if (segment.SegmentIndex > currentTetheredSegment.SegmentIndex)
-                {
-                    // For tail segments behind the tether, trail backward from the fixed anchor's history point
-                    float distanceBehindAnchor = requiredDistanceBehindHead - (spacingManager != null ? spacingManager.GetTargetDistanceForSegment(currentTetheredSegment) : currentTetheredSegment.SegmentIndex * segmentSpacing);
-                    targetDistanceInHistory = tetheredSegmentDistanceInHistory - distanceBehindAnchor;
-                }
-                else
-                {
-                    // For pieces between head and anchor, follow the head's normal breadcrumbs
-                    targetDistanceInHistory = headTotalDistance - requiredDistanceBehindHead;
-                }
-            }
 
             // Find the two breadcrumbs this distance falls between
             for (int j = 0; j < positionHistory.Count - 1; j++)
@@ -553,8 +496,6 @@ public class SegmentedDragonManager : MonoBehaviour
         IsTethered = false;
         TetherAnchorTransform = null;
         TetherMaxLength = 0f;
-        currentTetheredSegment = null;
-        tetheredSegmentDistanceInHistory = 0f;
 
         OnSegmentCountChanged?.Invoke(0);
 
