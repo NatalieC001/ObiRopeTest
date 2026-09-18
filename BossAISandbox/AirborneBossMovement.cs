@@ -96,14 +96,25 @@ public class AirborneBossMovement : BaseBossMovement
 
     private void UpdateTetherStruggle()
     {
-        // Continuously update the struggle target so the dragon keeps fighting dynamically,
-        // rather than arriving at the initial point and stopping.
-        SegmentedDragonManager dragonManager = GetComponent<SegmentedDragonManager>();
-        if (dragonManager != null && dragonManager.TetherAnchorTransform != null)
+        // Continuously update the struggle target so the dragon keeps fighting dynamically.
+        // It will actively try to pursue the player, creating tension on the rope while
+        // aggressively facing the player.
+        GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+
+        if (playerObj != null)
         {
-            // Try to pull away from the anchor point based on the configured direction
-            Vector3 worldStruggleDirection = transform.TransformDirection(tetherStruggleDirection.normalized);
-            freestyleTargetPosition = dragonManager.TetherAnchorTransform.position + (worldStruggleDirection * tetherStruggleDistance);
+            // Aggressively try to eat the player while chained!
+            freestyleTargetPosition = playerObj.transform.position;
+        }
+        else
+        {
+            // Fallback: If no player is found, pull blindly against the anchor
+            SegmentedDragonManager dragonManager = GetComponent<SegmentedDragonManager>();
+            if (dragonManager != null && dragonManager.TetherAnchorTransform != null)
+            {
+                Vector3 worldStruggleDirection = transform.TransformDirection(tetherStruggleDirection.normalized);
+                freestyleTargetPosition = dragonManager.TetherAnchorTransform.position + (worldStruggleDirection * tetherStruggleDistance);
+            }
         }
     }
 
