@@ -17,7 +17,7 @@ public class BossCreature : MonoBehaviour
     private MinionRequestBroker requestBroker;
     private RegeneratorController regenerator;
     private CreatureStatusEffects statusEffects;
-
+    private BossPathManager pathManager;
 
     private float decisionTimer = 0f;
     private const float decisionTickRate = 1f;
@@ -83,6 +83,7 @@ public class BossCreature : MonoBehaviour
         eventBus = FindFirstObjectByType<BossEventBus>();
         desireEvaluator = FindFirstObjectByType<DesireEvaluator>();
         tagRegistry = FindFirstObjectByType<EnvironmentTagRegistry>();
+        pathManager = FindFirstObjectByType<BossPathManager>();
 
         if (eventBus != null)
         {
@@ -114,22 +115,32 @@ public class BossCreature : MonoBehaviour
         currentPhase = BossPhase.Orchestrator;
 
         GameObject initialPath = null;
-        if (movementManager != null)
+        if (pathManager != null)
         {
-            // At the start of the level, the boss asks the manager for an Observation path to orbit on
-            initialPath = movementManager.GetObservationPath(PathTypeTag.PathType.Airborne);
-            if (initialPath != null)
+            // Directly query the scene-level BossPathManager for an Observation path
+            System.Collections.Generic.List<GameObject> obsPaths = pathManager.GetObservationPaths(PathTypeTag.PathType.Airborne);
+            if (obsPaths.Count > 0)
             {
+                // Select a random valid observation path
+                initialPath = obsPaths[Random.Range(0, obsPaths.Count)];
+
                 // Force the boss to instantly snap to the start of this path
                 transform.position = initialPath.transform.position;
 
-                // Instruct the movement manager to begin following it
-                movementManager.RequestReturnToCoil(initialPath);
+                if (movementManager != null)
+                {
+                    // Instruct the movement manager to begin following it
+                    movementManager.RequestReturnToCoil(initialPath);
+                }
             }
             else
             {
                 Debug.LogWarning("[BossCreature] Start: No Airborne Observation paths found in BossPathManager! Spawning freely.");
             }
+        }
+        else
+        {
+            Debug.LogError("[BossCreature] Start: BossPathManager is missing from the scene!");
         }
 
         // Spawn anatomy
