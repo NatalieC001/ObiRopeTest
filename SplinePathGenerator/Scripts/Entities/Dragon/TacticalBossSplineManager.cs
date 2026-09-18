@@ -108,7 +108,7 @@ public class TacticalBossSplineManager : MonoBehaviour
             StartCoroutine(FindMouthTransformRoutine());
         }
 
-        aiRoutine = StartCoroutine(AIRoutine());
+        if (aiRoutine == null) aiRoutine = StartCoroutine(AIRoutine());
     }
 
     private void OnDestroy()
@@ -137,15 +137,22 @@ public class TacticalBossSplineManager : MonoBehaviour
         if (observationSpline != null)
         {
             bossFollower.follow = false;
-            transform.position = observationSpline.Evaluate(0).position;
-            bossFollower.spline = observationSpline;
-            bossFollower.SetPercent(0);
-            bossFollower.follow = true;
-
-            if (bodyManager != null) bodyManager.SwitchToNewSpline(observationSpline);
+            if (aiRoutine != null) StopCoroutine(aiRoutine); // Temporarily stop normal AI
+            aiRoutine = StartCoroutine(InitialFlightToObservation());
         }
 
         if (mouthTransform == null) StartCoroutine(FindMouthTransformRoutine());
+    }
+
+    private IEnumerator InitialFlightToObservation()
+    {
+        // Smoothly fly to the initial observation spline instead of teleporting
+        yield return StartCoroutine(FreestyleToSplineRoutine(observationSpline));
+        bossFollower.wrapMode = SplineFollower.Wrap.Loop;
+
+        // Once we've arrived, start the normal AI routine
+        if (aiRoutine != null) StopCoroutine(aiRoutine);
+        aiRoutine = StartCoroutine(AIRoutine());
     }
 
     /// <summary>

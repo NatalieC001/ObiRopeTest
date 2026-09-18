@@ -6,8 +6,6 @@ using System.Collections.Generic;
 /// Solely responsible for tracking the breadcrumb history of the boss's root object
 /// and physically dragging the pieces along that track.
 /// </summary>
-// NEW: Changes 1 of 1:
-// 1. Modified PlaceSegment() to use Rigidbody.MovePosition to fix arrow tunneling.
 public class DragonMovementManager : MonoBehaviour
 {
     private struct PositionData
@@ -122,7 +120,6 @@ public class DragonMovementManager : MonoBehaviour
 
                 Vector3 newPos = Vector3.Lerp(newer.position, older.position, t);
                 Quaternion newRot = Quaternion.Slerp(newer.rotation, older.rotation, t);
-                // NEW: 1. Using MovePosition to solve fast-moving physics tunneling.
                 Rigidbody rb = segment.GetComponent<Rigidbody>();
                 if (rb != null) {
                     rb.MovePosition(newPos);

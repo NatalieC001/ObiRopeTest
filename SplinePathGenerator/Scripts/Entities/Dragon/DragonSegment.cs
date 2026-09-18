@@ -218,8 +218,18 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
             segmentCollider.enabled = false;
         }
 
-        // You can trigger the DissolveEffect.cs directly here if you have a reference to it,
-        // otherwise Destroy(gameObject) will clean it up.
-        Destroy(gameObject);
+        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
+        if (dissolve != null)
+        {
+            // Trigger visual effect, then destroy the object when visuals finish.
+            dissolve.TriggerDissolve(() =>
+            {
+                Destroy(gameObject);
+            });
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
     }
 }
