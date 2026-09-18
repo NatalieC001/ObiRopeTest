@@ -117,7 +117,7 @@ public class DissolveManager : MonoBehaviour
             }
         }
 
-        config.InvokeOnDissolveCompleted();
+        if (config != null) config.InvokeOnDissolveCompleted();
         onComplete?.Invoke();
     }
 }
