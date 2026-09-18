@@ -150,10 +150,10 @@ public class AirborneBossMovement : BaseBossMovement
         {
             // Smoothly ease position and rotation
             Vector3 direction = (freestyleTargetPosition - transform.position).normalized;
-            if (direction != Vector3.zero)
+            if (direction != Vector3.zero && currentSpeedMultiplier > 0f)
             {
                 Quaternion targetRotation = Quaternion.LookRotation(direction);
-                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * coilTightness);
+                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * coilTightness * currentSpeedMultiplier);
             }
             transform.position += transform.forward * (effectiveSpeed * Time.deltaTime);
         }

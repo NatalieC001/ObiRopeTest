@@ -189,7 +189,6 @@ public class BossCreature : MonoBehaviour
 
     private void Update()
     {
-
         if (crystalThreatTimeout > 0f)
         {
             crystalThreatTimeout -= Time.deltaTime;
@@ -201,37 +200,6 @@ public class BossCreature : MonoBehaviour
         {
             decisionTimer = decisionTickRate;
             EvaluateDesires();
-        }
-
-// Handle Phase 2 Stamina Drain
-        if (currentPhase == BossPhase.Engaged)
-        {
-            currentStamina -= staminaDrainRate * Time.deltaTime;
-            if (currentStamina <= 0)
-            {
-                currentStamina = 0;
-                EnterExhaustedPhase();
-            }
-            else if (movementManager != null)
-            {
-                // Let the tactical manager handle the freestyle movement
-                GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
-                if (playerObj != null)
-                {
-                    if (movementManager != null) movementManager.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Pursue, playerObj.transform.position);
-                }
-            }
-        }
-        else if (currentPhase == BossPhase.Recharging)
-        {
-            // Regain stamina. Note: Health never heals to prevent infinite fights!
-            currentStamina += staminaRechargeRate * Time.deltaTime;
-            if (currentStamina >= maxStamina)
-            {
-                currentStamina = maxStamina;
-                Debug.Log("<color=green>[BossCreature] Stamina full! Diving back in to attack!</color>");
-                EngagePlayer();
-            }
         }
 
         // Decay the damage accumulator over time so the boss only evades
@@ -246,8 +214,7 @@ public class BossCreature : MonoBehaviour
             }
         }
     }
-
-    private void EnterExhaustedPhase()
+private void EnterExhaustedPhase()
     {
         currentPhase = BossPhase.Exhausted;
         Debug.Log("<color=cyan>[BossCreature] Phase 3: Dragon is exhausted! Fleeing to recharge!</color>");
@@ -257,7 +224,7 @@ public class BossCreature : MonoBehaviour
         if (maxStamina < 20f) maxStamina = 20f; // Minimum stamina floor so it can still fight briefly
 
         // Command the manager to flee through environmental splines
-        // movementManager.ForceImmediateEvasion();
+        movementManager.ForceImmediateEvasion();
     }
 
     /// <summary>
@@ -382,6 +349,12 @@ public class BossCreature : MonoBehaviour
     public float GetCurrentHealthPct()
     {
         return maxHealth > 0 ? currentHealth / maxHealth : 0f;
+    }
+
+    public void Initialize(WaveSpawner spawner)
+    {
+        // Optional tracking logic if Boss needs a direct ref to its creator.
+        // The event bus handles decoupling, but this satisfies the WaveSpawner's spawn routine.
     }
 
     public void TakeDamage(float baseAmount, Vector3 hitPoint, ElementTypeOB7 arrowType = ElementTypeOB7.Normal)

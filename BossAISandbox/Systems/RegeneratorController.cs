@@ -9,15 +9,19 @@ public class RegeneratorController : MonoBehaviour
     private float currentRegenTimer = 0f;
     private bool isRegenerating = false;
 
+
     private AirborneBossMovement movementManager;
     private MinionRequestBroker requestBroker;
     private BossCreature brain;
+    private SegmentedDragonManager segmentManager;
+
 
     private void Awake()
     {
         movementManager = GetComponent<AirborneBossMovement>();
         brain = GetComponent<BossCreature>();
         requestBroker = FindFirstObjectByType<MinionRequestBroker>();
+        segmentManager = GetComponent<SegmentedDragonManager>();
     }
 
     public void BeginRegeneration(HealthCrystal targetCrystal)
@@ -45,8 +49,19 @@ public class RegeneratorController : MonoBehaviour
 
         currentRegenTimer += Time.deltaTime;
 
-        // Simulate health restore & segment rebuild over time
-        // brain.Heal(healthPerSecond * Time.deltaTime);
+        // Heal Boss
+        if (brain != null)
+        {
+            // Note: Since Health is abstracted, this would need an AddHealth method,
+            // but for now we apply negative damage.
+            brain.TakeDamage(-healthPerSecond * Time.deltaTime, transform.position, ElementTypeOB7.Normal);
+        }
+
+        if (segmentManager != null)
+        {
+            // Segment rebuild hook would go here, e.g. segmentManager.RebuildNextSegment()
+            // (Assuming SegmentedDragonManager exposes such a method, which we would add if needed)
+        }
 
         if (currentRegenTimer >= maxRegenTime)
         {
