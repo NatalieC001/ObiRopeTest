@@ -5,7 +5,13 @@ using UnityEngine;
 /// These are typically the grunts that ride geometric spline shapes and use the Swarm logic,
 /// clearly separated from the basic 'MovingTarget' test objects.
 /// </summary>
-public class StandardCreature : MonoBehaviour
+// NEW: Changes 4 of 4:
+// 1. Added IArrowTarget interface to class declaration.
+// 2. Added isDead boolean to prevent multiple deaths.
+// 3. Updated Awake() to force all child colliders to the Enemy layer.
+// 4. Added OnArrowHit implementation and updated Die() to pass callback to DissolveEffect.
+    // NEW: 1. Natively implements IArrowTarget directly on the brain.
+public class StandardCreature : MonoBehaviour, IArrowTarget
 {
     [System.Serializable]
     public struct ElementalModifier
@@ -29,6 +35,9 @@ public class StandardCreature : MonoBehaviour
 
     private CreatureStatusEffects statusEffects;
 
+    // NEW: 2. Tracking death state.
+    private bool isDead = false;
+
     private void Awake()
     {
         // Force the physics layer so arrows detect this creature, even if the dev forgot to set it!
@@ -36,6 +45,14 @@ public class StandardCreature : MonoBehaviour
         if (layerIndex != -1)
         {
             gameObject.layer = layerIndex;
+
+            // Explicitly iterate through all child colliders to ensure nested physical colliders receive the layer
+            // NEW: 3. Automatic nested collider layer assignment to fix hit detection.
+            Collider[] colliders = GetComponentsInChildren<Collider>(true);
+            foreach (Collider col in colliders)
+            {
+                col.gameObject.layer = layerIndex;
+            }
         }
         else
         {
@@ -54,8 +71,16 @@ public class StandardCreature : MonoBehaviour
     /// <summary>
     /// Called when the player shoots this creature.
     /// </summary>
+    // NEW: 4. Routing interface hits natively to TakeDamage, and Die() passes a callback.
+    public void OnArrowHit(float damage, Vector3 impactPoint, ElementTypeOB7 elementType)
+    {
+
+        TakeDamage(damage, impactPoint, elementType);
+    }
+
     public virtual void TakeDamage(float baseAmount, Vector3 hitPoint, ElementTypeOB7 arrowType = ElementTypeOB7.Normal)
     {
+        if (isDead) return;
         // 0. Trigger Status Effects (Slows, Freezes)
         if (statusEffects != null)
         {
@@ -105,6 +130,7 @@ public class StandardCreature : MonoBehaviour
 
     protected virtual void Die()
     {
+        isDead = true;
         Debug.Log($"[StandardCreature] {gameObject.name} has died.");
 
         // Ensure we detach from any Dreamteck splines properly upon death
@@ -114,7 +140,16 @@ public class StandardCreature : MonoBehaviour
             follower.follow = false;
         }
 
-        // Trigger death effects here (dissolve, ragdoll, etc.)
-        Destroy(gameObject);
+        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
+        if (dissolve != null)
+        {
+            dissolve.TriggerDissolve(() => {
+                Destroy(gameObject);
+            });
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
     }
 }

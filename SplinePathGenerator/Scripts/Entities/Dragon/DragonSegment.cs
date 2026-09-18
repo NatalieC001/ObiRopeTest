@@ -6,6 +6,11 @@ using Dreamteck.Splines;
 /// Handles segment health and reports destruction to the main SegmentedDragonManager.
 /// </summary>
 [RequireComponent(typeof(SplineFollower))]
+// NEW: Changes 4 of 4:
+// 1. Added private bool isDead to prevent double-triggering.
+// 2. Updated Awake() to force all nested colliders onto the Enemy layer automatically.
+// 3. Updated TakeDamage() to check isDead and Die() to set isDead.
+// 4. Updated Die() to pass FinalizeDestruction as a callback to DissolveEffect.
 public class DragonSegment : MonoBehaviour, IArrowTarget
 {
     [Header("Segment Stats")]
@@ -33,6 +38,9 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
     // The index of this segment in the manager's list (Head = 0)
     public int SegmentIndex { get; set; }
     public SplineFollower Follower => follower;
+    // NEW: 1. Prevent double death triggering
+    private bool isDead = false;
+
 
     private void Awake()
     {
@@ -42,8 +50,14 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
         int layerIndex = LayerMask.NameToLayer(targetLayer);
         if (layerIndex != -1)
         {
-            gameObject.layer = layerIndex;
+            // NEW: 2. Automatically apply Enemy layer to all child colliders to fix hit detection.
+            Collider[] allColliders = GetComponentsInChildren<Collider>(true);
+            foreach (Collider col in allColliders)
+            {
+                col.gameObject.layer = layerIndex;
+            }
 
+            gameObject.layer = layerIndex;
             // Also explicitly ensure the collider child is on the layer, as that's what physics actually hits
             if (segmentCollider != null)
             {
@@ -91,6 +105,8 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
     public virtual void TakeDamage(float amount, Vector3 hitPoint, ElementTypeOB7 arrowType = ElementTypeOB7.Normal)
     {
         // Pass damage up to the brain so the overall boss loses health and can trigger evasions!
+        if (isDead) return;
+
         if (bossBrain != null)
         {
             // The boss brain calculates actual damage using its own elemental modifiers
@@ -116,23 +132,10 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
         }
     }
 
-    private void Start()
-    {
-        // For destructible body parts, we intercept the OnDissolveCompleted event right from the start.
-        // The DissolveEffect script naturally handles the arrow hit and plays the animation immediately.
-        // We just sit back and wait for it to finish, then we obliterate the root object and close the gap.
-        if (isDestructiblePart)
-        {
-            DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
-            if (dissolve != null)
-            {
-                dissolve.OnDissolveCompleted += FinalizeDestruction;
-            }
-        }
-    }
-
     protected virtual void Die()
     {
+        isDead = true;
+
         if (!isDestructiblePart) return;
 
         Debug.Log($"<color=red>[DragonSegment] Segment {SegmentIndex} health reached 0!</color>");
@@ -157,28 +160,15 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
             }
         }
 
-        // Explicitly command the segment's visual effect to start dissolving!
-        // This will eventually fire the OnDissolveCompleted event we subscribed to in Start, 
-        // which will trigger FinalizeDestruction().
         DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
         if (dissolve != null)
         {
-            dissolve.TriggerDissolve();
+            // NEW: 4. Passing callback to decoupled visual effect.
+            dissolve.TriggerDissolve(FinalizeDestruction);
         }
         else
         {
-            // Fallback: If no DissolveEffect exists to fire the event, we just destroy it now
             FinalizeDestruction();
-        }
-    }
-
-    private void OnDestroy()
-    {
-        // Clean up the event listener to avoid memory leaks
-        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
-        if (dissolve != null)
-        {
-            dissolve.OnDissolveCompleted -= FinalizeDestruction;
         }
     }
 
@@ -228,8 +218,18 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
             segmentCollider.enabled = false;
         }
 
-        // You can trigger the DissolveEffect.cs directly here if you have a reference to it,
-        // otherwise Destroy(gameObject) will clean it up.
-        Destroy(gameObject);
+        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
+        if (dissolve != null)
+        {
+            // Trigger visual effect, then destroy the object when visuals finish.
+            dissolve.TriggerDissolve(() =>
+            {
+                Destroy(gameObject);
+            });
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
     }
 }
