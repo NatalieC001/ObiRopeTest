@@ -1,13 +1,33 @@
 using UnityEngine;
 
-/// <summary>
-/// The core Health and Phase 'Brain' for an advanced Boss creature.
-/// It monitors health and battle state, and commands the BaseBossMovement
-/// to make intelligent evasion choices when threatened.
+/// <summary>NEEEEEWW
+/// The 'Brain' for an advanced Boss creature.
+/// It monitors health and battle state, and commands the AirborneBossMovement
+/// to make intelligent evasion choices (like jumping to escape splines) when threatened.
 /// </summary>
-[RequireComponent(typeof(BaseBossMovement))]
+[RequireComponent(typeof(AirborneBossMovement))]
 public class BossCreature : MonoBehaviour
 {
+
+    private BossEventBus eventBus;
+    private DesireEvaluator desireEvaluator;
+    private EnvironmentTagRegistry tagRegistry;
+    private AirborneBossMovement movementManager;
+    private ElementalBreathController breathController;
+    private MinionRequestBroker requestBroker;
+    private RegeneratorController regenerator;
+    private CreatureStatusEffects statusEffects;
+
+
+    private float decisionTimer = 0f;
+    private const float decisionTickRate = 1f;
+
+    public HealthCrystal LastThreatenedCrystal { get; private set; }
+    private float crystalThreatTimeout = 0f;
+
+    // Track minion power deduction
+    public int lostMinionCount = 0;
+
     [System.Serializable]
     public struct ElementalModifier
     {
@@ -47,29 +67,47 @@ public class BossCreature : MonoBehaviour
     public float staminaRechargeRate = 15f;
     private float currentStamina;
 
-    [Header("Anatomy Tracking")]
-    [Tooltip("Dynamically found on Awake. Used as the origin point for breath attacks or projectiles.")]
-    public Transform mouthTransform { get; private set; }
-
-    private BaseBossMovement movementSystem;
-    private CreatureStatusEffects statusEffects;
-    private float recentDamageAccumulator = 0f;
-    private float damageDecayTimer = 0f;
-
     // Injected by WaveSpawner to explicitly report Boss death progression
     private WaveSpawner waveSpawner;
 
-    public void Initialize(WaveSpawner spawner)
-    {
-        waveSpawner = spawner;
-    }
+    private float recentDamageAccumulator = 0f;
+    private float damageDecayTimer = 0f;
 
     private void Awake()
     {
-        movementSystem = GetComponent<BaseBossMovement>();
+        movementManager = GetComponent<AirborneBossMovement>();
+        breathController = GetComponent<ElementalBreathController>();
+        regenerator = GetComponent<RegeneratorController>();
         statusEffects = GetComponent<CreatureStatusEffects>();
+
+        requestBroker = FindFirstObjectByType<MinionRequestBroker>();
+        eventBus = FindFirstObjectByType<BossEventBus>();
+        desireEvaluator = FindFirstObjectByType<DesireEvaluator>();
+        tagRegistry = FindFirstObjectByType<EnvironmentTagRegistry>();
+
+        if (eventBus != null)
+        {
+            eventBus.OnBossDamaged += OnBossDamagedInterrupt;
+            eventBus.OnCrystalDamaged += OnCrystalDamagedInterrupt;
+            eventBus.OnCrystalDestroyed += OnCrystalDestroyedInterrupt;
+            eventBus.OnBossMinionDied += OnMinionDiedInterrupt;
+            eventBus.OnBossStatusEnded += OnStatusEndedInterrupt;
+        }
+
         currentHealth = maxHealth;
         currentStamina = maxStamina;
+    }
+
+    private void OnDestroy()
+    {
+        if (eventBus != null)
+        {
+            eventBus.OnBossDamaged -= OnBossDamagedInterrupt;
+            eventBus.OnCrystalDamaged -= OnCrystalDamagedInterrupt;
+            eventBus.OnCrystalDestroyed -= OnCrystalDestroyedInterrupt;
+            eventBus.OnBossMinionDied -= OnMinionDiedInterrupt;
+            eventBus.OnBossStatusEnded -= OnStatusEndedInterrupt;
+        }
     }
 
     private void Start()
@@ -89,51 +127,49 @@ public class BossCreature : MonoBehaviour
             dragonBody.InitializeDragon(initialSpline);
         }
 
-        ChangePhase(BossPhase.Orchestrator);
+        currentPhase = BossPhase.Orchestrator;
+    }
 
-        FindMouthTransform();
+    public void Initialize(WaveSpawner spawner)
+    {
+        waveSpawner = spawner;
     }
 
     /// <summary>
-    /// Dynamically searches all children (even deeply nested ones) for an object exactly named 'MouthTransform'.
+    /// Called by the Spawner or internal logic when minions drop below threshold.
     /// </summary>
-    private void FindMouthTransform()
-    {
-        if (mouthTransform != null) return; // Already assigned in Inspector
-
-        Transform[] allChildren = GetComponentsInChildren<Transform>(true);
-        foreach (Transform t in allChildren)
-        {
-            if (t.name == "mouthTransform")
-            {
-                mouthTransform = t;
-                Debug.Log($"<color=green>[BossCreature] Successfully located MouthTransform on {t.parent.name}</color>");
-                return;
-            }
-        }
-
-        Debug.LogWarning("[BossCreature] Could not find a child object named 'MouthTransform'. Breath attacks may fail!");
-    }
-
-    private void ChangePhase(BossPhase newPhase)
-    {
-        currentPhase = newPhase;
-        if (movementSystem != null)
-        {
-            movementSystem.OnPhaseChanged((int)newPhase);
-        }
-    }
-
     public void EngagePlayer()
     {
-        ChangePhase(BossPhase.Engaged);
+        currentPhase = BossPhase.Engaged;
         Debug.Log("<color=magenta>[BossCreature] Phase 2: Dragon attacking player!</color>");
 
-        // Movement system now handles freestyle logic via OnPhaseChanged hooks
+        // Unhook from the spline so the dragon can freestyle toward the player
+        if (movementManager != null)
+        {
+            GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+            if (playerObj != null)
+            {
+                movementManager.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Pursue, playerObj.transform.position);
+            }
+        }
     }
 
     private void Update()
     {
+
+        if (crystalThreatTimeout > 0f)
+        {
+            crystalThreatTimeout -= Time.deltaTime;
+            if (crystalThreatTimeout <= 0f) LastThreatenedCrystal = null;
+        }
+
+        decisionTimer -= Time.deltaTime;
+        if (decisionTimer <= 0f)
+        {
+            decisionTimer = decisionTickRate;
+            EvaluateDesires();
+        }
+
         // Handle Phase 2 Stamina Drain
         if (currentPhase == BossPhase.Engaged)
         {
@@ -142,6 +178,15 @@ public class BossCreature : MonoBehaviour
             {
                 currentStamina = 0;
                 EnterExhaustedPhase();
+            }
+            else if (movementManager != null)
+            {
+                // Let the tactical manager handle the freestyle movement
+                GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+                if (playerObj != null)
+                {
+                    movementManager.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Pursue, playerObj.transform.position);
+                }
             }
         }
         else if (currentPhase == BossPhase.Recharging)
@@ -171,27 +216,26 @@ public class BossCreature : MonoBehaviour
 
     private void EnterExhaustedPhase()
     {
-        ChangePhase(BossPhase.Exhausted);
+        currentPhase = BossPhase.Exhausted;
         Debug.Log("<color=cyan>[BossCreature] Phase 3: Dragon is exhausted! Fleeing to recharge!</color>");
 
         // Permanently decay stamina so fights don't last forever
         maxStamina *= 0.7f;
         if (maxStamina < 20f) maxStamina = 20f; // Minimum stamina floor so it can still fight briefly
 
-        // Command the movement system to flee
-        if (movementSystem != null)
+        if (movementManager != null)
         {
-            movementSystem.ForceImmediateEvasion();
+            movementManager.ForceImmediateEvasion();
         }
     }
 
     /// <summary>
-    /// Called by the Movement System when the boss finishes an escape route
+    /// Called by the Tactical Manager when the boss finishes an escape route
     /// and returns to the observation deck.
     /// </summary>
     public void BeginRecharging()
     {
-        ChangePhase(BossPhase.Recharging);
+        currentPhase = BossPhase.Recharging;
         Debug.Log("<color=cyan>[BossCreature] Phase 4: Recharging stamina on the observation deck!</color>");
     }
 
@@ -201,28 +245,109 @@ public class BossCreature : MonoBehaviour
     /// </summary>
     public void ForceImmediateEvasion()
     {
+        if (movementManager == null)
+        {
+            Debug.LogWarning("[BossCreature] ForceImmediateEvasion called but AirborneBossMovement not found.");
+            return;
+        }
+
         Debug.Log("<color=red>[BossCreature] ForceImmediateEvasion: ordering immediate tactical evasion.</color>");
 
+        // If the boss was orchestrating, engage first so movement routines behave correctly
         if (currentPhase == BossPhase.Orchestrator)
         {
             EngagePlayer();
         }
 
-        if (movementSystem != null)
-        {
-            movementSystem.ForceImmediateEvasion();
-        }
+        // Trigger the evasion routine on the tactical manager (this will use the configured escape splines)
+        movementManager.ForceImmediateEvasion();
 
         // Reset accumulators so we don't re-trigger immediately
         recentDamageAccumulator = 0f;
         damageDecayTimer = 0f;
 
-        ChangePhase(BossPhase.Exhausted);
+        // Move into Exhausted state so tactical flow (recharge after route) is consistent
+        currentPhase = BossPhase.Exhausted;
     }
 
-    /// <summary>
-    /// Called when the player shoots the boss.
-    /// </summary>
+    public void EvaluateDesires()
+    {
+        if (desireEvaluator == null || tagRegistry == null) return;
+
+        DesireResult result = desireEvaluator.Evaluate(this, tagRegistry);
+
+        if (movementManager != null)
+        {
+            if (result.StrongestDesire == DesireType.CrystalDefense && LastThreatenedCrystal != null)
+            {
+                EnvironmentTag loop = tagRegistry.GetNearestTag(LastThreatenedCrystal.transform.position, EnvironmentTag.TagType.ObservationLoop);
+                if (loop != null)
+                {
+                    movementManager.RequestReturnToCoil(loop.gameObject);
+                }
+
+                if (breathController != null)
+                {
+                    breathController.FireBreath(BreathType.Fire, result.TargetPosition);
+                }
+
+                if (requestBroker != null)
+                {
+                    requestBroker.RequestMinions(SpawnIntent.DefendCrystal, LastThreatenedCrystal.transform.position);
+                }
+            }
+            else if (result.StrongestDesire == DesireType.Regeneration)
+            {
+                if (regenerator != null && result.TargetTransform != null)
+                {
+                    HealthCrystal crystal = result.TargetTransform.GetComponentInParent<HealthCrystal>();
+                    if (crystal != null)
+                    {
+                        regenerator.BeginRegeneration(crystal);
+                    }
+                }
+            }
+            else if (result.StrongestDesire == DesireType.Survival)
+            {
+                movementManager.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Withdraw, transform.position + Vector3.up * 30f);
+            }
+        }
+    }
+
+    private void OnBossDamagedInterrupt(BossCreature boss, ElementTypeOB7 type)
+    {
+        if (boss == this) EvaluateDesires();
+    }
+
+    private void OnCrystalDamagedInterrupt(HealthCrystal crystal)
+    {
+        LastThreatenedCrystal = crystal;
+        crystalThreatTimeout = 5f;
+        EvaluateDesires();
+    }
+
+    private void OnCrystalDestroyedInterrupt(HealthCrystal crystal)
+    {
+        if (LastThreatenedCrystal == crystal) LastThreatenedCrystal = null;
+        EvaluateDesires();
+    }
+
+    private void OnMinionDiedInterrupt(GameObject minion)
+    {
+        lostMinionCount++;
+        EvaluateDesires();
+    }
+
+    private void OnStatusEndedInterrupt()
+    {
+        EvaluateDesires();
+    }
+
+    public float GetCurrentHealthPct()
+    {
+        return maxHealth > 0 ? currentHealth / maxHealth : 0f;
+    }
+
     public void TakeDamage(float baseAmount, Vector3 hitPoint, ElementTypeOB7 arrowType = ElementTypeOB7.Normal)
     {
         // 0. Trigger Status Effects (Slows, Freezes)
@@ -230,6 +355,8 @@ public class BossCreature : MonoBehaviour
         {
             statusEffects.ApplyElementalEffect(arrowType);
         }
+
+        if (eventBus != null) eventBus.TriggerBossDamaged(this, arrowType);
 
         // 1. Calculate actual damage based on elemental weaknesses/resistances
         float actualDamage = baseAmount;
@@ -323,9 +450,9 @@ public class BossCreature : MonoBehaviour
         }
 
         // Stop movement
-        if (movementSystem != null)
+        if (movementManager != null)
         {
-            movementSystem.enabled = false;
+            movementManager.enabled = false;
         }
 
         // Command all indestructible pieces (Head, Legs, Tail) to dissolve
