@@ -36,7 +36,6 @@ public class AirborneBossMovement : BaseBossMovement
     public float bodyUndulationRate = 2f;
     public float coilTightness = 5f;
     public float minTurnRadius = 3f;
-    public float blendDuration = 2f;
 
     private SplineFollower splineFollower;
     private CreatureStatusEffects statusEffects;
@@ -44,6 +43,7 @@ public class AirborneBossMovement : BaseBossMovement
 
     // Blending state
     private float blendTimer = 0f;
+    private float dynamicBlendDuration = 2f;
     private Vector3 blendStartPosition;
     private Quaternion blendStartRotation;
 
@@ -108,8 +108,21 @@ public class AirborneBossMovement : BaseBossMovement
 
             if (splineFollower != null)
             {
-                splineFollower.spline = observationPath.GetComponentInChildren<SplineComputer>();
+                SplineComputer targetSpline = observationPath.GetComponentInChildren<SplineComputer>();
+                splineFollower.spline = targetSpline;
                 splineFollower.follow = false; // Stay manual until blend finishes
+
+                if (targetSpline != null)
+                {
+                    // Calculate distance to nearest point on target spline
+                    SplineSample targetSample = new SplineSample();
+                    targetSpline.Project(transform.position, ref targetSample);
+                    float distanceToSpline = Vector3.Distance(transform.position, targetSample.position);
+
+                    // Dynamic duration based on consistent flight speed
+                    dynamicBlendDuration = distanceToSpline / (baseFlightSpeed > 0 ? baseFlightSpeed : 1f);
+                    if (dynamicBlendDuration < 0.5f) dynamicBlendDuration = 0.5f; // ensure it doesn't snap instantly if super close
+                }
             }
         }
     }
@@ -172,7 +185,7 @@ public class AirborneBossMovement : BaseBossMovement
         }
 
         blendTimer += Time.deltaTime * currentSpeedMultiplier; // Slow down blend if frozen
-        float t = Mathf.Clamp01(blendTimer / blendDuration);
+        float t = Mathf.Clamp01(blendTimer / dynamicBlendDuration);
 
         // Use smoothstep for easing
         t = t * t * (3f - 2f * t);
