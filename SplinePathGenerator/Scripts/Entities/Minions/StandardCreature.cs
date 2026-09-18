@@ -36,6 +36,13 @@ public class StandardCreature : MonoBehaviour, IArrowTarget
         if (layerIndex != -1)
         {
             gameObject.layer = layerIndex;
+
+            // Explicitly iterate through all child colliders to ensure nested physical colliders receive the layer
+            Collider[] colliders = GetComponentsInChildren<Collider>(true);
+            foreach (Collider col in colliders)
+            {
+                col.gameObject.layer = layerIndex;
+            }
         }
         else
         {
