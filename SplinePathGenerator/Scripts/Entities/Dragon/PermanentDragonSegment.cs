@@ -11,18 +11,6 @@ public class PermanentDragonSegment : DragonSegment
     {
         // Force this to be indestructible just in case the manager didn't catch it
         isDestructiblePart = false;
-
-        // Ensure DissolveEffect waits for TriggerTotalDeath
-        DissolveEffect effect = GetComponentInChildren<DissolveEffect>();
-        if (effect != null)
-        {
-            // Safely toggle the private field so this piece doesn't accidentally bypass health logic and visually explode when shot
-            System.Reflection.FieldInfo field = effect.GetType().GetField("dissolveImmediatelyOnHit", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            if (field != null)
-            {
-                field.SetValue(effect, false);
-            }
-        }
     }
 
     protected override void Die()

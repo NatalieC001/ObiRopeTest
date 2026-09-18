@@ -231,8 +231,8 @@ public class StickingArrow : MonoBehaviour
 
         if (effect != null && !isDestroying)
         {
-            effect.TriggerDissolve();
-            yield return new WaitForSeconds(1.5f);
+            effect.TriggerDissolve(CleanupArrow);
+            yield break;
         }
 
         CleanupArrow();

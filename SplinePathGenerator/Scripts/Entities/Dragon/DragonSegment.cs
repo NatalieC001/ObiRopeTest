@@ -121,21 +121,6 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
         }
     }
 
-    private void Start()
-    {
-        // For destructible body parts, we intercept the OnDissolveCompleted event right from the start.
-        // The DissolveEffect script naturally handles the arrow hit and plays the animation immediately.
-        // We just sit back and wait for it to finish, then we obliterate the root object and close the gap.
-        if (isDestructiblePart)
-        {
-            DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
-            if (dissolve != null)
-            {
-                dissolve.OnDissolveCompleted += FinalizeDestruction;
-            }
-        }
-    }
-
     protected virtual void Die()
     {
         if (!isDestructiblePart) return;
@@ -162,27 +147,16 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
             }
         }
 
-        // Explicitly command the segment's visual effect to start dissolving!
-        // This will eventually fire the OnDissolveCompleted event we subscribed to in Start,
-        // which will trigger FinalizeDestruction().
         DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
         if (dissolve != null)
         {
-            dissolve.TriggerDissolve();
+            dissolve.TriggerDissolve(FinalizeDestruction);
         }
         else
         {
-            // Fallback: If no DissolveEffect exists to fire the event, we just destroy it now
             FinalizeDestruction();
         }
     }
-
-    private void OnDestroy()
-    {
-        // Clean up the event listener to avoid memory leaks
-        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
-        if (dissolve != null)
-        {
             dissolve.OnDissolveCompleted -= FinalizeDestruction;
         }
     }

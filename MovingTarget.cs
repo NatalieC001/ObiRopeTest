@@ -278,7 +278,7 @@ public class MovingTarget : MonoBehaviour, IArrowTarget
             DissolveEffect[] dissolveComponents = GetComponentsInChildren<DissolveEffect>();
             foreach (DissolveEffect effect in dissolveComponents)
             {
-                effect.TriggerDissolve();
+                effect.TriggerDissolve(null); // Now delegates to DissolveManager
             }
 
             Destroy(gameObject, deathDespawnDelay);

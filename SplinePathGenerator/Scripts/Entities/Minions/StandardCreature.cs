@@ -5,7 +5,7 @@ using UnityEngine;
 /// These are typically the grunts that ride geometric spline shapes and use the Swarm logic,
 /// clearly separated from the basic 'MovingTarget' test objects.
 /// </summary>
-public class StandardCreature : MonoBehaviour
+public class StandardCreature : MonoBehaviour, IArrowTarget
 {
     [System.Serializable]
     public struct ElementalModifier
@@ -54,6 +54,11 @@ public class StandardCreature : MonoBehaviour
     /// <summary>
     /// Called when the player shoots this creature.
     /// </summary>
+    public void OnArrowHit(float damage, Vector3 impactPoint, ElementTypeOB7 elementType)
+    {
+        TakeDamage(damage, impactPoint, elementType);
+    }
+
     public virtual void TakeDamage(float baseAmount, Vector3 hitPoint, ElementTypeOB7 arrowType = ElementTypeOB7.Normal)
     {
         // 0. Trigger Status Effects (Slows, Freezes)
@@ -114,7 +119,16 @@ public class StandardCreature : MonoBehaviour
             follower.follow = false;
         }
 
-        // Trigger death effects here (dissolve, ragdoll, etc.)
-        Destroy(gameObject);
+        DissolveEffect dissolve = GetComponentInChildren<DissolveEffect>();
+        if (dissolve != null)
+        {
+            dissolve.TriggerDissolve(() => {
+                Destroy(gameObject);
+            });
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
     }
 }

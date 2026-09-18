@@ -485,7 +485,7 @@ public class SegmentedDragonManager : MonoBehaviour
                 DissolveEffect dissolve = segment.GetComponentInChildren<DissolveEffect>();
                 if (dissolve != null)
                 {
-                    System.Reflection.FieldInfo durationField = dissolve.GetType().GetField("dissolveDuration", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    System.Reflection.FieldInfo durationField = dissolve.GetType().GetField("dissolveDuration", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
                     if (durationField != null)
                     {
                         float duration = (float)durationField.GetValue(dissolve);
