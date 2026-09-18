@@ -29,6 +29,8 @@ public class StandardCreature : MonoBehaviour, IArrowTarget
 
     private CreatureStatusEffects statusEffects;
 
+    private bool isDead = false;
+
     private void Awake()
     {
         // Force the physics layer so arrows detect this creature, even if the dev forgot to set it!
@@ -63,11 +65,13 @@ public class StandardCreature : MonoBehaviour, IArrowTarget
     /// </summary>
     public void OnArrowHit(float damage, Vector3 impactPoint, ElementTypeOB7 elementType)
     {
+
         TakeDamage(damage, impactPoint, elementType);
     }
 
     public virtual void TakeDamage(float baseAmount, Vector3 hitPoint, ElementTypeOB7 arrowType = ElementTypeOB7.Normal)
     {
+        if (isDead) return;
         // 0. Trigger Status Effects (Slows, Freezes)
         if (statusEffects != null)
         {
@@ -117,6 +121,7 @@ public class StandardCreature : MonoBehaviour, IArrowTarget
 
     protected virtual void Die()
     {
+        isDead = true;
         Debug.Log($"[StandardCreature] {gameObject.name} has died.");
 
         // Ensure we detach from any Dreamteck splines properly upon death

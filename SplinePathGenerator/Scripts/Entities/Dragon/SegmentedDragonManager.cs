@@ -485,16 +485,8 @@ public class SegmentedDragonManager : MonoBehaviour
                 DissolveEffect dissolve = segment.GetComponentInChildren<DissolveEffect>();
                 if (dissolve != null)
                 {
-                    System.Reflection.FieldInfo durationField = dissolve.GetType().GetField("dissolveDuration", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                    if (durationField != null)
-                    {
-                        float duration = (float)durationField.GetValue(dissolve);
-                        if (duration > longestDissolveDuration) longestDissolveDuration = duration;
-                    }
-                    else
-                    {
-                        if (1.5f > longestDissolveDuration) longestDissolveDuration = 1.5f; // Fallback
-                    }
+                    float duration = dissolve.dissolveDuration;
+                    if (duration > longestDissolveDuration) longestDissolveDuration = duration;
                 }
             }
         }

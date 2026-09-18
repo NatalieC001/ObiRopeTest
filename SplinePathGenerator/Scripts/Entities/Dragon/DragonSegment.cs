@@ -33,6 +33,8 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
     // The index of this segment in the manager's list (Head = 0)
     public int SegmentIndex { get; set; }
     public SplineFollower Follower => follower;
+    private bool isDead = false;
+
 
     private void Awake()
     {
@@ -96,6 +98,8 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
     public virtual void TakeDamage(float amount, Vector3 hitPoint, ElementTypeOB7 arrowType = ElementTypeOB7.Normal)
     {
         // Pass damage up to the brain so the overall boss loses health and can trigger evasions!
+        if (isDead) return;
+
         if (bossBrain != null)
         {
             // The boss brain calculates actual damage using its own elemental modifiers
@@ -123,6 +127,8 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
 
     protected virtual void Die()
     {
+        isDead = true;
+
         if (!isDestructiblePart) return;
 
         Debug.Log($"<color=red>[DragonSegment] Segment {SegmentIndex} health reached 0!</color>");
@@ -155,9 +161,6 @@ public class DragonSegment : MonoBehaviour, IArrowTarget
         else
         {
             FinalizeDestruction();
-        }
-    }
-            dissolve.OnDissolveCompleted -= FinalizeDestruction;
         }
     }
 
