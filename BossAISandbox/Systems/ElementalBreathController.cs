@@ -20,6 +20,7 @@ public class ElementalBreathController : MonoBehaviour
     public GameObject darkSpiritBreathPrefab;
 
     [Header("Fire Point")]
+    [Tooltip("Leave empty to auto-fetch from BossCreature")]
     public Transform mouthTransform;
 
     private BossCreature brain;
@@ -34,6 +35,12 @@ public class ElementalBreathController : MonoBehaviour
 
     public void FireBreath(BreathType type, Vector3 targetPosition)
     {
+        // Try to fetch mouth transform from the brain if it wasn't assigned manually here
+        if (mouthTransform == null && brain != null)
+        {
+            mouthTransform = brain.mouthTransform;
+        }
+
         if (isBreathing || mouthTransform == null) return;
         StartCoroutine(BreathRoutine(type, targetPosition));
     }
@@ -57,10 +64,14 @@ public class ElementalBreathController : MonoBehaviour
             }
             else
             {
-                // Standard breath projectile
-                Vector3 dir = (targetPosition - mouthTransform.position).normalized;
-                GameObject proj = Instantiate(prefabToFire, mouthTransform.position, Quaternion.LookRotation(dir));
-                // Add velocity to proj, etc...
+                // Safety check inside coroutine in case anatomy was destroyed
+                if (mouthTransform != null)
+                {
+                    // Standard breath projectile
+                    Vector3 dir = (targetPosition - mouthTransform.position).normalized;
+                    GameObject proj = Instantiate(prefabToFire, mouthTransform.position, Quaternion.LookRotation(dir));
+                    // Add velocity to proj, etc...
+                }
             }
         }
 
