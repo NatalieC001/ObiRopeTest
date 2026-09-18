@@ -38,6 +38,9 @@ public class ElementalBreathController : MonoBehaviour
         // Try to fetch mouth transform from the brain if it wasn't assigned manually here
         if (mouthTransform == null && brain != null)
         {
+            // The head prefab might have taken a few frames to spawn, so we instruct
+            // the brain to locate the mouth right now!
+            brain.FindMouthTransform();
             mouthTransform = brain.mouthTransform;
         }
 

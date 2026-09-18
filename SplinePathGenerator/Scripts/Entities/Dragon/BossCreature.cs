@@ -162,7 +162,8 @@ public class BossCreature : MonoBehaviour
             dragonBody.InitializeDragon(startingSpline);
         }
 
-        FindMouthTransform();
+        // Note: We don't call FindMouthTransform() here because the head prefab takes time to instantiate.
+        // It will be found dynamically the first time an attack is requested.
 
         // Give the evaluator time to think, ensuring its first state matches what it wants to do!
         EvaluateDesires();
@@ -171,7 +172,7 @@ public class BossCreature : MonoBehaviour
     /// <summary>
     /// Dynamically searches all children (even deeply nested ones) for an object exactly named 'MouthTransform'.
     /// </summary>
-    private void FindMouthTransform()
+    public void FindMouthTransform()
     {
         if (mouthTransform != null) return; // Already assigned in Inspector
 
