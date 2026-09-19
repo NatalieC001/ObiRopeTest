@@ -65,7 +65,6 @@ public class RegeneratorController : MonoBehaviour
             movementManager.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Withdraw, transform.position + Vector3.up * 20f);
         }
 
-        // We could manually trigger a Desire evaluation here to re-prioritize
         if (brain != null)
         {
             PixelCrushers.MessageSystem.SendMessage(this, "Brain", "RechargeFull", string.Empty);

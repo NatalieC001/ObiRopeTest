@@ -112,6 +112,11 @@ public class BossCreature : MonoBehaviour
         }
     }
 
+    public void ClearThreatenedCrystal()
+    {
+        LastThreatenedCrystal = null;
+    }
+
     private void OnCrystalDamagedInterrupt(HealthCrystal crystal)
     {
         LastThreatenedCrystal = crystal;
@@ -157,6 +162,7 @@ public class BossCreature : MonoBehaviour
 
         currentHealth -= actualDamage;
         recentDamageAccumulator += actualDamage;
+        damageDecayTimer = 0f;
 
         if (currentHealth <= 0)
         {

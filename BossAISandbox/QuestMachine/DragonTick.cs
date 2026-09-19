@@ -16,6 +16,7 @@ public class DragonTick : MonoBehaviour
     private BossCreature.BossPhase lastPhase;
     private float lastHealthPct;
     private int lastMinionCount;
+    private HealthCrystal lastThreatenedCrystal;
 
     private void Start()
     {
@@ -54,8 +55,7 @@ public class DragonTick : MonoBehaviour
             brain.crystalThreatTimeout -= Time.deltaTime;
             if (brain.crystalThreatTimeout <= 0f)
             {
-                // Trigger an event bus or direct property nullification
-                // (LastThreatenedCrystal is managed via EventBus in BossCreature)
+                brain.ClearThreatenedCrystal();
             }
         }
 
@@ -101,7 +101,8 @@ public class DragonTick : MonoBehaviour
         // 1. Check if Crystal became safe
         if (brain.LastThreatenedCrystal == null && brain.crystalThreatTimeout <= 0f)
         {
-            MessageSystem.SendMessage(this, "Brain", "CrystalSafe", string.Empty);
+            if (lastThreatenedCrystal != null) MessageSystem.SendMessage(this, "Brain", "CrystalSafe", string.Empty);
+            lastThreatenedCrystal = null;
         }
 
         if (brain.LastThreatenedCrystal != null && brain.LastThreatenedCrystal.IsDestroyed)
