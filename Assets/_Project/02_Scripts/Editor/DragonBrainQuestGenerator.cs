@@ -21,27 +21,33 @@ public class DragonBrainQuestGenerator : EditorWindow
         // Helper to create and properly assign a QuestNode to the quest
         QuestNode CreateNode(string id, QuestNodeType type, Vector2 position)
         {
-            QuestNode node = ScriptableObject.CreateInstance<QuestNode>();
-            node.SetRuntimeReferences(quest);
+            // QuestNode is a standard class, NOT a ScriptableObject
+            QuestNode node = new QuestNode();
             node.id = new StringField(id);
             node.internalName = new StringField(id);
-            node.nodeType = type;
             node.canvasRect = new Rect(position.x, position.y, 150, 50);
 
+            // Establish state info arrays if they aren't initialized
+            node.stateInfo = new QuestNodeStateInfo[2];
+            node.stateInfo[(int)QuestNodeState.Inactive] = new QuestNodeStateInfo();
+            node.stateInfo[(int)QuestNodeState.Active] = new QuestNodeStateInfo();
+            node.stateInfo[(int)QuestNodeState.True] = new QuestNodeStateInfo();
+
             quest.nodeList.Add(node);
-            AssetDatabase.AddObjectToAsset(node, quest);
             return node;
         }
 
         // Creates a Condition Node and adds an Action to its Active state
         QuestNode CreateStateNode(string id, string actionTarget, string actionMessage, Vector2 position)
         {
-            QuestNode node = CreateNode(id, QuestNodeType.Condition, position);
+            // Note: In Quest Machine, QuestNodeType.Normal is used for objective/condition check steps
+            QuestNode node = CreateNode(id, QuestNodeType.Normal, position);
 
             // Add the action to the Active state
             if (!string.IsNullOrEmpty(actionTarget) && !string.IsNullOrEmpty(actionMessage))
             {
-                var actionList = node.GetStateInfo(QuestNodeState.Active).actionList;
+                var stateInfo = node.GetStateInfo(QuestNodeState.Active);
+                if (stateInfo.actionList == null) stateInfo.actionList = new System.Collections.Generic.List<QuestAction>();
 
                 MessageQuestAction msgAction = ScriptableObject.CreateInstance<MessageQuestAction>();
                 msgAction.senderID = new StringField("");
@@ -49,7 +55,7 @@ public class DragonBrainQuestGenerator : EditorWindow
                 msgAction.message = new StringField(actionMessage);
                 msgAction.parameter = new StringField("");
 
-                actionList.Add(msgAction);
+                stateInfo.actionList.Add(msgAction);
                 AssetDatabase.AddObjectToAsset(msgAction, quest);
             }
             return node;
@@ -61,11 +67,15 @@ public class DragonBrainQuestGenerator : EditorWindow
             int childIndex = quest.nodeList.IndexOf(dest);
             if (childIndex >= 0)
             {
+                if (source.childIndexList == null) source.childIndexList = new System.Collections.Generic.List<int>();
                 source.childIndexList.Add(childIndex);
             }
 
             if (!string.IsNullOrEmpty(msgTarget) && !string.IsNullOrEmpty(msgString))
             {
+                if (dest.conditionSet == null) dest.conditionSet = new QuestConditionSet();
+                if (dest.conditionSet.conditionList == null) dest.conditionSet.conditionList = new System.Collections.Generic.List<QuestCondition>();
+
                 MessageQuestCondition msgCondition = ScriptableObject.CreateInstance<MessageQuestCondition>();
                 msgCondition.senderID = new StringField("");
                 msgCondition.targetID = new StringField(msgTarget);
@@ -79,9 +89,8 @@ public class DragonBrainQuestGenerator : EditorWindow
 
         // --- CREATE ALL NODES FROM GRAPH ---
 
-        // 2. Create Start Node and assign it properly
+        // 2. Create Start Node and assign it first (Index 0 automatically makes it the startNode)
         QuestNode startNode = CreateNode("Start", QuestNodeType.Start, new Vector2(800, 50));
-        quest.startNode = startNode;
 
         // Hubs
         QuestNode orchNode = CreateStateNode("Orchestrator", "", "", new Vector2(800, 150));
@@ -198,12 +207,11 @@ public class DragonBrainQuestGenerator : EditorWindow
         ConnectWithCondition(absorbNode, desperateNode, "Brain", "NoCrystalsLeft");
         ConnectWithCondition(desperateNode, relentlessNode, "", "");
 
-        // 4. Save and Refresh
+        // Save modifications to the asset file
         EditorUtility.SetDirty(quest);
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
 
-        Debug.Log($"[DragonBrainQuestGenerator] Successfully generated automated Quest Machine brain at: {path}");
-        Selection.activeObject = quest;
+        Debug.Log("Dragon Brain Quest successfully built and saved to asset path.");
     }
 }
