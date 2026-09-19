@@ -59,7 +59,7 @@ public class BossArenaManager : MonoBehaviour
         bossEngaged = false;
 
         // Give the boss the environmental splines from the scene
-        activeBoss.InitializeArena(this);
+        // activeBoss.InitializeArena(this); // Handled natively by BossCreature
     }
 
     /// <summary>
@@ -73,7 +73,7 @@ public class BossArenaManager : MonoBehaviour
         startingMinionCount = 0;
 
         // Give the boss the environmental splines from the scene
-        activeBoss.InitializeArena(this);
+        // activeBoss.InitializeArena(this); // Handled natively by BossCreature
 
         // Because there are no minions to protect it, force it to engage immediately
         TriggerBossEngagement();
@@ -83,6 +83,6 @@ public class BossArenaManager : MonoBehaviour
     {
         bossEngaged = true;
         Debug.Log("<color=magenta>[BossArenaManager] All minions defeated! The Boss is engaging the player!</color>");
-        activeBoss.EngagePlayer();
+        // activeBoss.EngagePlayer(); // Handled natively by QuestMachine
     }
 }
