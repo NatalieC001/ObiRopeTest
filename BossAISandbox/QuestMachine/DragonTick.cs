@@ -104,6 +104,11 @@ public class DragonTick : MonoBehaviour
             if (lastThreatenedCrystal != null) MessageSystem.SendMessage(this, "Brain", "CrystalSafe", string.Empty);
             lastThreatenedCrystal = null;
         }
+        else if (brain.LastThreatenedCrystal != null && lastThreatenedCrystal != brain.LastThreatenedCrystal)
+        {
+            // Track the new crystal so we can properly fire CrystalSafe when it expires
+            lastThreatenedCrystal = brain.LastThreatenedCrystal;
+        }
 
         if (brain.LastThreatenedCrystal != null && brain.LastThreatenedCrystal.IsDestroyed)
         {
