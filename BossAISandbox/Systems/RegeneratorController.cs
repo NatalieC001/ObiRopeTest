@@ -68,7 +68,7 @@ public class RegeneratorController : MonoBehaviour
         // We could manually trigger a Desire evaluation here to re-prioritize
         if (brain != null)
         {
-            brain.EvaluateDesires();
+            PixelCrushers.MessageSystem.SendMessage(this, "Brain", "RechargeFull", string.Empty);
         }
     }
 }

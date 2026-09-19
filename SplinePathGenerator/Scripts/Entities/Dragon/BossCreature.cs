@@ -74,7 +74,26 @@ public class BossCreature : MonoBehaviour
         SegmentedDragonManager dragonBody = GetComponent<SegmentedDragonManager>();
         if (dragonBody != null)
         {
-            dragonBody.InitializeDragon(null);
+            BossPathManager pathManager = FindFirstObjectByType<BossPathManager>();
+            GameObject initialPath = null;
+            if (pathManager != null)
+            {
+                System.Collections.Generic.List<GameObject> obsPaths = pathManager.GetObservationPaths(PathTypeTag.PathType.Airborne);
+                if (obsPaths.Count > 0)
+                {
+                    initialPath = obsPaths[UnityEngine.Random.Range(0, obsPaths.Count)];
+                    Dreamteck.Splines.SplineComputer spline = initialPath.GetComponentInChildren<Dreamteck.Splines.SplineComputer>();
+                    if (spline != null) transform.position = spline.EvaluatePosition(0.0);
+                    else transform.position = initialPath.transform.position;
+
+                    AirborneBossMovement movementManager = GetComponent<AirborneBossMovement>();
+                    if (movementManager != null)
+                    {
+                        movementManager.RequestReturnToCoil(initialPath);
+                    }
+                }
+            }
+            dragonBody.InitializeDragon(initialPath != null ? initialPath.GetComponentInChildren<Dreamteck.Splines.SplineComputer>() : null);
         }
 
         Renderer[] allRenderers = GetComponentsInChildren<Renderer>();

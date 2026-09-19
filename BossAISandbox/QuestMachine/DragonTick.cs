@@ -104,11 +104,15 @@ public class DragonTick : MonoBehaviour
             MessageSystem.SendMessage(this, "Brain", "CrystalSafe", string.Empty);
         }
 
+        if (brain.LastThreatenedCrystal != null && brain.LastThreatenedCrystal.IsDestroyed)
+        {
+            MessageSystem.SendMessage(this, "Brain", "CrystalDestroyed", string.Empty);
+        }
+
         // Segments Intact evaluation
         SegmentedDragonManager anatomy = GetComponent<SegmentedDragonManager>();
         if (anatomy != null)
         {
-            // (Placeholder evaluation depending on actual implementation of segments)
             if (anatomy.IsMissingSegments())
             {
                 MessageSystem.SendMessage(this, "Brain", "SegmentsMissing", string.Empty);
@@ -189,9 +193,9 @@ public class DragonTick : MonoBehaviour
                 EnvironmentTag tag = result.TargetTransform.GetComponent<EnvironmentTag>();
                 if (tag != null)
                 {
-                    if (tag.TagType == EnvironmentTag.TagType.Chokepoint) MessageSystem.SendMessage(this, "Brain", "TagChokepoint", string.Empty);
-                    if (tag.TagType == EnvironmentTag.TagType.HardCover) MessageSystem.SendMessage(this, "Brain", "TagCover", string.Empty);
-                    if (tag.TagType == EnvironmentTag.TagType.ToppleObject) MessageSystem.SendMessage(this, "Brain", "TagTopple", string.Empty);
+                    if (tag.type == EnvironmentTag.TagType.Chokepoint) MessageSystem.SendMessage(this, "Brain", "TagChokepoint", string.Empty);
+                    if (tag.type == EnvironmentTag.TagType.HardCover) MessageSystem.SendMessage(this, "Brain", "TagCover", string.Empty);
+                    if (tag.type == EnvironmentTag.TagType.ToppleObject) MessageSystem.SendMessage(this, "Brain", "TagTopple", string.Empty);
                 }
             }
         }

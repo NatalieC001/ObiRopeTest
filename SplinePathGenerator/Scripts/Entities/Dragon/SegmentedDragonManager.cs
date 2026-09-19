@@ -428,6 +428,11 @@ public class SegmentedDragonManager : MonoBehaviour
             }
         }
     }
+    public bool IsMissingSegments()
+    {
+        return activeSegments.Count < originalSegmentCount;
+    }
+
 
     public void PauseSplineFollow()
     {
