@@ -70,11 +70,7 @@ public class SegmentedDragonManager : MonoBehaviour
     private float headTotalDistance = 0f;
 
     // --- Regrowth state ---
-    private int originalSegmentCount = 0;
-    private Coroutine regenCoroutine;
-    [Tooltip("Seconds between regrowing one segment from the crystal.")]
-    public float secondsPerRegrow = 1f;
-    private bool regenerationLocked = false; // becomes true when crystal destroyed
+    public int originalSegmentCount { get; private set; } = 0;
 
     public void InitializeDragon(SplineComputer track)
     {
@@ -227,41 +223,7 @@ public class SegmentedDragonManager : MonoBehaviour
         totalBossPower += segment.powerContribution;
     }
 
-    /// <summary>
-    /// Start a regeneration loop while the crystal exists and is not destroyed.
-    /// Segments will be regrown at a rate of one per secondsPerRegrow until originalSegmentCount or crystal destroyed.
-    /// </summary>
-    public void StartRegeneration(HealthCrystal crystal)
-    {
-        if (regenerationLocked) return;
-        if (crystal == null || crystal.IsDestroyed) return;
-
-        StopRegeneration();
-        regenCoroutine = StartCoroutine(RegrowCoroutine(crystal));
-        Debug.Log("[SegmentedDragonManager] Starting regeneration from crystal.");
-    }
-
-    public void StopRegeneration()
-    {
-        if (regenCoroutine != null)
-        {
-            StopCoroutine(regenCoroutine);
-            regenCoroutine = null;
-            Debug.Log("[SegmentedDragonManager] Stopped regeneration.");
-        }
-    }
-
-    private IEnumerator RegrowCoroutine(HealthCrystal crystal)
-    {
-        while (crystal != null && !crystal.IsDestroyed && activeSegments.Count < originalSegmentCount && !regenerationLocked)
-        {
-            RegrowOneSegment();
-            yield return new WaitForSeconds(secondsPerRegrow);
-        }
-        regenCoroutine = null;
-    }
-
-    private void RegrowOneSegment()
+    public void RegrowOneSegment()
     {
         // Regrow at the index before tail: place just before the final tail segment if exists.
         int insertIndex = Mathf.Max(1, activeSegments.Count - 1); // don't insert before head
@@ -284,16 +246,6 @@ public class SegmentedDragonManager : MonoBehaviour
 
         OnSegmentCountChanged?.Invoke(activeSegments.Count);
         Debug.Log($"[SegmentedDragonManager] Regrew a body segment. New count: {activeSegments.Count}/{originalSegmentCount}");
-    }
-
-    /// <summary>
-    /// Call to permanently lock regeneration (e.g. when crystal destroyed).
-    /// </summary>
-    public void LockRegenerationPermanently()
-    {
-        regenerationLocked = true;
-        StopRegeneration();
-        Debug.Log("[SegmentedDragonManager] Regeneration permanently locked (crystal destroyed).");
     }
 
     /// <summary>

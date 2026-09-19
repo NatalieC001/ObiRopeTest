@@ -78,7 +78,25 @@ public class BossCreature : MonoBehaviour
         if (dragonBody != null)
         {
             Debug.Log("[BossCreature] Instructing SegmentedDragonManager to spawn anatomy...");
-            dragonBody.InitializeDragon(null);
+
+            BossPathManager pathManager = FindFirstObjectByType<BossPathManager>();
+            Dreamteck.Splines.SplineComputer startSpline = null;
+
+            if (pathManager != null)
+            {
+                var paths = pathManager.GetObservationPaths(PathTypeTag.PathType.Airborne);
+                if (paths.Count > 0 && paths[0] != null)
+                {
+                    startSpline = paths[0].GetComponentInChildren<Dreamteck.Splines.SplineComputer>();
+                }
+            }
+
+            if (startSpline == null)
+            {
+                Debug.LogWarning("[BossCreature] No Observation Spline found! Dragon will spawn at 0,0,0.");
+            }
+
+            dragonBody.InitializeDragon(startSpline);
         }
     }
 

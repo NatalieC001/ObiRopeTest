@@ -4,14 +4,16 @@ public class RegeneratorController : MonoBehaviour
 {
     [Header("Regeneration Limits")]
     public float maxRegenTime = 15f; // Hard cap
-    public float healthPerSecond = 5f;
+    public float secondsPerRegrow = 1.5f;
 
     private float currentRegenTimer = 0f;
+    private float segmentRegenTimer = 0f;
     private bool isRegenerating = false;
 
     private AirborneBossMovement movementManager;
     private MinionRequestBroker requestBroker;
     private SegmentedDragonManager segmentManager;
+    private HealthCrystal activeCrystal;
 
     private void Awake()
     {
@@ -26,19 +28,13 @@ public class RegeneratorController : MonoBehaviour
 
         isRegenerating = true;
         currentRegenTimer = 0f;
+        segmentRegenTimer = 0f;
+        activeCrystal = targetCrystal;
 
-        // 1. Move to the crystal
-        // BossCreature already blends to it via Desire Evaluator, but we ensure we are in a slower coil state
-
-        // 2. Refill minion reserve immediately
+        // Refill minion reserve immediately
         if (requestBroker != null)
         {
             requestBroker.RefillReserve();
-        }
-
-        if (segmentManager != null)
-        {
-            segmentManager.StartRegeneration(targetCrystal);
         }
 
         Debug.Log("[RegeneratorController] Dragon has begun regeneration loop.");
@@ -48,7 +44,23 @@ public class RegeneratorController : MonoBehaviour
     {
         if (!isRegenerating) return;
 
+        if (activeCrystal == null || activeCrystal.IsDestroyed)
+        {
+            FinishRegeneration();
+            return;
+        }
+
         currentRegenTimer += Time.deltaTime;
+        segmentRegenTimer += Time.deltaTime;
+
+        if (segmentManager != null && segmentRegenTimer >= secondsPerRegrow)
+        {
+            if (segmentManager.IsMissingSegments())
+            {
+                segmentManager.RegrowOneSegment();
+                segmentRegenTimer = 0f;
+            }
+        }
 
         if (currentRegenTimer >= maxRegenTime)
         {
@@ -60,12 +72,10 @@ public class RegeneratorController : MonoBehaviour
     {
         isRegenerating = false;
         currentRegenTimer = 0f;
-        Debug.Log("[RegeneratorController] 15-second cap reached. Forcing Dragon off crystal.");
+        segmentRegenTimer = 0f;
+        activeCrystal = null;
 
-        if (segmentManager != null)
-        {
-            segmentManager.StopRegeneration();
-        }
+        Debug.Log("[RegeneratorController] Regeneration finished. Forcing Dragon off crystal.");
 
         if (movementManager != null)
         {
