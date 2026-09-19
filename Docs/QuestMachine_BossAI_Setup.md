@@ -1,100 +1,72 @@
-# Dragon AI Behavior Tree (Consolidated Blueprint)
+# Dragon AI Behavior Tree (Automated Setup)
 
-> [!danger] EXACT NODE TYPE TO USE
-> **EVERY SINGLE NODE** in the graph below is a **Condition** node.
-> *(Do not use "Task". Use "Condition" nodes because they evaluate the incoming message from `DragonTick` before passing Success).*
+> [!tip] ZERO MANUAL SETUP REQUIRED
+> You do not need to look at the Inspector, add Actions to the Active state, or configure Conditions on the node blocks anymore!
 >
-> To create one, you must click exactly:
-> 1. **Right-Click** empty space in the Quest Editor.
-> 2. Select **Add Node**.
-> 3. Click **Condition**.
+> I have created an Editor Tool that will automatically build this entire Behavior Tree for you. It automatically creates every Node, writes all the Action strings, and properly places the Message conditions in the `Conditions` foldout (exactly as you showed me).
+>
+> **To generate the AI:**
+> 1. In Unity, go to the very top menu.
+> 2. Click exactly: **Archery Range -> Generate Dragon Brain Quest**
+> 3. The script will create a new file named `DragonBrain_Automated` in your `Assets` folder and highlight it for you.
+> 4. Simply drag this new `DragonBrain_Automated` asset into the `dragonBrainAsset` slot on your Boss Prefab's `DragonBrainController`.
 
 ---
 
-> [!tip] How to read this graph
-> - All the data you need to type into the Unity Inspector is inside the box.
-> - **Connections (Arrows)**: Just draw a line from the top node's **Green (Success) pin** to the node below it. No text goes on the connection itself.
+> [!info] Visual Reference
+> Below is the map of what the automated script generates behind the scenes. You do not need to build this manually anymore!
 
 ```mermaid
 flowchart TD
-    Start(["Node: Start"]) --> Orch
+    Start([Battle Starts]) --> Orch((Orchestrator))
 
-    Orch(["Node: Orchestrator (Condition)"])
+    Orch -->|Circle + Spawn Minions| Obs(Observation Spline)
+    Obs -.->|Player shoots Boss| Engage
+    Obs -.->|Minions beaten / Time| Engage
+    Obs -.->|Crystal destroyed| Rage
 
-    Orch --> Obs
-    Obs(["Node: Observation Spline (Condition)<br/>Condition: (Circle + Spawn Minions)"])
+    Engage((Engaged)) --> Eval{Weigh Desire vs Threat}
 
-    Obs -.-> Engage_Shoots
-    Engage_Shoots(["Node: Engaged (Condition)<br/>Condition: PlayerShootsBoss"])
+    Eval -->|Dominance, low threat| Pursue(Freestyle: Graceful Pursuit)
+    Pursue --> Swoop(Freestyle: Committed Swoop + Breath)
+    Swoop -->|Overshoot| Bank(Freestyle: Wide Bank + Reacquire)
+    Bank --> Pursue
 
-    Obs -.-> Engage_Time
-    Engage_Time(["Node: Engaged (Condition)<br/>Condition: Minions beaten / Time"])
+    Eval -->|Territory control| Bait(Freestyle: Drop Spirit Zones)
+    Bait --> Herd(Freestyle: Herd Player)
+    Herd --> Swoop
 
-    Obs -.-> Rage_Crystal
-    Rage_Crystal(["Node: Enraged (Condition)<br/>Condition: Crystal destroyed"])
+    Eval -->|Reserve rich, player pressured| Spawn(Freestyle: Spawn Wave)
+    Spawn -->|Tag: Chokepoint| Herd
+    Spawn -->|Tag: Cover| Flank(Freestyle: Flank via Cover)
 
-    Engage(["Node: Engaged (Condition)<br/>Action: Weigh Desire vs Threat"]) --> Pursue
-    Engage --> Bait
-    Engage --> Spawn
-    Engage --> Breath
-    Engage --> Defend
-    Engage --> Evade_Dmg
-    Engage --> Evade_Stamina
+    Eval -->|Elemental advantage| Breath(Freestyle: Breath Attack)
+    Breath -->|Tag: ToppleObject| Topple(Freestyle: Topple Object)
 
-    Pursue(["Node: Pursue (Condition)<br/>Condition: DesireDominance<br/>Action: Pursuit"]) --> Swoop
-    Swoop(["Node: Swoop (Condition)<br/>Action: Swoop"]) --> Bank
-    Bank(["Node: Bank (Condition)<br/>Condition: SwoopOvershoot<br/>Action: Bank"]) --> Pursue
+    Eval -->|Crystal threatened| Defend((Defender))
+    Eval -->|Burst damage / No stamina| Evade(Tactical Withdrawal)
+    Eval -->|Stamina empty| Evade
 
-    Bait(["Node: Bait (Condition)<br/>Condition: DesireTerritory<br/>Action: Bait"]) --> Herd
-    Herd(["Node: Herd (Condition)<br/>Action: Herd"]) --> Swoop
+    Defend -->|Crystal safe| Engage
+    Defend -->|Crystal destroyed| Rage
 
-    Spawn(["Node: Spawn (Condition)<br/>Condition: DesireSpawn<br/>Action: SpawnWave"]) --> Herd_Choke
-    Herd_Choke(["Node: Herd (Condition)<br/>Condition: TagChokepoint<br/>Action: Herd"])
+    Evade -->|Pick best spline via Tags| FlyEsc[Freestyle: Glide to Escape Spline]
+    FlyEsc --> Exhaust((Exhausted))
 
-    Spawn --> Flank
-    Flank(["Node: Flank (Condition)<br/>Condition: TagCover<br/>Action: Flank"])
+    Exhaust --> EscSpline(Ride Escape Spline)
+    EscSpline --> Recharge((Recharging))
+    Recharge --> RechargeLoop(Observation Spline - Regen Stamina)
+    RechargeLoop -->|Full, crystals intact| Engage
+    RechargeLoop -->|Full, crystals lost| Rage
 
-    Breath(["Node: Breath (Condition)<br/>Condition: DesireElement<br/>Action: Breath"]) --> Topple
-    Topple(["Node: Topple (Condition)<br/>Condition: TagToppleObject<br/>Action: Topple"])
+    Rage((Enraged)) --> RageEval{Segments Intact?}
+    RageEval -- Yes --> Relentless(Freestyle: All-in Aggression)
+    RageEval -- No --> Regen((Regenerator))
+    Relentless -->|Stamina zero| Exhaust
 
-    Defend(["Node: Defender (Condition)<br/>Condition: DesireDefend<br/>Action: DefendCrystal"])
-    Defend --> Engage_Safe
-    Engage_Safe(["Node: Engaged (Condition)<br/>Condition: Crystal safe"])
-
-    Defend --> Rage_Dest
-    Rage_Dest(["Node: Enraged (Condition)<br/>Condition: Crystal destroyed"])
-
-    Evade_Dmg(["Node: Evade (Condition)<br/>Condition: BurstDamageTaken<br/>Action: Evade"]) --> FlyEsc
-    Evade_Stamina(["Node: Evade (Condition)<br/>Condition: StaminaEmpty<br/>Action: Evade"]) --> FlyEsc
-
-    FlyEsc(["Node: Glide to Escape Spline (Condition)<br/>Action: (Pick best spline via Tags)"]) --> Exhaust
-
-    Exhaust(["Node: Exhausted (Condition)<br/>Action: Ride Escape Spline"]) --> EscSpline
-    EscSpline(["Node: EscSpline (Condition)<br/>Action: Ride Escape Spline"]) --> Recharge
-
-    Recharge(["Node: Recharging (Condition)<br/>Action: Recharging"]) --> RechargeLoop
-    RechargeLoop(["Node: RechargeLoop (Condition)<br/>Action: Observation Spline - Regen Stamina"])
-
-    RechargeLoop --> Engage_Full
-    Engage_Full(["Node: Engaged (Condition)<br/>Condition: RechargeFull"])
-
-    RechargeLoop --> Rage_Lost
-    Rage_Lost(["Node: Enraged (Condition)<br/>Condition: Crystals lost"])
-
-    Rage(["Node: Enraged (Condition)<br/>Action: Rage"]) --> Relentless
-    Rage --> Regen
-
-    Relentless(["Node: Relentless (Condition)<br/>Condition: SegmentsIntact<br/>Action: Relentless"]) --> Exhaust_Rage
-    Exhaust_Rage(["Node: Exhausted (Condition)<br/>Condition: StaminaEmpty<br/>Action: Evade"])
-
-    Regen(["Node: Regenerator (Condition)<br/>Condition: SegmentsMissing<br/>Action: Regenerate"]) --> Seek
-    Seek(["Node: Seek (Condition)<br/>Action: Fly to Nearest Crystal"]) --> Absorb
-    Absorb(["Node: Absorb (Condition)<br/>Action: Drain Crystal"])
-
-    Absorb --> Engage_Restored
-    Engage_Restored(["Node: Engaged (Condition)<br/>Condition: Segments restored"])
-
-    Absorb --> Desperate
-    Desperate(["Node: Desperate (Condition)<br/>Condition: NoCrystalsLeft<br/>Action: Desperate"]) --> Relentless_Desp
-    Relentless_Desp(["Node: Relentless (Condition)<br/>Action: Relentless"])
+    Regen --> Seek(Freestyle: Fly to Nearest Crystal)
+    Seek --> Absorb(Freestyle: Drain Crystal)
+    Absorb -->|Segments restored| Engage
+    Absorb -->|No crystals left| Desperate((Desperate))
+    Desperate --> Relentless
 ```
