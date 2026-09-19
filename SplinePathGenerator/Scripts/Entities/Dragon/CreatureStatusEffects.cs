@@ -17,12 +17,10 @@ public class CreatureStatusEffects : MonoBehaviour
     public float CurrentSpeedMultiplier { get; private set; } = 1f;
     
     private Coroutine activeSpeedModifier;
-    private BossEventBus eventBus;
 
     private void Awake()
     {
         follower = GetComponent<SplineFollower>();
-        eventBus = FindFirstObjectByType<BossEventBus>();
     }
 
     private void Start()
@@ -81,9 +79,9 @@ public class CreatureStatusEffects : MonoBehaviour
         // Effect ends
         ResetEffects();
 
-        if (isStasis && eventBus != null)
+        if (isStasis)
         {
-            eventBus.TriggerBossStatusEnded();
+            PixelCrushers.MessageSystem.SendMessage(this, "Brain", "StatusEnded", string.Empty);
         }
     }
 

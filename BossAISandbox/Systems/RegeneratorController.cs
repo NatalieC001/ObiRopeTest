@@ -11,18 +11,18 @@ public class RegeneratorController : MonoBehaviour
 
     private AirborneBossMovement movementManager;
     private MinionRequestBroker requestBroker;
-    private BossCreature brain;
+    private SegmentedDragonManager segmentManager;
 
     private void Awake()
     {
         movementManager = GetComponent<AirborneBossMovement>();
-        brain = GetComponent<BossCreature>();
+        segmentManager = GetComponent<SegmentedDragonManager>();
         requestBroker = FindFirstObjectByType<MinionRequestBroker>();
     }
 
     public void BeginRegeneration(HealthCrystal targetCrystal)
     {
-        if (targetCrystal == null || targetCrystal.isDestroyed) return;
+        if (targetCrystal == null || targetCrystal.IsDestroyed) return;
 
         isRegenerating = true;
         currentRegenTimer = 0f;
@@ -36,6 +36,11 @@ public class RegeneratorController : MonoBehaviour
             requestBroker.RefillReserve();
         }
 
+        if (segmentManager != null)
+        {
+            segmentManager.StartRegeneration(targetCrystal);
+        }
+
         Debug.Log("[RegeneratorController] Dragon has begun regeneration loop.");
     }
 
@@ -44,9 +49,6 @@ public class RegeneratorController : MonoBehaviour
         if (!isRegenerating) return;
 
         currentRegenTimer += Time.deltaTime;
-
-        // Simulate health restore & segment rebuild over time
-        // brain.Heal(healthPerSecond * Time.deltaTime);
 
         if (currentRegenTimer >= maxRegenTime)
         {
@@ -60,15 +62,16 @@ public class RegeneratorController : MonoBehaviour
         currentRegenTimer = 0f;
         Debug.Log("[RegeneratorController] 15-second cap reached. Forcing Dragon off crystal.");
 
+        if (segmentManager != null)
+        {
+            segmentManager.StopRegeneration();
+        }
+
         if (movementManager != null)
         {
             movementManager.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Withdraw, transform.position + Vector3.up * 20f);
         }
 
-        // We could manually trigger a Desire evaluation here to re-prioritize
-        if (brain != null)
-        {
-            brain.EvaluateDesires();
-        }
+        PixelCrushers.MessageSystem.SendMessage(this, "Brain", "RechargeFull", string.Empty);
     }
 }
