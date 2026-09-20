@@ -92,6 +92,10 @@ public class SegmentedDragonManager : MonoBehaviour
         SpawnSegment(headPrefab, currentIndex, track);
         headFollower = activeSegments[0].Follower;
 
+        // Ensure the head has zero local offset so it perfectly matches the root BossCreature's position
+        activeSegments[0].transform.localPosition = Vector3.zero;
+        activeSegments[0].transform.localRotation = Quaternion.identity;
+
         // Disable the head's follower component entirely. The body will follow the ROOT object instead!
         headFollower.enabled = false;
         headFollower.follow = false;
@@ -332,8 +336,9 @@ public class SegmentedDragonManager : MonoBehaviour
     {
         if (activeSegments.Count == 0) return;
 
-        // 1. Update the Breadcrumb History using the ROOT BOSS object, not the spawned head
-        Vector3 currentHeadPos = transform.position;
+        // 1. Update the Breadcrumb History using the actual Head Segment piece!
+        Transform actualHead = activeSegments[0].transform;
+        Vector3 currentHeadPos = actualHead.position;
         if (positionHistory.Count == 0) return;
         PositionData lastData = positionHistory[0];
 
@@ -346,7 +351,7 @@ public class SegmentedDragonManager : MonoBehaviour
             positionHistory.Insert(0, new PositionData
             {
                 position = currentHeadPos,
-                rotation = transform.rotation,
+                rotation = actualHead.rotation,
                 distanceTraveled = headTotalDistance
             });
 
@@ -388,9 +393,9 @@ public class SegmentedDragonManager : MonoBehaviour
 
     private void UpdateSegmentSpacing(bool animateSmoothly, float lerpT)
     {
-        // 3. Move all segments (including the Head at index 0) along the history buffer.
-        // Because they follow the root object, the head just trails at 0 distance!
-        for (int i = 0; i < activeSegments.Count; i++)
+        // 3. Move all segments (EXCEPT the Head at index 0) along the history buffer.
+        // The Head drives the history, so we don't move it backwards along its own trail.
+        for (int i = 1; i < activeSegments.Count; i++)
         {
             DragonSegment segment = activeSegments[i];
 

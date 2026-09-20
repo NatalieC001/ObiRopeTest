@@ -98,8 +98,8 @@ public class DesireEvaluator : MonoBehaviour
         }
 
         // --- 2. Evaluate Survival & Recovery (Health/Stamina driven) ---
-        float healthPct = brain.GetCurrentHealthPct();
-        if (healthPct < 0.3f)
+        float currentHealthPct = brain.GetCurrentHealthPct();
+        if (currentHealthPct < 0.3f)
         {
             result.StrongestDesire = DesireType.Survival;
             result.SecondChoice = DesireType.Regeneration;
@@ -111,7 +111,7 @@ public class DesireEvaluator : MonoBehaviour
                 result.TargetTransform = tag.transform;
                 result.TargetPosition = tag.transform.position;
             }
-            result.Urgency = 1f - healthPct;
+            result.Urgency = 1f - currentHealthPct;
             return result;
         }
 
