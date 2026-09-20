@@ -37,11 +37,53 @@ public class DesireEvaluator : MonoBehaviour
     public float vengeanceWeight = 1f;
     public float territoryWeight = 1f;
 
+    [Header("Dynamic Tuning")]
+    [Tooltip("How much random fuzziness to add to desire scores to prevent deterministic loops.")]
+    public float fuzzyLogicRange = 0.2f;
+    [Tooltip("Multiplier applied to aggressive desires for every missing body segment.")]
+    public float enrageMultiplierPerLostSegment = 0.2f;
+    [Tooltip("How long before a recently used desire fully recovers its priority.")]
+    public float desireCooldownDuration = 10f;
+    [Tooltip("How much to heavily penalize a desire if it was just used (spam prevention).")]
+    public float recentUsePenalty = 0.8f; // Cuts the weight by 80% if spammed
+
     // We can expand the weights as we iterate on the AI.
 
-    public DesireResult Evaluate(BossCreature brain, EnvironmentTagRegistry registry)
+    public DesireResult Evaluate(BossCreature brain, EnvironmentTagRegistry registry, DesireType lastDesire, float timeSinceLastDesire)
     {
         DesireResult result = new DesireResult();
+
+        // 0. Calculate Global Modifiers
+        float enrageBonus = 1.0f;
+        SegmentedDragonManager anatomy = brain.GetComponent<SegmentedDragonManager>();
+        if (anatomy != null && anatomy.originalSegmentCount > 0)
+        {
+            // Let's just use health percentage as an enrage modifier instead of segments to be safe.
+            float healthPct = brain.GetCurrentHealthPct();
+            enrageBonus = 1.0f + ((1.0f - healthPct) * 2.0f); // Up to 3x multiplier at 0% health
+        }
+
+        // Helper function for Fuzzy Logic + Anti-Spam
+        float GetDynamicWeight(DesireType type, float baseWeight, bool isAggressive)
+        {
+            float weight = baseWeight;
+
+            // Enrage multiplier for aggressive actions (Breath, Swoop)
+            if (isAggressive) weight *= enrageBonus;
+
+            // Anti-Spam: Diminishing returns if we just used this
+            if (type == lastDesire && timeSinceLastDesire < desireCooldownDuration)
+            {
+                // Gradually recover the weight as time passes
+                float recoveryRatio = timeSinceLastDesire / desireCooldownDuration;
+                float penalty = recentUsePenalty * (1.0f - recoveryRatio);
+                weight *= (1.0f - penalty);
+            }
+
+            // Fuzzy Logic: slight unpredictability
+            weight += Random.Range(-fuzzyLogicRange, fuzzyLogicRange);
+            return Mathf.Max(0, weight);
+        }
 
         // --- 1. Evaluate Crystal Defense (Absolute Priority if active) ---
         // If the brain tells us a crystal is currently threatened (e.g. within the last 5 seconds)
@@ -74,10 +116,23 @@ public class DesireEvaluator : MonoBehaviour
         }
 
         // --- 3. Default to Dominance/Vengeance (Combat focus) ---
+        // Instead of hardcoding, we run the weighted fuzzy logic to see what wins!
+        float domWeight = GetDynamicWeight(DesireType.Dominance, 1.0f, true);
+        float elemWeight = GetDynamicWeight(DesireType.ElementalAdvantage, 1.0f, true);
+        float spawnWeight = GetDynamicWeight(DesireType.Attrition, 0.8f, false);
+        float terrWeight = GetDynamicWeight(DesireType.Territory, 0.6f, false);
+
+        // Find the winner
+        float maxScore = domWeight;
         result.StrongestDesire = DesireType.Dominance;
-        result.SecondChoice = DesireType.Territory;
+
+        if (elemWeight > maxScore) { maxScore = elemWeight; result.StrongestDesire = DesireType.ElementalAdvantage; }
+        if (spawnWeight > maxScore) { maxScore = spawnWeight; result.StrongestDesire = DesireType.Attrition; }
+        if (terrWeight > maxScore) { maxScore = terrWeight; result.StrongestDesire = DesireType.Territory; }
+
+        result.SecondChoice = DesireType.None;
         result.TargetPosition = brain.transform.position; // Fallback
-        result.Urgency = 0.5f;
+        result.Urgency = 0.5f * enrageBonus; // Scales with enrage
 
         return result;
     }

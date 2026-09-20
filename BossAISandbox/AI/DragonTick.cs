@@ -18,6 +18,10 @@ public class DragonTick : MonoBehaviour, IMessageHandler
     private int lastMinionCount;
     private HealthCrystal lastThreatenedCrystal;
 
+    // Anti-spam tracking
+    [HideInInspector] public DesireType lastExecutedDesire = DesireType.None;
+    [HideInInspector] public float timeSinceLastDesire = 0f;
+
     private void Start()
     {
         tickInterval = 1f / updatesPerSecond;
@@ -88,6 +92,8 @@ public class DragonTick : MonoBehaviour, IMessageHandler
 
         // 10Hz Tick for decision-making and messaging
         tickTimer += Time.deltaTime;
+        timeSinceLastDesire += Time.deltaTime;
+
         if (tickTimer >= tickInterval)
         {
             tickTimer = 0f;
@@ -194,7 +200,7 @@ public class DragonTick : MonoBehaviour, IMessageHandler
 
         if (brain.lostMinionCount > lastMinionCount)
         {
-            MessageSystem.SendMessage(this, "Brain", "MinionBeaten", string.Empty);
+            MessageSystem.SendMessage(this, "Brain", "Minions beaten / Time", string.Empty);
             lastMinionCount = brain.lostMinionCount;
         }
 
@@ -214,32 +220,32 @@ public class DragonTick : MonoBehaviour, IMessageHandler
 
         if (evaluator != null && registry != null)
         {
-            DesireResult result = evaluator.Evaluate(brain, registry);
+            DesireResult result = evaluator.Evaluate(brain, registry, lastExecutedDesire, timeSinceLastDesire);
 
             // Map the desire output into the expected flowchart triggers
             if (result.StrongestDesire == DesireType.CrystalDefense)
             {
-                MessageSystem.SendMessage(this, "Brain", "DesireDefend", string.Empty);
+                MessageSystem.SendMessage(this, "Brain", "DesireDefend");
             }
             else if (result.StrongestDesire == DesireType.Survival)
             {
-                MessageSystem.SendMessage(this, "Brain", "DesireEvade", string.Empty);
+                MessageSystem.SendMessage(this, "Brain", "DesireEvade");
             }
             else if (result.StrongestDesire == DesireType.Dominance)
             {
-                MessageSystem.SendMessage(this, "Brain", "DesireDominance", string.Empty);
+                MessageSystem.SendMessage(this, "Brain", "DesireDominance");
             }
             else if (result.StrongestDesire == DesireType.Territory)
             {
-                MessageSystem.SendMessage(this, "Brain", "DesireTerritory", string.Empty);
+                MessageSystem.SendMessage(this, "Brain", "DesireTerritory");
             }
             else if (result.StrongestDesire == DesireType.ElementalAdvantage)
             {
-                MessageSystem.SendMessage(this, "Brain", "DesireElement", string.Empty);
+                MessageSystem.SendMessage(this, "Brain", "DesireElement");
             }
             else if (result.StrongestDesire == DesireType.Attrition)
             {
-                MessageSystem.SendMessage(this, "Brain", "DesireSpawn", string.Empty);
+                MessageSystem.SendMessage(this, "Brain", "DesireSpawn");
             }
 
             // Map additional situational context tags

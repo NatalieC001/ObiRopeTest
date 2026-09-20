@@ -78,6 +78,11 @@ public class DragonActionListeners : MonoBehaviour, IMessageHandler
                 if (brain != null) brain.currentPhase = BossCreature.BossPhase.Engaged;
                 if (movement != null) movement.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Pursue, playerPos);
                 if (breath != null) breath.FireBreath(BreathType.Fire, playerPos);
+
+                // Tell DragonTick what desire was executed so it can apply cooldowns
+                DragonTick tickSwoop = GetComponent<DragonTick>();
+                if (tickSwoop != null) { tickSwoop.lastExecutedDesire = DesireType.Dominance; tickSwoop.timeSinceLastDesire = 0f; }
+
                 Invoke(nameof(SimulateSwoopOvershoot), 2.5f);
                 break;
 
@@ -98,6 +103,11 @@ public class DragonActionListeners : MonoBehaviour, IMessageHandler
 
             case "SpawnWave":
                 if (spawner != null) spawner.RequestMinions(SpawnIntent.AllIn, playerPos);
+
+                DragonTick tickSpawn = GetComponent<DragonTick>();
+                if (tickSpawn != null) { tickSpawn.lastExecutedDesire = DesireType.Attrition; tickSpawn.timeSinceLastDesire = 0f; }
+
+                Invoke(nameof(SimulateActionComplete), 1.0f);
                 break;
 
             case "Flank":
@@ -108,11 +118,17 @@ public class DragonActionListeners : MonoBehaviour, IMessageHandler
             case "Breath":
                 if (brain != null) brain.currentPhase = BossCreature.BossPhase.Engaged;
                 if (breath != null) breath.FireBreath(BreathType.Fire, playerPos);
+
+                DragonTick tickBreath = GetComponent<DragonTick>();
+                if (tickBreath != null) { tickBreath.lastExecutedDesire = DesireType.ElementalAdvantage; tickBreath.timeSinceLastDesire = 0f; }
+
+                Invoke(nameof(SimulateActionComplete), 2.5f);
                 break;
 
             case "Topple":
                 if (brain != null) brain.currentPhase = BossCreature.BossPhase.Engaged;
                 if (movement != null) movement.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Pursue, playerPos);
+                Invoke(nameof(SimulateActionComplete), 2.0f);
                 break;
 
             case "DefendCrystal":
@@ -175,129 +191,12 @@ public class DragonActionListeners : MonoBehaviour, IMessageHandler
                 if (movement != null) movement.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Pursue, playerPos);
                 break;
 
-            // ---- Brain: signals that satisfy Quest Machine conditions ----
             case "Weigh Desire vs Threat":
-                break;
-
-            case "SwoopOvershoot":
-                MessageSystem.SendMessage(this, "Brain", "SwoopOvershoot");
-                break;
-
-            case "PlayerShootsBoss":
-                MessageSystem.SendMessage(this, "Brain", "PlayerShootsBoss");
-                break;
-
-            case "Minions beaten / Time":
-                MessageSystem.SendMessage(this, "Brain", "Minions beaten / Time");
-                break;
-
-            case "Crystal destroyed":
-                MessageSystem.SendMessage(this, "Brain", "Crystal destroyed");
-                break;
-
-            case "DesireDominance":
-                MessageSystem.SendMessage(this, "Brain", "DesireDominance");
-                break;
-
-            case "DesireTerritory":
-                MessageSystem.SendMessage(this, "Brain", "DesireTerritory");
-                break;
-
-            case "DesireSpawn":
-                MessageSystem.SendMessage(this, "Brain", "DesireSpawn");
-                break;
-
-            case "DesireElement":
-                MessageSystem.SendMessage(this, "Brain", "DesireElement");
-                break;
-
-            case "DesireDefend":
-                MessageSystem.SendMessage(this, "Brain", "DesireDefend");
-                break;
-
-            case "BurstDamageTaken":
-                MessageSystem.SendMessage(this, "Brain", "BurstDamageTaken");
-                break;
-
-            case "StaminaEmpty":
-                MessageSystem.SendMessage(this, "Brain", "StaminaEmpty");
-                break;
-
-            case "TagChokepoint":
-                MessageSystem.SendMessage(this, "Brain", "TagChokepoint");
-                break;
-
-            case "TagCover":
-                MessageSystem.SendMessage(this, "Brain", "TagCover");
-                break;
-
-            case "ActionComplete":
-                MessageSystem.SendMessage(this, "Brain", "ActionComplete");
-                break;
-
-            case "CrystalSafe":
-                MessageSystem.SendMessage(this, "Brain", "CrystalSafe");
-                break;
-
-            case "CrystalDestroyed":
-                MessageSystem.SendMessage(this, "Brain", "CrystalDestroyed");
-                break;
-
-            case "ReachedSafeAltitude":
-                MessageSystem.SendMessage(this, "Brain", "ReachedSafeAltitude");
-                break;
-
-            case "StaminaDepleted":
-                MessageSystem.SendMessage(this, "Brain", "StaminaDepleted");
-                break;
-
-            case "SafeZoneReached":
-                MessageSystem.SendMessage(this, "Brain", "SafeZoneReached");
-                break;
-
-            case "SplineEnd":
-                MessageSystem.SendMessage(this, "Brain", "SplineEnd");
-                break;
-
-            case "StaminaFullyCharged":
-                MessageSystem.SendMessage(this, "Brain", "StaminaFullyCharged");
-                break;
-
-            case "CrystalsLost":
-                MessageSystem.SendMessage(this, "Brain", "CrystalsLost");
-                break;
-
-            case "EnrageStart":
-                MessageSystem.SendMessage(this, "Brain", "EnrageStart");
-                break;
-
-            case "SegmentsBreached":
-                MessageSystem.SendMessage(this, "Brain", "SegmentsBreached");
-                break;
-
-            case "AngerMaxed":
-                MessageSystem.SendMessage(this, "Brain", "AngerMaxed");
-                break;
-
-            case "AtCrystal":
-                MessageSystem.SendMessage(this, "Brain", "AtCrystal");
-                break;
-
-            case "CrystalInterrupted":
-                MessageSystem.SendMessage(this, "Brain", "CrystalInterrupted");
-                break;
-
-            case "RegenComplete":
-                MessageSystem.SendMessage(this, "Brain", "RegenComplete");
-                break;
-
-            case "DesperateTimerEnd":
-                MessageSystem.SendMessage(this, "Brain", "DesperateTimerEnd");
                 break;
 
             case "Circle + Spawn Minions":
                 if (spawner != null) spawner.RequestMinions(SpawnIntent.Circle, playerPos);
-                MessageSystem.SendMessage(this, "Brain", "Circle + Spawn Minions");
+                MessageSystem.SendMessage(this, "Brain", "ActionComplete");
                 break;
         }
     }
@@ -305,5 +204,10 @@ public class DragonActionListeners : MonoBehaviour, IMessageHandler
     private void SimulateSwoopOvershoot()
     {
         MessageSystem.SendMessage(this, "Brain", "SwoopOvershoot");
+    }
+
+    private void SimulateActionComplete()
+    {
+        MessageSystem.SendMessage(this, "Brain", "ActionComplete");
     }
 }

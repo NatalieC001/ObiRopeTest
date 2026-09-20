@@ -231,10 +231,15 @@ public class SegmentedDragonManager : MonoBehaviour
 
         SpawnSegment(bodyPrefab, spawnIndex, bossSpline);
 
+        // Move the newly added segment to the correct index in the list
+        DragonSegment newSegment = activeSegments[activeSegments.Count - 1];
+        activeSegments.RemoveAt(activeSegments.Count - 1);
+        activeSegments.Insert(insertIndex, newSegment);
+
         // Re-register segments with spacing manager
         if (spacingManager != null)
         {
-            spacingManager.RegisterSegment(activeSegments[activeSegments.Count - 1]);
+            spacingManager.RegisterSegment(newSegment);
             spacingManager.RefreshSegments(activeSegments);
         }
 
