@@ -95,6 +95,19 @@ public class BossCreature : MonoBehaviour
             {
                 Debug.LogWarning("[BossCreature] No Observation Spline found! Dragon will spawn at 0,0,0.");
             }
+            else
+            {
+                // Physically relocate the dragon root to the start of the spline
+                Dreamteck.Splines.SplineSample sample = startSpline.Evaluate(0.0);
+                transform.position = sample.position;
+                transform.rotation = sample.rotation;
+
+                // Tell the movement manager to begin observing the spline
+                if (movementManager != null)
+                {
+                    movementManager.RequestReturnToCoil(startSpline.gameObject.transform.parent != null ? startSpline.gameObject.transform.parent.gameObject : startSpline.gameObject);
+                }
+            }
 
             dragonBody.InitializeDragon(startSpline);
         }

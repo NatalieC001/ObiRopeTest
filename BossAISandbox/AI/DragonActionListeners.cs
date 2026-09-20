@@ -19,7 +19,6 @@ public class DragonActionListeners : MonoBehaviour, IMessageHandler
         movement = GetComponent<AirborneBossMovement>();
         brain = GetComponent<BossCreature>();
         anatomy = GetComponent<SegmentedDragonManager>();
-        breath = GetComponent<ElementalBreathController>();
         spawner = FindFirstObjectByType<MinionRequestBroker>();
     }
 
@@ -27,21 +26,47 @@ public class DragonActionListeners : MonoBehaviour, IMessageHandler
     {
         MessageSystem.AddListener(this, "DragonActions", string.Empty);
         MessageSystem.AddListener(this, "Brain", string.Empty);
+        if (anatomy != null) anatomy.OnHeadSpawned += HandleHeadSpawned;
     }
 
     private void OnDisable()
     {
         MessageSystem.RemoveListener(this, "DragonActions", string.Empty);
         MessageSystem.RemoveListener(this, "Brain", string.Empty);
+        if (anatomy != null) anatomy.OnHeadSpawned -= HandleHeadSpawned;
+    }
+
+    private void HandleHeadSpawned()
+    {
+        breath = GetComponentInChildren<ElementalBreathController>(true);
     }
 
     public void OnMessage(MessageArgs messageArgs)
     {
         // PixelCrushers MessageSystem passes the actual command in the parameter
-        string action = messageArgs.parameter;
+        // Actually, the Quest Generator sets the Action target to "DragonActions" and the message to the action string
+        string action = messageArgs.message;
+
+        // Only process messages targeting "DragonActions" or "Brain"
+        // Since we registered for those in OnEnable, we should receive them, but we must check what they are.
+        // Wait, if the message string IS the action ("Pursuit"), we must check if we should process it.
+        // But we registered explicitly to listen to "DragonActions" and "Brain". So `messageArgs.message` will be "DragonActions" or "Brain"!
+        // Let's look at the generator again: targetID = "DragonActions", message = actionMessage, parameter = "".
+        // So the PixelCrushers MessageSystem will broadcast a message where `messageArgs.target` = "DragonActions", and `messageArgs.message` = "Pursuit".
+        // HOWEVER, `MessageSystem.AddListener(this, "DragonActions", "")` means "listen for messages where the `message` field is 'DragonActions'".
+        // This is wrong! The generator sends the action in the `message` field.
+        // To fix this without breaking the generator, we can read messageArgs.parameter if the generator set parameter, OR read messageArgs.message if we fixed the generator.
+
+        // I will fix the generator to send targetID = "", message = "DragonActions", parameter = "Pursuit".
+        string actionCommand = messageArgs.parameter;
         Vector3 playerPos = GameObject.FindGameObjectWithTag("Player")?.transform.position ?? Vector3.zero;
 
-        switch (action)
+        // We only want to execute actions if this message is targeted at DragonActions (i.e. the muscles).
+        // The Brain (Quest Machine) sends "DragonActions". If it's a message for the "Brain", we don't process it here,
+        // otherwise we would infinitely loop by re-broadcasting it.
+        if (action != "DragonActions") return;
+
+        switch (actionCommand)
         {
             // ---- DragonActions: visual/behavioral commands ----
             case "Pursuit":
@@ -103,8 +128,22 @@ public class DragonActionListeners : MonoBehaviour, IMessageHandler
                 if (brain != null) brain.currentPhase = BossCreature.BossPhase.Exhausted;
                 break;
 
+            case "Ride Escape Spline":
+                if (brain != null) brain.currentPhase = BossCreature.BossPhase.Exhausted;
+                if (movement != null) movement.ForceImmediateEvasion();
+                break;
+
             case "Recharging":
                 if (brain != null) brain.currentPhase = BossCreature.BossPhase.Recharging;
+                break;
+
+            case "Observation Spline - Regen Stamina":
+                if (brain != null) brain.currentPhase = BossCreature.BossPhase.Recharging;
+                if (movement != null)
+                {
+                    GameObject obsPath = movement.GetObservationPath(PathTypeTag.PathType.Airborne);
+                    movement.RequestReturnToCoil(obsPath);
+                }
                 break;
 
             case "Rage":
@@ -141,130 +180,130 @@ public class DragonActionListeners : MonoBehaviour, IMessageHandler
                 break;
 
             case "SwoopOvershoot":
-                MessageSystem.SendMessage(this, "SwoopOvershoot", "");
+                MessageSystem.SendMessage(this, "Brain", "SwoopOvershoot");
                 break;
 
             case "PlayerShootsBoss":
-                MessageSystem.SendMessage(this, "PlayerShootsBoss", "");
+                MessageSystem.SendMessage(this, "Brain", "PlayerShootsBoss");
                 break;
 
             case "Minions beaten / Time":
-                MessageSystem.SendMessage(this, "Minions beaten / Time", "");
+                MessageSystem.SendMessage(this, "Brain", "Minions beaten / Time");
                 break;
 
             case "Crystal destroyed":
-                MessageSystem.SendMessage(this, "Crystal destroyed", "");
+                MessageSystem.SendMessage(this, "Brain", "Crystal destroyed");
                 break;
 
             case "DesireDominance":
-                MessageSystem.SendMessage(this, "DesireDominance", "");
+                MessageSystem.SendMessage(this, "Brain", "DesireDominance");
                 break;
 
             case "DesireTerritory":
-                MessageSystem.SendMessage(this, "DesireTerritory", "");
+                MessageSystem.SendMessage(this, "Brain", "DesireTerritory");
                 break;
 
             case "DesireSpawn":
-                MessageSystem.SendMessage(this, "DesireSpawn", "");
+                MessageSystem.SendMessage(this, "Brain", "DesireSpawn");
                 break;
 
             case "DesireElement":
-                MessageSystem.SendMessage(this, "DesireElement", "");
+                MessageSystem.SendMessage(this, "Brain", "DesireElement");
                 break;
 
             case "DesireDefend":
-                MessageSystem.SendMessage(this, "DesireDefend", "");
+                MessageSystem.SendMessage(this, "Brain", "DesireDefend");
                 break;
 
             case "BurstDamageTaken":
-                MessageSystem.SendMessage(this, "BurstDamageTaken", "");
+                MessageSystem.SendMessage(this, "Brain", "BurstDamageTaken");
                 break;
 
             case "StaminaEmpty":
-                MessageSystem.SendMessage(this, "StaminaEmpty", "");
+                MessageSystem.SendMessage(this, "Brain", "StaminaEmpty");
                 break;
 
             case "TagChokepoint":
-                MessageSystem.SendMessage(this, "TagChokepoint", "");
+                MessageSystem.SendMessage(this, "Brain", "TagChokepoint");
                 break;
 
             case "TagCover":
-                MessageSystem.SendMessage(this, "TagCover", "");
+                MessageSystem.SendMessage(this, "Brain", "TagCover");
                 break;
 
             case "ActionComplete":
-                MessageSystem.SendMessage(this, "ActionComplete", "");
+                MessageSystem.SendMessage(this, "Brain", "ActionComplete");
                 break;
 
             case "CrystalSafe":
-                MessageSystem.SendMessage(this, "CrystalSafe", "");
+                MessageSystem.SendMessage(this, "Brain", "CrystalSafe");
                 break;
 
             case "CrystalDestroyed":
-                MessageSystem.SendMessage(this, "CrystalDestroyed", "");
+                MessageSystem.SendMessage(this, "Brain", "CrystalDestroyed");
                 break;
 
             case "ReachedSafeAltitude":
-                MessageSystem.SendMessage(this, "ReachedSafeAltitude", "");
+                MessageSystem.SendMessage(this, "Brain", "ReachedSafeAltitude");
                 break;
 
             case "StaminaDepleted":
-                MessageSystem.SendMessage(this, "StaminaDepleted", "");
+                MessageSystem.SendMessage(this, "Brain", "StaminaDepleted");
                 break;
 
             case "SafeZoneReached":
-                MessageSystem.SendMessage(this, "SafeZoneReached", "");
+                MessageSystem.SendMessage(this, "Brain", "SafeZoneReached");
                 break;
 
             case "SplineEnd":
-                MessageSystem.SendMessage(this, "SplineEnd", "");
+                MessageSystem.SendMessage(this, "Brain", "SplineEnd");
                 break;
 
             case "StaminaFullyCharged":
-                MessageSystem.SendMessage(this, "StaminaFullyCharged", "");
+                MessageSystem.SendMessage(this, "Brain", "StaminaFullyCharged");
                 break;
 
             case "CrystalsLost":
-                MessageSystem.SendMessage(this, "CrystalsLost", "");
+                MessageSystem.SendMessage(this, "Brain", "CrystalsLost");
                 break;
 
             case "EnrageStart":
-                MessageSystem.SendMessage(this, "EnrageStart", "");
+                MessageSystem.SendMessage(this, "Brain", "EnrageStart");
                 break;
 
             case "SegmentsBreached":
-                MessageSystem.SendMessage(this, "SegmentsBreached", "");
+                MessageSystem.SendMessage(this, "Brain", "SegmentsBreached");
                 break;
 
             case "AngerMaxed":
-                MessageSystem.SendMessage(this, "AngerMaxed", "");
+                MessageSystem.SendMessage(this, "Brain", "AngerMaxed");
                 break;
 
             case "AtCrystal":
-                MessageSystem.SendMessage(this, "AtCrystal", "");
+                MessageSystem.SendMessage(this, "Brain", "AtCrystal");
                 break;
 
             case "CrystalInterrupted":
-                MessageSystem.SendMessage(this, "CrystalInterrupted", "");
+                MessageSystem.SendMessage(this, "Brain", "CrystalInterrupted");
                 break;
 
             case "RegenComplete":
-                MessageSystem.SendMessage(this, "RegenComplete", "");
+                MessageSystem.SendMessage(this, "Brain", "RegenComplete");
                 break;
 
             case "DesperateTimerEnd":
-                MessageSystem.SendMessage(this, "DesperateTimerEnd", "");
+                MessageSystem.SendMessage(this, "Brain", "DesperateTimerEnd");
                 break;
 
             case "Circle + Spawn Minions":
                 if (spawner != null) spawner.RequestMinions(SpawnIntent.Circle, playerPos);
-                MessageSystem.SendMessage(this, "Circle + Spawn Minions", "");
+                MessageSystem.SendMessage(this, "Brain", "Circle + Spawn Minions");
                 break;
         }
     }
 
     private void SimulateSwoopOvershoot()
     {
-        MessageSystem.SendMessage(this, "SwoopOvershoot", "");
+        MessageSystem.SendMessage(this, "Brain", "SwoopOvershoot");
     }
 }

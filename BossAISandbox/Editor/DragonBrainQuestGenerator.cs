@@ -49,9 +49,9 @@ public class DragonBrainQuestGenerator : EditorWindow
                 MessageQuestAction msgAction =
                     ScriptableObject.CreateInstance<MessageQuestAction>();
                 msgAction.senderID = StringField.empty;
-                msgAction.targetID = new StringField(actionTarget);
-                msgAction.message = new StringField(actionMessage);
-                msgAction.parameter = new StringField("");
+                msgAction.targetID = StringField.empty;
+                msgAction.message = new StringField(actionTarget); // "DragonActions" or "Brain"
+                msgAction.parameter = new StringField(actionMessage); // "Pursuit", etc.
 
                 stateInfo.actionList.Add(msgAction);
                 AssetDatabase.AddObjectToAsset(msgAction, quest);
@@ -83,9 +83,9 @@ public class DragonBrainQuestGenerator : EditorWindow
                 MessageQuestCondition msgCondition =
                     ScriptableObject.CreateInstance<MessageQuestCondition>();
                 msgCondition.senderID = StringField.empty;
-                msgCondition.targetID = new StringField(msgTarget);
-                msgCondition.message = new StringField(msgString);
-                msgCondition.parameter = new StringField("");
+                msgCondition.targetID = StringField.empty;
+                msgCondition.message = new StringField(msgTarget); // "DragonActions" or "Brain"
+                msgCondition.parameter = new StringField(msgString); // "Pursuit", etc.
 
                 dest.conditionSet.conditionList.Add(msgCondition);
                 AssetDatabase.AddObjectToAsset(msgCondition, quest);

@@ -32,6 +32,9 @@ public class DragonBrainController : MonoBehaviour
             journal = gameObject.AddComponent<QuestJournal>();
         }
 
+        // Important: Register the dynamically created journal so the Quest Editor can find it
+        QuestMachine.RegisterQuestJournal(journal);
+
         journal.AddQuest(runtimeQuestInstance);
 
         // Force the quest to become active immediately (Starting the Start -> Orchestrator flow)
@@ -46,6 +49,12 @@ public class DragonBrainController : MonoBehaviour
             // Cleanly shut down the quest graph when the dragon despawns/dies
             runtimeQuestInstance.SetState(QuestState.Successful);
             Debug.Log($"[DragonBrainController] Shut down Quest Machine brain for {gameObject.name}");
+        }
+
+        QuestJournal journal = GetComponent<QuestJournal>();
+        if (journal != null)
+        {
+            QuestMachine.UnregisterQuestJournal(journal);
         }
     }
 }

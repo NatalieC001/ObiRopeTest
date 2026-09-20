@@ -53,11 +53,19 @@ public class RegeneratorController : MonoBehaviour
         currentRegenTimer += Time.deltaTime;
         segmentRegenTimer += Time.deltaTime;
 
-        if (segmentManager != null && segmentRegenTimer >= secondsPerRegrow)
+        if (segmentManager != null)
         {
             if (segmentManager.IsMissingSegments())
             {
-                segmentManager.RegrowOneSegment();
+                if (segmentRegenTimer >= secondsPerRegrow)
+                {
+                    segmentManager.RegrowOneSegment();
+                    segmentRegenTimer = 0f;
+                }
+            }
+            else
+            {
+                // Reset timer when full so we don't instantly regrow a lost segment
                 segmentRegenTimer = 0f;
             }
         }
