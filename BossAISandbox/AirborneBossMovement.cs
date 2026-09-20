@@ -121,6 +121,14 @@ public class AirborneBossMovement : BaseBossMovement
         {
             splineFollower.follow = true;
             splineFollower.followSpeed = splineFollower.followSpeed * currentSpeedMultiplier; // Modified by stasis/ice
+
+            // Check if we reached the end of the current spline
+            if (splineFollower.GetPercent() >= 0.99)
+            {
+                // Prevent spamming
+                splineFollower.follow = false;
+                PixelCrushers.MessageSystem.SendMessage(this, "Brain", "SplineEnd", string.Empty);
+            }
         }
     }
 
@@ -147,14 +155,23 @@ public class AirborneBossMovement : BaseBossMovement
         }
         else
         {
-            // Smoothly ease position and rotation
+            // Smoothly ease position and rotation toward the target
             Vector3 direction = (freestyleTargetPosition - transform.position).normalized;
             if (direction != Vector3.zero)
             {
                 Quaternion targetRotation = Quaternion.LookRotation(direction);
                 transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * coilTightness);
             }
-            transform.position += transform.forward * (effectiveSpeed * Time.deltaTime);
+
+            // INJECT SERPENTINE UNDULATION:
+            // Instead of flying perfectly straight (which causes the history buffer to be a straight line, making the dragon look stiff),
+            // we wobble the flight path left and right slightly over time. The history buffer will record this S-curve,
+            // and the body segments will naturally slither through it!
+            float undulationOffset = Mathf.Sin(Time.time * bodyUndulationRate * 2f) * 2.0f; // Scale up speed/width for flight
+            Vector3 flightPath = transform.forward * effectiveSpeed;
+            Vector3 wobblePath = transform.right * undulationOffset;
+
+            transform.position += (flightPath + wobblePath) * Time.deltaTime;
         }
     }
 
