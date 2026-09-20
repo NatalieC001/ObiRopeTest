@@ -4,33 +4,34 @@ public class RegeneratorController : MonoBehaviour
 {
     [Header("Regeneration Limits")]
     public float maxRegenTime = 15f; // Hard cap
-    public float healthPerSecond = 5f;
+    public float secondsPerRegrow = 1.5f;
 
     private float currentRegenTimer = 0f;
+    private float segmentRegenTimer = 0f;
     private bool isRegenerating = false;
 
     private AirborneBossMovement movementManager;
     private MinionRequestBroker requestBroker;
-    private BossCreature brain;
+    private SegmentedDragonManager segmentManager;
+    private HealthCrystal activeCrystal;
 
     private void Awake()
     {
         movementManager = GetComponent<AirborneBossMovement>();
-        brain = GetComponent<BossCreature>();
+        segmentManager = GetComponent<SegmentedDragonManager>();
         requestBroker = FindFirstObjectByType<MinionRequestBroker>();
     }
 
     public void BeginRegeneration(HealthCrystal targetCrystal)
     {
-        if (targetCrystal == null || targetCrystal.isDestroyed) return;
+        if (targetCrystal == null || targetCrystal.IsDestroyed) return;
 
         isRegenerating = true;
         currentRegenTimer = 0f;
+        segmentRegenTimer = 0f;
+        activeCrystal = targetCrystal;
 
-        // 1. Move to the crystal
-        // BossCreature already blends to it via Desire Evaluator, but we ensure we are in a slower coil state
-
-        // 2. Refill minion reserve immediately
+        // Refill minion reserve immediately
         if (requestBroker != null)
         {
             requestBroker.RefillReserve();
@@ -43,10 +44,31 @@ public class RegeneratorController : MonoBehaviour
     {
         if (!isRegenerating) return;
 
-        currentRegenTimer += Time.deltaTime;
+        if (activeCrystal == null || activeCrystal.IsDestroyed)
+        {
+            FinishRegeneration();
+            return;
+        }
 
-        // Simulate health restore & segment rebuild over time
-        // brain.Heal(healthPerSecond * Time.deltaTime);
+        currentRegenTimer += Time.deltaTime;
+        segmentRegenTimer += Time.deltaTime;
+
+        if (segmentManager != null)
+        {
+            if (segmentManager.IsMissingSegments())
+            {
+                if (segmentRegenTimer >= secondsPerRegrow)
+                {
+                    segmentManager.RegrowOneSegment();
+                    segmentRegenTimer = 0f;
+                }
+            }
+            else
+            {
+                // Reset timer when full so we don't instantly regrow a lost segment
+                segmentRegenTimer = 0f;
+            }
+        }
 
         if (currentRegenTimer >= maxRegenTime)
         {
@@ -58,17 +80,16 @@ public class RegeneratorController : MonoBehaviour
     {
         isRegenerating = false;
         currentRegenTimer = 0f;
-        Debug.Log("[RegeneratorController] 15-second cap reached. Forcing Dragon off crystal.");
+        segmentRegenTimer = 0f;
+        activeCrystal = null;
+
+        Debug.Log("[RegeneratorController] Regeneration finished. Forcing Dragon off crystal.");
 
         if (movementManager != null)
         {
             movementManager.RequestFreestyleIntent(AirborneBossMovement.FreestyleIntent.Withdraw, transform.position + Vector3.up * 20f);
         }
 
-        // We could manually trigger a Desire evaluation here to re-prioritize
-        if (brain != null)
-        {
-            brain.EvaluateDesires();
-        }
+        PixelCrushers.MessageSystem.SendMessage(this, "Brain", "RechargeFull", string.Empty);
     }
 }

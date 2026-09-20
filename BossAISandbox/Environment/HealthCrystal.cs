@@ -7,13 +7,11 @@ public class HealthCrystal : MonoBehaviour, IArrowTarget
     public float maxHealth = 100f;
     private float currentHealth;
     public bool isDestroyed = false;
-
-    private BossEventBus eventBus;
+    public bool IsDestroyed => isDestroyed;
 
     private void Awake()
     {
         currentHealth = maxHealth;
-        eventBus = FindFirstObjectByType<BossEventBus>();
     }
 
     public void OnArrowHit(float damage, Vector3 impactPoint, ElementTypeOB7 elementType)
@@ -22,19 +20,16 @@ public class HealthCrystal : MonoBehaviour, IArrowTarget
 
         currentHealth -= damage;
 
-        if (eventBus != null)
+        if (currentHealth <= 0f)
         {
-            if (currentHealth <= 0f)
-            {
-                isDestroyed = true;
-                eventBus.TriggerCrystalDestroyed(this);
-                // Trigger visual destruction, disable mesh, etc.
-                Debug.Log($"[HealthCrystal] {gameObject.name} Destroyed!");
-            }
-            else
-            {
-                eventBus.TriggerCrystalDamaged(this);
-            }
+            isDestroyed = true;
+            PixelCrushers.MessageSystem.SendMessage(this, "Brain", "CrystalDestroyed", string.Empty);
+            // Trigger visual destruction, disable mesh, etc.
+            Debug.Log($"[HealthCrystal] {gameObject.name} Destroyed!");
+        }
+        else
+        {
+            PixelCrushers.MessageSystem.SendMessage(this, "Brain", "CrystalDamaged", string.Empty);
         }
     }
 }

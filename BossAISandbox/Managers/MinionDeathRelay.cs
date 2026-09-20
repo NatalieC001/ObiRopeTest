@@ -3,17 +3,11 @@ using System.Collections.Generic;
 
 /// <summary>
 /// Listens specifically for minion deaths of minions requested by the boss.
-/// Notifies the BossEventBus when they die so the Brain loses power.
+/// Notifies the Brain via PixelCrushers MessageSystem when they die so the Brain loses power.
 /// </summary>
 public class MinionDeathRelay : MonoBehaviour
 {
-    private BossEventBus eventBus;
     private HashSet<GameObject> trackedMinions = new HashSet<GameObject>();
-
-    private void Awake()
-    {
-        eventBus = FindFirstObjectByType<BossEventBus>();
-    }
 
     public void RegisterBossMinion(GameObject minion)
     {
@@ -41,10 +35,7 @@ public class MinionDeathRelay : MonoBehaviour
         foreach (var dm in deadMinions)
         {
             trackedMinions.Remove(dm);
-            if (eventBus != null)
-            {
-                eventBus.TriggerBossMinionDied(dm);
-            }
+            PixelCrushers.MessageSystem.SendMessage(this, "Brain", "MinionDied", string.Empty);
         }
     }
 }

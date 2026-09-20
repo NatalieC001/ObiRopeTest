@@ -1,7 +1,10 @@
-using UnityEngine;
-using Dreamteck.Splines;
 using DG.Tweening;
+using Dreamteck.Splines;
+using System;
+using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
+using UnityEngine;
 
 /// <summary>
 /// Controls the multi-part Asian Dragon boss.
@@ -32,7 +35,7 @@ public class SegmentedDragonManager : MonoBehaviour
     public float totalBossPower { get; private set; }
 
     // List tracking all live segments. Head is index 0.
-    private List<DragonSegment> activeSegments = new List<DragonSegment>();
+    public List<DragonSegment> activeSegments = new List<DragonSegment>();
     private SplineComputer bossSpline;
 
     // The new dynamic spacing manager
@@ -41,14 +44,13 @@ public class SegmentedDragonManager : MonoBehaviour
     // The Dreamteck follower component for the Head. The rest of the body follows this.
     private SplineFollower headFollower;
     private BossCreature bossBrain;
+    public event Action OnHeadSpawned;
 
     // --- TETHER STATE ---
     private RopeArrow currentTether = null;
     public bool IsTethered { get; private set; } = false;
     public Transform TetherAnchorTransform { get; private set; } = null;
     public float TetherMaxLength { get; private set; } = 0f;
-    private DragonSegment currentTetheredSegment = null;
-    private float tetheredSegmentDistanceInHistory = 0f;
 
     /// <summary>
     /// Event invoked whenever the number of active segments changes (passes new remaining count).
@@ -64,6 +66,9 @@ public class SegmentedDragonManager : MonoBehaviour
     }
     private List<PositionData> positionHistory = new List<PositionData>();
     private float headTotalDistance = 0f;
+
+    // --- Regrowth state ---
+    public int originalSegmentCount = 0;
 
     public void InitializeDragon(SplineComputer track)
     {
@@ -88,6 +93,7 @@ public class SegmentedDragonManager : MonoBehaviour
         // Disable the head's follower component entirely. The body will follow the ROOT object instead!
         headFollower.enabled = false;
         headFollower.follow = false;
+        OnHeadSpawned?.Invoke();
 
         currentIndex++;
 
@@ -114,6 +120,8 @@ public class SegmentedDragonManager : MonoBehaviour
 
         // 5. Spawn Tail
         SpawnSegment(tailPrefab, currentIndex, track);
+
+        originalSegmentCount = activeSegments.Count;
 
         // Clear follower components from body segments - they will be driven entirely by the History buffer!
         for (int i = 1; i < activeSegments.Count; i++)
@@ -212,6 +220,41 @@ public class SegmentedDragonManager : MonoBehaviour
         totalBossPower += segment.powerContribution;
     }
 
+    public bool IsMissingSegments()
+    {
+        return activeSegments.Count < originalSegmentCount;
+    }
+
+    public void RegrowOneSegment()
+    {
+        // Regrow at the index before tail: place just before the final tail segment if exists.
+        int insertIndex = Mathf.Max(1, activeSegments.Count - 1); // don't insert before head
+        int spawnIndex = activeSegments.Count; // name index for naming only
+
+        SpawnSegment(bodyPrefab, spawnIndex, bossSpline);
+
+        // Move the newly added segment to the correct index in the list
+        DragonSegment newSegment = activeSegments[activeSegments.Count - 1];
+        activeSegments.RemoveAt(activeSegments.Count - 1);
+        activeSegments.Insert(insertIndex, newSegment);
+
+        // Re-register segments with spacing manager
+        if (spacingManager != null)
+        {
+            spacingManager.RegisterSegment(newSegment);
+            spacingManager.RefreshSegments(activeSegments);
+        }
+
+        // Recalculate indices and notify
+        for (int i = 0; i < activeSegments.Count; i++)
+        {
+            activeSegments[i].SegmentIndex = i;
+        }
+
+        OnSegmentCountChanged?.Invoke(activeSegments.Count);
+        Debug.Log($"[SegmentedDragonManager] Regrew a body segment. New count: {activeSegments.Count}/{originalSegmentCount}");
+    }
+
     /// <summary>
     /// Updates the target spline for all active segments (e.g. when the boss evades to a new track).
     /// </summary>
@@ -226,27 +269,16 @@ public class SegmentedDragonManager : MonoBehaviour
 
         currentTether = rope;
         IsTethered = true;
-        currentTetheredSegment = segment;
 
         TetherAnchorTransform = rope.GetTailTransform();
 
         if (TetherAnchorTransform != null)
         {
-            // Max Radius is the chain length (sum of gaps) from the head to this tethered segment
-            TetherMaxLength = spacingManager != null ? spacingManager.GetTargetDistanceForSegment(segment) : segment.SegmentIndex * segmentSpacing;
-            tetheredSegmentDistanceInHistory = headTotalDistance - TetherMaxLength;
+            TetherMaxLength = Vector3.Distance(transform.position, TetherAnchorTransform.position);
         }
         else
         {
             TetherMaxLength = 0f;
-            tetheredSegmentDistanceInHistory = 0f;
-        }
-
-        // Notify the base movement system to start struggling
-        BaseBossMovement movement = GetComponent<BaseBossMovement>();
-        if (movement != null)
-        {
-            movement.HandleTetherAttached();
         }
 
         Debug.Log($"<color=cyan>[SegmentedDragonManager] Tether attached to segment {segment.SegmentIndex}. MaxLength: {TetherMaxLength:F2}</color>");
@@ -262,14 +294,6 @@ public class SegmentedDragonManager : MonoBehaviour
             IsTethered = false;
             TetherAnchorTransform = null;
             TetherMaxLength = 0f;
-            currentTetheredSegment = null;
-            tetheredSegmentDistanceInHistory = 0f;
-
-            BaseBossMovement movement = GetComponent<BaseBossMovement>();
-            if (movement != null)
-            {
-                movement.HandleTetherDetached();
-            }
         }
     }
 
@@ -318,14 +342,6 @@ public class SegmentedDragonManager : MonoBehaviour
             });
 
             float maxNeededHistoryDistance = spacingManager != null ? spacingManager.GetTotalDragonLength() * 2f : segmentSpacing * activeSegments.Count * 2f;
-
-            // If tethered, we need to keep enough history back to the anchor point, which the head can walk far away from
-            if (IsTethered && TetherAnchorTransform != null)
-            {
-                float extraHistoryForTether = (headTotalDistance - tetheredSegmentDistanceInHistory) + maxNeededHistoryDistance;
-                maxNeededHistoryDistance = Mathf.Max(maxNeededHistoryDistance, extraHistoryForTether);
-            }
-
             if (headTotalDistance - positionHistory[positionHistory.Count - 1].distanceTraveled > maxNeededHistoryDistance)
             {
                 positionHistory.RemoveAt(positionHistory.Count - 1);
@@ -373,34 +389,6 @@ public class SegmentedDragonManager : MonoBehaviour
 
             float targetDistanceInHistory = headTotalDistance - requiredDistanceBehindHead;
 
-            if (IsTethered && currentTetheredSegment != null && TetherAnchorTransform != null)
-            {
-                if (segment == currentTetheredSegment)
-                {
-                    // Force the tethered segment to strictly match the anchor point!
-                    Rigidbody rb = segment.GetComponent<Rigidbody>();
-                    if (rb != null) {
-                        rb.MovePosition(TetherAnchorTransform.position);
-                        rb.MoveRotation(TetherAnchorTransform.rotation);
-                    } else {
-                        segment.transform.position = TetherAnchorTransform.position;
-                        segment.transform.rotation = TetherAnchorTransform.rotation;
-                    }
-                    continue; // Skip breadcrumb logic for the clamped segment
-                }
-                else if (segment.SegmentIndex > currentTetheredSegment.SegmentIndex)
-                {
-                    // For tail segments behind the tether, trail backward from the fixed anchor's history point
-                    float distanceBehindAnchor = requiredDistanceBehindHead - (spacingManager != null ? spacingManager.GetTargetDistanceForSegment(currentTetheredSegment) : currentTetheredSegment.SegmentIndex * segmentSpacing);
-                    targetDistanceInHistory = tetheredSegmentDistanceInHistory - distanceBehindAnchor;
-                }
-                else
-                {
-                    // For pieces between head and anchor, follow the head's normal breadcrumbs
-                    targetDistanceInHistory = headTotalDistance - requiredDistanceBehindHead;
-                }
-            }
-
             // Find the two breadcrumbs this distance falls between
             for (int j = 0; j < positionHistory.Count - 1; j++)
             {
@@ -415,11 +403,16 @@ public class SegmentedDragonManager : MonoBehaviour
 
                     Vector3 newPos = Vector3.Lerp(newer.position, older.position, t);
                     Quaternion newRot = Quaternion.Slerp(newer.rotation, older.rotation, t);
+
+                    // NEW: 1. Moving using physics to prevent arrow tunneling.
                     Rigidbody rb = segment.GetComponent<Rigidbody>();
-                    if (rb != null) {
+                    if (rb != null)
+                    {
                         rb.MovePosition(newPos);
                         rb.MoveRotation(newRot);
-                    } else {
+                    }
+                    else
+                    {
                         segment.transform.position = newPos;
                         segment.transform.rotation = newRot;
                     }
@@ -542,6 +535,7 @@ public class SegmentedDragonManager : MonoBehaviour
                 DissolveEffect dissolve = segment.GetComponentInChildren<DissolveEffect>();
                 if (dissolve != null)
                 {
+                    // NEW: 2. Directly accessing public property without Reflection.
                     float duration = dissolve.dissolveDuration;
                     if (duration > longestDissolveDuration) longestDissolveDuration = duration;
                 }
@@ -553,8 +547,6 @@ public class SegmentedDragonManager : MonoBehaviour
         IsTethered = false;
         TetherAnchorTransform = null;
         TetherMaxLength = 0f;
-        currentTetheredSegment = null;
-        tetheredSegmentDistanceInHistory = 0f;
 
         OnSegmentCountChanged?.Invoke(0);
 
