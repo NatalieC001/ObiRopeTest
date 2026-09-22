@@ -18,7 +18,7 @@ graph TD
     QM --> Evaluate{Quest Machine Evaluates}
     Evaluate -- Condition Met --> Action[Outputs 'Evade' Action]
     Action --> Adapter2[QuestMachineDragonBrain]
-    Adapter2 --> Motor[Calls BossNavigator.RequestEvasionPath()]
+    Adapter2 --> Motor["Calls BossNavigator.RequestEvasionPath()"]
 ```
 
 ```text
