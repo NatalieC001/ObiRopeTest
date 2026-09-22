@@ -27,8 +27,8 @@ graph TD
 |    (Implements IDragonBrain)      |
 +-----------------------------------+
 | - runtimeQuestInstance: Quest     |
-| - motor: BossNavigator                |
-| - vitals: BossStatsAndHealth              |
+| - motor: BossNavigator            |
+| - vitals: BossStatsAndHealth      |
 +-----------------------------------+
 | + OnDamageTaken(amount): void     |
 | + OnStaminaDepleted(): void       |
@@ -41,8 +41,7 @@ graph TD
 
 ```text
 +-----------------------------------+
-|            BossStatsAndHealth             |
-| (Absorbs stats from BossCreature) |
+|        BossStatsAndHealth         |
 +-----------------------------------+
 | + currentHealth: float            |
 | + currentStamina: float           |
@@ -54,7 +53,7 @@ graph TD
 | + event OnStaminaDepleted         |
 +-----------------------------------+
 ```
-*How it removes redundancy:* Strips all AI decision-making out of the old `BossCreature`. It no longer forces evasions; it acts strictly as a sensor that fires C# events for the Brain to interpret.
+*How it removes redundancy:* In the legacy code, `BossCreature` checked `currentHealth` in its `Update()` loop and manually forced evasions. `BossStatsAndHealth` deletes the `Update()` loop entirely. When `currentHealth` drops, it strictly fires the `OnHealthThresholdReached` C# event. It does not know that `BossNavigator` exists.
 
 ### Pillar C: `BossNavigator`
 **Player Perspective:** The engine that drives the dragon from point A to point B, handling the smooth transitions between riding a spline track and flying freely through the air.
@@ -69,8 +68,7 @@ graph TD
 
 ```text
 +-----------------------------------+
-|             BossNavigator             |
-| (Absorbs AirborneBossMovement)    |
+|           BossNavigator           |
 +-----------------------------------+
 | - currentMode: MovementMode       |
 | - splineFollower: SplineFollower  |
@@ -82,17 +80,14 @@ graph TD
 | - TickMovement(): void            |
 +-----------------------------------+
 ```
-*How it removes redundancy:* It completely drops all logic regarding `BossPhase` or health checks. It no longer asks *why* it is moving; it only accepts explicit coordinates and intents from the Brain.
+*How it removes redundancy:* In the legacy `AirborneBossMovement`, the `RequestReturnToCoil()` method accepted an observation path, but the script internally checked `BossCreature.currentPhase` to decide how to fly. `BossNavigator` deletes all references to `BossPhase`. It only stores the `targetDestination` Vector3 and moves toward it.
 
 ### Pillar D: `DragonSnakeMovementStyle`
 **Player Perspective:** The physical trailing of the body. As the head (moved by the Navigator) flies around, this system ensures the body parts follow seamlessly, close gaps when pieces are destroyed, and wave in a snake-like manner.
 
 ```text
 +-----------------------------------+
-|       DragonSnakeMovementStyle       |
-| (Merges SegmentedDragonManager,   |
-|  DragonMovementManager, and       |
-|  DragonSpacingManager)            |
+|     DragonSnakeMovementStyle      |
 +-----------------------------------+
 | - positionHistory: List<PosData>  |
 | - activeSegments: List<Segment>   |
@@ -106,11 +101,11 @@ graph TD
 | + HandleSegmentDestroyed(): void  |
 +-----------------------------------+
 ```
-*How it removes redundancy:* Completely consolidates three massive scripts into one. It does NOT care about splines, freestyle, or AI intents. It strictly monitors the root object's transform history and drags the child segments along that trail based on bounding box spacing.
+*How it removes redundancy:* It absorbs `DragonMovementManager.positionHistory` and `SegmentedDragonManager.positionHistory` into one single list. It absorbs the bounding box logic from `DragonSpacingManager.GetTargetDistanceForSegment()` directly into its `CalculateSegmentSpacings()` method, eliminating the need for three separate scripts trying to calculate the same tail positions.
 
 ---
 
-## 2. Current State (The "Before" Picture & Redundancies)
+## 2. Current State (The "Before" Picture & Explicit Flaws)
 
 The legacy architecture being replaced.
 
@@ -122,6 +117,7 @@ The legacy architecture being replaced.
 | - currentHealth: float            |
 | - currentStamina: float           |
 | + currentPhase: BossPhase         |
+| - movementManager: AirborneBoss...|
 +-----------------------------------+
 | + TakeDamage(amount, type): void  |
 | + EvaluateDesires(): void         |
@@ -129,8 +125,10 @@ The legacy architecture being replaced.
 | - EnterExhaustedPhase(): void     |
 +-----------------------------------+
 ```
-**The Flaw:** Highly coupled. Mixes state/data tracking (Vitals) with logic/decision-making.
-**The Fix:** Absorbed by `BossStatsAndHealth` (for stats) and `QuestMachineDragonBrain` (for logic).
+**The Flaw (Mixed Responsibilities):** `BossCreature` acts as a data container (holding `currentHealth` and `currentStamina`) but also acts as the AI controller. Inside `EvaluateThreat()`, if `currentHealth` drops below `evasionDamageThreshold`, it directly calls `movementManager.ForceImmediateEvasion()`. This hardcoded C# logic completely bypasses the Quest Machine Node Graph.
+**The Fix:**
+1. Move `currentHealth`, `currentStamina`, and `TakeDamage()` into the new `BossStatsAndHealth.cs` script.
+2. Delete `EvaluateDesires()`, `ForceImmediateEvasion()`, and `EnterExhaustedPhase()` from C#. Rebuild this logic visually as a Condition Node inside the Quest Machine UI (e.g., `If Health < Threshold -> Output Evade Action`).
 
 ### The Overlapping Motor (`AirborneBossMovement.cs`)
 ```text
@@ -139,6 +137,7 @@ The legacy architecture being replaced.
 +-----------------------------------+
 | + currentMode: MovementMode       |
 | - splineFollower: SplineFollower  |
+| - statusEffects: CreatureStatus...|
 +-----------------------------------+
 | + RequestFreestyleIntent(...):void|
 | + RequestReturnToCoil(...): void  |
@@ -146,17 +145,25 @@ The legacy architecture being replaced.
 | - UpdateBlendingMode(): void      |
 +-----------------------------------+
 ```
-**The Flaw:** Queries status effects directly and contains logic overlaps with the Phase enum.
-**The Fix:** Absorbed by `BossNavigator`, stripped of AI queries.
+**The Flaw (Logic Bleed):** In `AirborneBossMovement.TickMovement()`, the script explicitly calls `GetComponent<CreatureStatusEffects>()` to pull the `CurrentSpeedMultiplier` and alters its own speed. It also internally manages an `isTethered` boolean flag and applies rubber-band math.
+**The Fix:**
+1. Rename class to `BossNavigator.cs`.
+2. `BossNavigator` keeps `RequestFreestyleIntent()` and `RequestReturnToCoil()`.
+3. `BossNavigator` still reads `CreatureStatusEffects.CurrentSpeedMultiplier`, but it stops making decisions based on tethers. Tether logic is moved to the physics layer.
 
 ### The Scattered Snake Physics
 **The Flaw (Highest Redundancy):**
-- `SegmentedDragonManager.cs`: Spawns parts, tracks breadcrumbs, and handles gaps.
-- `DragonMovementManager.cs`: Also tracks breadcrumbs and places segments.
-- `DragonSpacingManager.cs`: Calculates bounding box distances.
-**The Fix:** Merged entirely into `DragonSnakeMovementStyle`. All redundant `positionHistory` tracking is unified into a single array.
+- `SegmentedDragonManager.cs`: Maintains a `List<PositionData> positionHistory` in its `LateUpdate()` loop to drag the parts. It handles the `gapCloseTimer` when a part dies.
+- `DragonMovementManager.cs`: Also maintains its own identical `List<PositionData> positionHistory` and calculates `distanceTraveled`. It contains a duplicate method `PlaceSegment()`.
+- `DragonSpacingManager.cs`: Holds a `List<SegmentData> activeSegmentsData` just to calculate the bounding box sizes and returns float distances via `GetTargetDistanceForSegment()`.
+**The Fix:**
+1. Delete `DragonMovementManager.cs` entirely.
+2. Delete `DragonSpacingManager.cs` entirely.
+3. Rename `SegmentedDragonManager.cs` to `DragonSnakeMovementStyle.cs`.
+4. Copy the float math from `DragonSpacingManager.GetTargetDistanceForSegment()` and paste it directly into a private method inside `DragonSnakeMovementStyle.cs`.
+5. Maintain only one `List<PositionData> positionHistory` inside `DragonSnakeMovementStyle.cs` to handle both normal trailing and gap-closing interpolation.
 
 ### Sensors & Status Effects
-- **`CreatureStatusEffects.cs`:** Manages Speed Multipliers (Ice, Stasis). Remains as a modular component read by `BossNavigator`.
-- **`DesireEvaluator.cs`:** Pure math logic block. Will be deprecated; its logic moves into Quest Machine Node Conditions.
-- **`BossEventBus.cs`:** The invisible network firing events (e.g., Crystal Damaged). Will be deprecated; specific sensors (Crystals) will fire events directly to the `IDragonBrain` interface.
+- **`CreatureStatusEffects.cs`:** Manages Speed Multipliers (Ice, Stasis). Remains as a modular component. `BossNavigator.TickMovement()` will multiply its speed by `CreatureStatusEffects.CurrentSpeedMultiplier`.
+- **`DesireEvaluator.cs`:** This script runs math like `survivalWeight * 1.5f` to decide what the boss wants. **The Fix:** Delete this script. Move the weight math into variables (Counters) inside the Quest Machine Editor.
+- **`BossEventBus.cs`:** Holds `Action<HealthCrystal> OnCrystalDamaged`. **The Fix:** Delete this script. Modify `HealthCrystal.cs` so that when shot, it fires a C# event directly to the `IDragonBrain` interface via `FindFirstObjectByType<QuestMachineDragonBrain>().OnCrystalDamaged()`.
