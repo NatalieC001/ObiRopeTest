@@ -84,12 +84,12 @@ graph TD
 ```
 *How it removes redundancy:* It completely drops all logic regarding `BossPhase` or health checks. It no longer asks *why* it is moving; it only accepts explicit coordinates and intents from the Brain.
 
-### Pillar D: `DragonSnakePhysics`
+### Pillar D: `SerpentineMovement`
 **Player Perspective:** The physical trailing of the body. As the head (moved by the Navigator) flies around, this system ensures the body parts follow seamlessly, close gaps when pieces are destroyed, and wave in a snake-like manner.
 
 ```text
 +-----------------------------------+
-|       DragonSnakePhysics       |
+|       SerpentineMovement       |
 | (Merges SegmentedDragonManager,   |
 |  DragonMovementManager, and       |
 |  DragonSpacingManager)            |
@@ -154,7 +154,7 @@ The legacy architecture being replaced.
 - `SegmentedDragonManager.cs`: Spawns parts, tracks breadcrumbs, and handles gaps.
 - `DragonMovementManager.cs`: Also tracks breadcrumbs and places segments.
 - `DragonSpacingManager.cs`: Calculates bounding box distances.
-**The Fix:** Merged entirely into `DragonSnakePhysics`. All redundant `positionHistory` tracking is unified into a single array.
+**The Fix:** Merged entirely into `SerpentineMovement`. All redundant `positionHistory` tracking is unified into a single array.
 
 ### Sensors & Status Effects
 - **`CreatureStatusEffects.cs`:** Manages Speed Multipliers (Ice, Stasis). Remains as a modular component read by `BossNavigator`.
