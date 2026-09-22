@@ -1,17 +1,17 @@
 # Dragon Boss Refactor Plan
 
-Document maps Quest Machine integration. Target: decouple AI from movement.
+Maps Quest Machine integration. Target: Decouple AI from movement.
 
 ---
 
 ## 1. Target Architecture
 
-Build four core scripts.
+Builds four core scripts.
 
 ### Pillar A: `QuestMachineDragonBrain`
-**Player View:** Dragon reacts to game state. Runs away when hurt. Attacks when player stands still.
-**Code Function:** Translates data. Receives C# events from `BossStatsAndHealth`. Updates Quest Machine Node Graph variables. Quest Machine processes logic tree. Quest Machine outputs action. Script calls `BossNavigator` methods.
-**Why:** Centralizes all AI logic in visual node editor. Prevents hardcoded C# logic traps.
+**Player View:** Dragon reacts to game state. Flees when hurt. Attacks when player stops.
+**Code Function:** Translates data. Catches C# events from `BossStatsAndHealth`. Updates Quest Machine Node Graph variables. Processes logic tree. Outputs action. Calls `BossNavigator` methods.
+**Why:** Centralizes AI logic in visual node editor. Prevents hardcoded C# logic traps.
 
 ```mermaid
 graph TD
@@ -46,8 +46,8 @@ graph TD
 ```
 
 ### Pillar B: `BossStatsAndHealth`
-**Player View:** Dragon takes damage. Dragon loses stamina. Dragon catches fire.
-**Code Function:** Stores float variables for health and stamina. Health hits zero. Fires C# event.
+**Player View:** Dragon takes damage. Loses stamina. Catches fire.
+**Code Function:** Stores float variables for health and stamina. Fires C# event upon reaching zero health.
 **Why:** Creates pure data container. Stops health script from forcing movement. Decouples stats from AI decisions.
 
 ```mermaid
@@ -77,7 +77,7 @@ graph TD
 ### Pillar C: `BossNavigator`
 **Player View:** Dragon flies. Locks onto splines. Detaches from splines. Flies freely.
 **Code Function:** Controls `transform.position`. Accepts Vector3 coordinate. Flies Dragon to coordinate.
-**Why:** Makes movement reusable. Stops flight script from querying BossPhase. Navigator blindly obeys Quest Machine coordinates.
+**Why:** Makes movement reusable. Stops flight script from querying BossPhase. Forces Navigator to blindly obey Quest Machine coordinates.
 
 ```mermaid
 graph TD
@@ -138,7 +138,7 @@ graph TD
 
 ## 2. Current Flaws & Fixes
 
-Address redundant logic.
+Addresses redundant logic.
 
 ### Flaw 1: `BossCreature.cs`
 **Problem:** Holds health data and AI logic. `EvaluateThreat()` method checks `currentHealth`. Method calls `movementManager.ForceImmediateEvasion()`. Logic bypasses Quest Machine.
@@ -148,7 +148,7 @@ Address redundant logic.
 ### Flaw 2: `AirborneBossMovement.cs`
 **Problem:** Controls flight and AI logic. Checks `BossCreature.currentPhase`. Checks `isTethered`.
 **Fix:** Rename file to `BossNavigator.cs`. Delete phase checks. Move tether logic into `DragonSnakeMovementStyle.cs`.
-**Why:** Enforces single responsibility. Navigator only flies. Physics script handles tethers.
+**Why:** Enforces single responsibility. Navigator flies exclusively. Physics script handles tethers.
 
 ### Flaw 3: Physics Scripts
 **Problem:** Three scripts drag body parts.
@@ -156,9 +156,9 @@ Address redundant logic.
 - `DragonMovementManager.cs` maintains `positionHistory` list.
 - `DragonSpacingManager.cs` calculates distances.
 **Fix:** Delete `DragonMovementManager.cs`. Delete `DragonSpacingManager.cs`. Move math into `DragonSnakeMovementStyle.cs`.
-**Why:** Removes memory waste. Stops three scripts from competing to calculate exact same body segment coordinates.
+**Why:** Removes memory waste. Stops three scripts from computing identical body segment coordinates.
 
 ### Flaw 4: Status Scripts
 - **`CreatureStatusEffects.cs`:** Manages speed multipliers. Keep script. `BossNavigator.cs` reads script.
-- **`DesireEvaluator.cs`:** Runs math. Delete script. Move math into Quest Machine Node Conditions. **Why:** Moves math into visual editor. Easier balancing.
+- **`DesireEvaluator.cs`:** Runs math. Delete script. Move math into Quest Machine Node Conditions. **Why:** Moves math into visual editor. Eases balancing.
 - **`BossEventBus.cs`:** Fires events. Delete script. Modify `HealthCrystal.cs`. `HealthCrystal.cs` fires event to `QuestMachineDragonBrain.cs`. **Why:** Removes middleman manager. Sensors ping Brain directly.
