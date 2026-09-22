@@ -1,16 +1,17 @@
-# Dragon Boss Refactoring Document
+# Dragon Boss Refactor Plan
 
-This document maps the Quest Machine refactor. We will rewrite `BossCreature.cs`, `AirborneBossMovement.cs`, `SegmentedDragonManager.cs`, `DragonMovementManager.cs`, and `DragonSpacingManager.cs`. We will move AI logic into Quest Machine. We will move math and movement into C# scripts.
+Document maps Quest Machine integration. Target: decouple AI from movement.
 
 ---
 
 ## 1. Target Architecture
 
-We will build four scripts.
+Build four core scripts.
 
 ### Pillar A: `QuestMachineDragonBrain`
-**Player View:** The Dragon reacts to the game state. It runs away when hurt. It attacks when the player stands still.
-**Code Function:** This script translates data. It receives C# events from `BossStatsAndHealth`. It sends data to the Quest Machine Node Graph. Quest Machine runs the logic tree. Quest Machine outputs an action. This script tells `BossNavigator` where to fly.
+**Player View:** Dragon reacts to game state. Runs away when hurt. Attacks when player stands still.
+**Code Function:** Translates data. Receives C# events from `BossStatsAndHealth`. Updates Quest Machine Node Graph variables. Quest Machine processes logic tree. Quest Machine outputs action. Script calls `BossNavigator` methods.
+**Why:** Centralizes all AI logic in visual node editor. Prevents hardcoded C# logic traps.
 
 ```mermaid
 graph TD
@@ -45,8 +46,9 @@ graph TD
 ```
 
 ### Pillar B: `BossStatsAndHealth`
-**Player View:** The Dragon takes damage. The Dragon loses stamina. The Dragon catches on fire.
-**Code Function:** This script holds data. It holds float variables for health and stamina. Health hits zero. This script fires a C# event.
+**Player View:** Dragon takes damage. Dragon loses stamina. Dragon catches fire.
+**Code Function:** Stores float variables for health and stamina. Health hits zero. Fires C# event.
+**Why:** Creates pure data container. Stops health script from forcing movement. Decouples stats from AI decisions.
 
 ```mermaid
 graph TD
@@ -70,11 +72,12 @@ graph TD
 | + event OnStaminaDepleted         |
 +-----------------------------------+
 ```
-**Refactor Action:** We will rewrite `BossCreature.cs`. We will delete the `Update()` loop. We will delete AI logic. We will rename the file to `BossStatsAndHealth.cs`.
+**Refactor Action:** Delete `BossCreature.cs` `Update()` loop. Delete AI logic. Rename file to `BossStatsAndHealth.cs`.
 
 ### Pillar C: `BossNavigator`
-**Player View:** The Dragon flies. It locks onto splines. It detaches from splines. It flies freely.
-**Code Function:** This script controls `transform.position`. It accepts a Vector3 coordinate. It flies the Dragon to the coordinate.
+**Player View:** Dragon flies. Locks onto splines. Detaches from splines. Flies freely.
+**Code Function:** Controls `transform.position`. Accepts Vector3 coordinate. Flies Dragon to coordinate.
+**Why:** Makes movement reusable. Stops flight script from querying BossPhase. Navigator blindly obeys Quest Machine coordinates.
 
 ```mermaid
 graph TD
@@ -98,11 +101,12 @@ graph TD
 | - TickMovement(): void            |
 +-----------------------------------+
 ```
-**Refactor Action:** We will rewrite `AirborneBossMovement.cs`. We will rename the file to `BossNavigator.cs`. We will delete references to `BossPhase`.
+**Refactor Action:** Rewrite `AirborneBossMovement.cs`. Rename file to `BossNavigator.cs`. Delete `BossPhase` references.
 
 ### Pillar D: `DragonSnakeMovementStyle`
-**Player View:** The Dragon body slithers behind the head. The player shoots a body piece. The piece explodes. The body pieces slide forward.
-**Code Function:** This script handles snake physics. It records head movement. It creates a history trail. It moves child body pieces along the trail.
+**Player View:** Dragon body slithers behind head. Player shoots body piece. Piece explodes. Body pieces slide forward.
+**Code Function:** Handles snake physics. Records head movement. Creates history trail. Moves child body pieces along trail.
+**Why:** Merges three redundant scripts into one. Eliminates duplicate history lists. Confines body physics to single file.
 
 ```mermaid
 graph TD
@@ -128,30 +132,33 @@ graph TD
 | + HandleSegmentDestroyed(): void  |
 +-----------------------------------+
 ```
-**Refactor Action:** We will delete `DragonMovementManager.cs`. We will delete `DragonSpacingManager.cs`. We will move math from both files into `SegmentedDragonManager.cs`. We will rename `SegmentedDragonManager.cs` to `DragonSnakeMovementStyle.cs`.
+**Refactor Action:** Delete `DragonMovementManager.cs`. Delete `DragonSpacingManager.cs`. Move math from both files into `SegmentedDragonManager.cs`. Rename `SegmentedDragonManager.cs` to `DragonSnakeMovementStyle.cs`.
 
 ---
 
-## 2. Current State
+## 2. Current Flaws & Fixes
 
-We will fix flaws in the old code.
+Address redundant logic.
 
 ### Flaw 1: `BossCreature.cs`
-**Problem:** `BossCreature.cs` holds health data and AI logic. The `EvaluateThreat()` method checks if `currentHealth` is low. The method calls `movementManager.ForceImmediateEvasion()`. This logic bypasses Quest Machine.
-**Fix:** We will delete `EvaluateDesires()`. We will delete `ForceImmediateEvasion()`. We will move logic into the Quest Machine Node Graph. We will move health data into `BossStatsAndHealth.cs`.
+**Problem:** Holds health data and AI logic. `EvaluateThreat()` method checks `currentHealth`. Method calls `movementManager.ForceImmediateEvasion()`. Logic bypasses Quest Machine.
+**Fix:** Delete `EvaluateDesires()`. Delete `ForceImmediateEvasion()`. Move logic into Quest Machine Node Graph. Move health data into `BossStatsAndHealth.cs`.
+**Why:** Guarantees Quest Machine acts as sole brain. Prevents hidden C# overrides from breaking boss fights.
 
 ### Flaw 2: `AirborneBossMovement.cs`
-**Problem:** `AirborneBossMovement.cs` controls flight and AI logic. It checks `BossCreature.currentPhase`. It checks `isTethered`.
-**Fix:** We will rename the file to `BossNavigator.cs`. We will delete phase checks. We will move tether logic into `DragonSnakeMovementStyle.cs`.
+**Problem:** Controls flight and AI logic. Checks `BossCreature.currentPhase`. Checks `isTethered`.
+**Fix:** Rename file to `BossNavigator.cs`. Delete phase checks. Move tether logic into `DragonSnakeMovementStyle.cs`.
+**Why:** Enforces single responsibility. Navigator only flies. Physics script handles tethers.
 
 ### Flaw 3: Physics Scripts
 **Problem:** Three scripts drag body parts.
-- `SegmentedDragonManager.cs` maintains a `positionHistory` list.
-- `DragonMovementManager.cs` maintains a `positionHistory` list.
+- `SegmentedDragonManager.cs` maintains `positionHistory` list.
+- `DragonMovementManager.cs` maintains `positionHistory` list.
 - `DragonSpacingManager.cs` calculates distances.
-**Fix:** We will delete `DragonMovementManager.cs`. We will delete `DragonSpacingManager.cs`. We will move math into `DragonSnakeMovementStyle.cs`.
+**Fix:** Delete `DragonMovementManager.cs`. Delete `DragonSpacingManager.cs`. Move math into `DragonSnakeMovementStyle.cs`.
+**Why:** Removes memory waste. Stops three scripts from competing to calculate exact same body segment coordinates.
 
 ### Flaw 4: Status Scripts
-- **`CreatureStatusEffects.cs`:** This script manages speed multipliers. We will keep this script. `BossNavigator.cs` will read this script.
-- **`DesireEvaluator.cs`:** This script runs math. We will delete this script. We will put math into Quest Machine Node Conditions.
-- **`BossEventBus.cs`:** This script fires events. We will delete this script. We will modify `HealthCrystal.cs`. `HealthCrystal.cs` will fire an event to `QuestMachineDragonBrain.cs`.
+- **`CreatureStatusEffects.cs`:** Manages speed multipliers. Keep script. `BossNavigator.cs` reads script.
+- **`DesireEvaluator.cs`:** Runs math. Delete script. Move math into Quest Machine Node Conditions. **Why:** Moves math into visual editor. Easier balancing.
+- **`BossEventBus.cs`:** Fires events. Delete script. Modify `HealthCrystal.cs`. `HealthCrystal.cs` fires event to `QuestMachineDragonBrain.cs`. **Why:** Removes middleman manager. Sensors ping Brain directly.
