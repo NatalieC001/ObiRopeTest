@@ -13,7 +13,7 @@ To achieve absolute separation of concerns, the monolithic scripts will be broke
 
 ```mermaid
 graph TD
-    Vitals[BossHealth fires OnStaminaDepleted] --> Adapter[QuestMachineDragonBrain]
+    Vitals[BossStatsAndHealth fires OnStaminaDepleted] --> Adapter[QuestMachineDragonBrain]
     Adapter --> QM[Updates Quest Machine Variables]
     QM --> Evaluate{Quest Machine Evaluates}
     Evaluate -- Condition Met --> Action[Outputs 'Evade' Action]
@@ -28,7 +28,7 @@ graph TD
 +-----------------------------------+
 | - runtimeQuestInstance: Quest     |
 | - motor: BossNavigator                |
-| - vitals: BossHealth              |
+| - vitals: BossStatsAndHealth              |
 +-----------------------------------+
 | + OnDamageTaken(amount): void     |
 | + OnStaminaDepleted(): void       |
@@ -36,12 +36,12 @@ graph TD
 +-----------------------------------+
 ```
 
-### Pillar B: `BossHealth`
+### Pillar B: `BossStatsAndHealth`
 **Player Perspective:** The pure health pool and stamina meter of the dragon.
 
 ```text
 +-----------------------------------+
-|            BossHealth             |
+|            BossStatsAndHealth             |
 | (Absorbs stats from BossCreature) |
 +-----------------------------------+
 | + currentHealth: float            |
@@ -84,12 +84,12 @@ graph TD
 ```
 *How it removes redundancy:* It completely drops all logic regarding `BossPhase` or health checks. It no longer asks *why* it is moving; it only accepts explicit coordinates and intents from the Brain.
 
-### Pillar D: `SerpentineMovement`
+### Pillar D: `DragonSnakeMovementStyle`
 **Player Perspective:** The physical trailing of the body. As the head (moved by the Navigator) flies around, this system ensures the body parts follow seamlessly, close gaps when pieces are destroyed, and wave in a snake-like manner.
 
 ```text
 +-----------------------------------+
-|       SerpentineMovement       |
+|       DragonSnakeMovementStyle       |
 | (Merges SegmentedDragonManager,   |
 |  DragonMovementManager, and       |
 |  DragonSpacingManager)            |
@@ -130,7 +130,7 @@ The legacy architecture being replaced.
 +-----------------------------------+
 ```
 **The Flaw:** Highly coupled. Mixes state/data tracking (Vitals) with logic/decision-making.
-**The Fix:** Absorbed by `BossHealth` (for stats) and `QuestMachineDragonBrain` (for logic).
+**The Fix:** Absorbed by `BossStatsAndHealth` (for stats) and `QuestMachineDragonBrain` (for logic).
 
 ### The Overlapping Motor (`AirborneBossMovement.cs`)
 ```text
@@ -154,7 +154,7 @@ The legacy architecture being replaced.
 - `SegmentedDragonManager.cs`: Spawns parts, tracks breadcrumbs, and handles gaps.
 - `DragonMovementManager.cs`: Also tracks breadcrumbs and places segments.
 - `DragonSpacingManager.cs`: Calculates bounding box distances.
-**The Fix:** Merged entirely into `SerpentineMovement`. All redundant `positionHistory` tracking is unified into a single array.
+**The Fix:** Merged entirely into `DragonSnakeMovementStyle`. All redundant `positionHistory` tracking is unified into a single array.
 
 ### Sensors & Status Effects
 - **`CreatureStatusEffects.cs`:** Manages Speed Multipliers (Ice, Stasis). Remains as a modular component read by `BossNavigator`.
