@@ -4,12 +4,19 @@ Maps Quest Machine integration. Target: Decouple AI from movement.
 
 ---
 
+## 0. Combat Dynamics (The Game Loop)
+
+Player Objective: Destroy Power Crystals. Pick off minions. Force Dragon into unrecoverable state. Survive.
+Dragon Objective: Protect Power Crystals. Maintain minion pack count. Corral player using Dark Spirit Clouds. Pivot entirely to defense when player threatens crystals. Kill player.
+
+---
+
 ## 1. Target Architecture
 
 Builds four core scripts.
 
 ### Pillar A: `QuestMachineDragonBrain`
-**Player View:** Dragon proactively controls battlefield. Defends crystals. Corrals player using hazards. Coordinates swarm ambushes. Flees to regenerate when health drops to critical thresholds.
+**Player View:** Dragon proactively controls battlefield. Corrals player using Dark Spirit Clouds. Obscures minions. Pivots entire body and breath to defend threatened Power Crystals. Flees to regenerate when health drops to critical thresholds.
 **Code Function:** Translates data. Catches C# events from `BossStatsAndHealth` and environment sensors. Updates Quest Machine Node Graph variables. Processes logic tree. Outputs action. Calls `BossNavigator` methods.
 **Why:** Centralizes AI logic in visual node editor. Prevents hardcoded C# logic traps. Enables complex, dynamic combat behaviors.
 
@@ -46,8 +53,8 @@ graph TD
 ```
 
 ### Pillar B: `BossStatsAndHealth`
-**Player View:** Dragon takes damage from arrows. Loses stamina during prolonged attacks. Visually reacts to status effects like fire or ice.
-**Code Function:** Stores float variables for health and stamina. Tracks elemental status states. Fires C# event upon crossing thresholds (e.g., reaching critical health or zero stamina).
+**Player View:** Dragon takes damage from arrows. Loses stamina during prolonged attacks. Loses power when pack minions die. Visually reacts to status effects like fire or ice.
+**Code Function:** Stores float variables for health and stamina. Tracks elemental status states. Tracks minion power deductions. Fires C# event upon crossing thresholds (e.g., reaching critical health or zero stamina).
 **Why:** Creates pure data container. Stops health script from forcing movement. Decouples stats from AI decisions.
 
 ```mermaid
@@ -75,7 +82,7 @@ graph TD
 **Refactor Action:** Delete `BossCreature.cs` `Update()` loop. Delete AI logic. Rename file to `BossStatsAndHealth.cs`. Add elemental state tracking properties.
 
 ### Pillar C: `BossNavigator`
-**Player View:** Dragon flies through scene geometry. Locks onto looping observation splines. Detaches from splines. Flies freely to specific destinations.
+**Player View:** Dragon flies through scene geometry. Locks onto looping observation splines to recharge. Detaches from splines. Flies freely to specific destinations.
 **Code Function:** Controls `transform.position` and rotation. Accepts Spline paths or Vector3 coordinates. Routes Dragon to exact location.
 **Why:** Makes movement reusable. Stops flight script from querying BossPhase. Forces Navigator to blindly obey Quest Machine destinations.
 
