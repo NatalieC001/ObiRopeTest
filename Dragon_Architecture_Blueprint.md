@@ -67,7 +67,7 @@ graph TD
 
 ### Pillar B: `BossStatsAndHealth`
 **Player View:** Dragon takes calculated damage from player arrow hits. Loses stamina during prolonged attacks. Loses power when pack minions die. Visually reacts to status effects like fire or ice.
-**Code Function:** Stores `currentHealth` and `currentStamina` float variables. Tracks elemental status states. Tracks minion deaths and deducts total boss power. Fires C# event upon crossing thresholds (e.g., reaching critical health or zero stamina).
+**Code Function:** Stores `currentHealth`, `currentStamina`, and an `isDead` boolean flag (rejects multiple arrow hits on the exact same frame during dissolve). Tracks elemental status states. Tracks minion deaths and deducts total boss power. Fires C# event upon crossing thresholds (e.g., reaching critical health or zero stamina).
 **Why:** Creates pure data container. Stops health script from forcing movement. Decouples stats from AI decisions.
 
 ```mermaid
@@ -93,7 +93,6 @@ graph TD
 | + event OnStaminaDepleted         |
 +-----------------------------------+
 ```
-**Implementation Directive:** Delete `BossCreature.cs` `Update()` loop. Delete AI logic. Rename file to `BossStatsAndHealth.cs`. Add elemental state tracking properties.
 
 ### Pillar C: `BossNavigator`
 **Player View:** Dragon flies through scene geometry. Locks onto looping observation splines to recharge. Utilizes evasion splines offensively to weave behind cover. Detaches from splines. Flies freely to specific destinations.
@@ -128,11 +127,10 @@ graph TD
 | - TickMovement(): void            |
 +-----------------------------------+
 ```
-**Implementation Directive:** Rewrite `AirborneBossMovement.cs`. Rename file to `BossNavigator.cs`. Delete `BossPhase` references.
 
 ### Pillar D: `DragonSnakeMovementStyle`
 **Player View:** Dragon body slithers naturally behind head. Player destroys destructible body piece. Body pieces slide forward seamlessly to close structural gaps.
-**Code Function:** Updates `positionHistory` list with Head transform data every frame (handles snake physics). Creates breadcrumb trail. Interpolates child segment transforms along `positionHistory` based on cumulative bounding box lengths (drags body pieces exactly along the path the head took).
+**Code Function:** Updates `positionHistory` list with Head transform data every frame (handles snake physics). Creates breadcrumb trail. Uses `Rigidbody.MovePosition()` (Kinematic) to interpolate child segments along `positionHistory` (prevents arrows from tunneling through fast-moving colliders) based on cumulative bounding box lengths (drags body pieces exactly along the path the head took).
 **Why:** Merges three redundant scripts into one. Eliminates duplicate history lists. Confines body physics to single script.
 
 ```mermaid
@@ -158,7 +156,6 @@ graph TD
 | + HandleSegmentDestroyed(): void  |
 +-----------------------------------+
 ```
-**Implementation Directive:** Delete `DragonMovementManager.cs`. Delete `DragonSpacingManager.cs`. Merge `UpdateBreadcrumbs()` and `GetTargetDistanceForSegment()` methods into `SegmentedDragonManager.cs`. Rename `SegmentedDragonManager.cs` to `DragonSnakeMovementStyle.cs`.
 
 ---
 
@@ -245,37 +242,3 @@ Target component structure for `Boss_AsianFireDragonNew`. Shows exact script pla
 **Anatomy Note:** `PermanentDragonSegment.cs` attaches to Head, Legs, and Tail. Prevents gory destruction mid-fight. `DragonSegment.cs` attaches to middle body pieces. Permits mid-fight destruction. `DragonSnakeMovementStyle.cs` tracks all parts identically in its history array.
 
 ---
-
-## 3. Implementation Checklist (Order of Operations)
-
-Build system from scratch in modular sequence. Test after every phase.
-
-### Phase 1: Isolate Data (Vitals)
-- [ ] Rename `BossCreature.cs` to `BossStatsAndHealth.cs`.
-- [ ] Delete `Update()` loop inside `BossStatsAndHealth.cs`.
-- [ ] Delete `EvaluateThreat()` and `ForceImmediateEvasion()`.
-- [ ] Create `OnHealthThresholdReached` C# event.
-- **Test:** Shoot Dragon. Verify health float drops. Verify C# event fires. Dragon must not move.
-
-### Phase 2: Isolate Movement (Navigator)
-- [ ] Rename `AirborneBossMovement.cs` to `BossNavigator.cs`.
-- [ ] Delete all references to `BossPhase` enum.
-- [ ] Expose `RequestSplinePath(SplineComputer path)`, `RequestFreestyleTarget(Vector3 pos)`, and `RequestBlendToSpline()` as public methods.
-- **Test:** Call `RequestFreestyleTarget(pos)` via Inspector/Debug button. Verify Dragon flies to coordinate.
-
-### Phase 3: Consolidate Physics (Snake Body)
-- [ ] Rename `SegmentedDragonManager.cs` to `DragonSnakeMovementStyle.cs`.
-- [ ] Copy `GetTargetDistanceForSegment()` method from `DragonSpacingManager.cs` directly into `DragonSnakeMovementStyle.cs`.
-- [ ] Copy `UpdateBreadcrumbs()` logic from `DragonMovementManager.cs` directly into `DragonSnakeMovementStyle.cs`.
-- [ ] Delete `DragonSpacingManager.cs` and `DragonMovementManager.cs`.
-- **Test:** Move Root object manually in Scene View. Verify child segments trail perfectly. Verify gaps close when segments are destroyed.
-
-### Phase 4: Implement AI (Quest Machine)
-- [ ] Delete `DesireEvaluator.cs` and `BossEventBus.cs`.
-- [ ] Modify `HealthCrystal.cs` to invoke `QuestMachineDragonBrain.OnCrystalDamaged()`.
-- [ ] Create Quest Machine asset in Unity Editor.
-- [ ] Build logic tree for fallback scenarios evaluating variables like `ActiveCrystals == 0` or `MinionsAlive > 0` (High Health -> Attack, Low Health + Crystals -> Flee, Low Health + No Crystals -> Use Minions, Total Starvation -> Tactical Weave).
-- **Test 1:** Keep Dragon health high. Attack Dragon. Verify Dragon counter-attacks (Swoops).
-- **Test 2:** Drop Dragon health. Keep Crystals alive. Verify Dragon flees to recharge.
-- **Test 3:** Drop Dragon health. Destroy all Crystals. Keep Minions alive. Verify Dragon uses minion pack.
-- **Test 4:** Drop Dragon health. Destroy all Crystals. Kill all Minions. Verify Dragon executes Last Stand. Verify Dragon actively calls `BossNavigator.RequestSplinePath()` with an Evasion Spline to weave behind cover offensively.

@@ -4,7 +4,7 @@
 **Subject:** Dragon Boss Architecture - Greenfield Implementation
 
 ## Objective
-The current Dragon Boss scripts (movement, AI, spacing) are fundamentally flawed and will be discarded. You will build a new, clean architecture from scratch based on the four-pillar design. The final architecture relies entirely on **Quest Machine** acting as the sole brain, while C# scripts act strictly as sensors (Vitals) and actuators (Movement/Physics).
+You will build a clean architecture from scratch based on the four-pillar design. The final architecture relies entirely on **Quest Machine** acting as the sole brain, while C# scripts act strictly as sensors (Vitals) and actuators (Movement/Physics).
 
 ## Required Plugins & Namespaces
 This architecture depends on two core third-party assets. You must include their namespaces in the new scripts:
@@ -23,7 +23,7 @@ This architecture depends on two core third-party assets. You must include their
 
 ## Execution Sequence (Phases 1-4)
 
-Do not attempt to salvage the old scripts. Build the new ones fresh, then delete the old ones.
+Build the new architecture fresh.
 
 ### Phase 1: `BossStatsAndHealth` (The Vitals Sensor)
 
@@ -46,7 +46,7 @@ Do not attempt to salvage the old scripts. Build the new ones fresh, then delete
 1. **Create** a new script `BossStatsAndHealth.cs`.
 2. Give it a serialized float `public float criticalHealthThreshold = 50f;`.
 3. Give it `currentHealth` and `currentStamina`.
-4. Ensure `TakeDamage()` updates the health float and strictly fires an `OnHealthThresholdReached` C# event when `currentHealth` drops below `criticalHealthThreshold`.
+4. Ensure `TakeDamage()` checks a private `isDead` flag first (preventing double-kills). Update the health float and strictly fire an `OnHealthThresholdReached` C# event when `currentHealth` drops below `criticalHealthThreshold`.
 5. Do not include an `Update()` loop.
 
 ### Phase 2: `BossNavigator` (The Movement Actuator)
@@ -94,8 +94,7 @@ Do not attempt to salvage the old scripts. Build the new ones fresh, then delete
 1. **Create** a new script `DragonSnakeMovementStyle.cs`.
 2. It must contain a single `positionHistory` array to track the head's breadcrumbs.
 3. Write clean math to calculate segment spacing based on bounding box lengths.
-4. Write clean math to interpolate child segments along the history array.
-5. **Delete** the legacy physics scripts: `SegmentedDragonManager.cs`, `DragonSpacingManager.cs`, and `DragonMovementManager.cs`.
+4. Write clean math to interpolate child segments along the history array using `Rigidbody.MovePosition()` and `Rigidbody.MoveRotation()` (do NOT use `transform.position`, to prevent arrow tunneling).
 
 ### Phase 4: `QuestMachineDragonBrain` (The Adapter & AI)
 
@@ -115,6 +114,7 @@ Do not attempt to salvage the old scripts. Build the new ones fresh, then delete
 ```
 
 1. **Create** a new script `QuestMachineDragonBrain.cs` that implements `IDragonBrain`.
+   - Ensure custom Quest Actions locate the correct Boss by calling `GetComponent<BossNavigator>()` on the `Quest` asset's assigned owner object.
 2. **Create** the custom Quest Machine adapter nodes: `QuestAction_CommandSplineFlight`, `QuestAction_CommandFreestyleFlight`, and `QuestCondition_CheckHealthDrops` (See `Dragon_Architecture_Blueprint.md` for class signatures).
 3. Write a **new** Editor script (`DragonBrainQuestGenerator_V2.cs`) to build the logic tree using these custom nodes.
 4. Configure the generated logic tree to handle these specific fallback scenarios using Quest Machine variables (e.g., `ActiveCrystals == 0`):
@@ -122,7 +122,6 @@ Do not attempt to salvage the old scripts. Build the new ones fresh, then delete
    - *Condition: Low Health + ActiveCrystals > 0* -> Action: Output 'Defend' (Flee to Crystal).
    - *Condition: Low Health + ActiveCrystals == 0 + MinionsAlive > 0* -> Action: Output 'Bait & Herd' (Use Minions).
    - *Condition: Low Health + ActiveCrystals == 0 + MinionsAlive == 0* -> Action: Output 'Tactical Weave' (Last Stand using Evasion Splines offensively).
-5. **Delete** the legacy AI scripts: `BossCreature.cs`, `AirborneBossMovement.cs`, `BaseBossMovement.cs`, `DesireEvaluator.cs`, and `BossEventBus.cs`.
 
 ---
 *Note: Refer to `Dragon_Architecture_Blueprint.md` for specific ASCII class diagrams and Mermaid logic flowcharts detailing the final structure.*
