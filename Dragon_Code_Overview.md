@@ -17,7 +17,7 @@ Builds four core scripts.
 
 ### Pillar A: `QuestMachineDragonBrain`
 **Player View:** Dragon proactively controls battlefield. Corrals player using Dark Spirit Clouds. Obscures minions. Pivots entire body and breath to defend threatened Power Crystals. Executes dynamic Last Stand. Uses evasion splines offensively to weave behind cover when starved.
-**Code Function:** Translates data. Catches C# events from `BossStatsAndHealth` and environment sensors. Updates Quest Machine Node Graph variables. Processes logic tree. Outputs action. Calls `BossNavigator` methods.
+**Code Function:** Translates Quest Machine actions into C# commands. Listens for C# events from `BossStatsAndHealth` and environment sensors. Updates Quest Machine Node Graph variables. Evaluates state variables via Quest Machine Node Graph. Outputs action. Calls `BossNavigator` methods.
 **Why:** Centralizes AI logic in visual node editor. Prevents hardcoded C# logic traps. Enables complex, dynamic combat behaviors.
 
 ```mermaid
@@ -59,8 +59,8 @@ graph TD
 ```
 
 ### Pillar B: `BossStatsAndHealth`
-**Player View:** Dragon takes damage from arrows. Loses stamina during prolonged attacks. Loses power when pack minions die. Visually reacts to status effects like fire or ice.
-**Code Function:** Stores float variables for health and stamina. Tracks elemental status states. Tracks minion power deductions. Fires C# event upon crossing thresholds (e.g., reaching critical health or zero stamina).
+**Player View:** Dragon takes calculated damage from player arrow hits. Loses stamina during prolonged attacks. Loses power when pack minions die. Visually reacts to status effects like fire or ice.
+**Code Function:** Stores `currentHealth` and `currentStamina` float variables. Tracks elemental status states. Tracks minion deaths and deducts total boss power. Fires C# event upon crossing thresholds (e.g., reaching critical health or zero stamina).
 **Why:** Creates pure data container. Stops health script from forcing movement. Decouples stats from AI decisions.
 
 ```mermaid
@@ -90,7 +90,7 @@ graph TD
 
 ### Pillar C: `BossNavigator`
 **Player View:** Dragon flies through scene geometry. Locks onto looping observation splines to recharge. Utilizes evasion splines offensively to weave behind cover. Detaches from splines. Flies freely to specific destinations.
-**Code Function:** Controls `transform.position` and rotation. Accepts Spline paths (Observation or Evasion) or Vector3 coordinates. Routes Dragon to exact location.
+**Code Function:** Manipulates `transform.position` and `transform.rotation` using splines or vector math. Accepts Unity `SplineComputer` paths or literal `Vector3` coordinates as input. Routes Dragon to exact location.
 **Why:** Makes movement reusable. Stops flight script from querying BossPhase. Decouples path type from AI intent. Permits AI to use "Evasion" splines offensively during Last Stand. Forces Navigator to blindly obey Quest Machine destinations.
 
 ```mermaid
@@ -125,7 +125,7 @@ graph TD
 
 ### Pillar D: `DragonSnakeMovementStyle`
 **Player View:** Dragon body slithers naturally behind head. Player destroys destructible body piece. Body pieces slide forward seamlessly to close structural gaps.
-**Code Function:** Handles snake physics. Records head movement history. Creates breadcrumb trail. Drags child body pieces along exact path based on bounding box sizes.
+**Code Function:** Updates `positionHistory` list with Head transform data every frame. Creates breadcrumb trail. Interpolates child segment transforms along `positionHistory` based on cumulative bounding box lengths.
 **Why:** Merges three redundant scripts into one. Eliminates duplicate history lists. Confines body physics to single script.
 
 ```mermaid
@@ -151,7 +151,7 @@ graph TD
 | + HandleSegmentDestroyed(): void  |
 +-----------------------------------+
 ```
-**Refactor Action:** Delete `DragonMovementManager.cs`. Delete `DragonSpacingManager.cs`. Move spacing and history math from both files into `SegmentedDragonManager.cs`. Rename `SegmentedDragonManager.cs` to `DragonSnakeMovementStyle.cs`.
+**Refactor Action:** Delete `DragonMovementManager.cs`. Delete `DragonSpacingManager.cs`. Merge `UpdateBreadcrumbs()` and `GetTargetDistanceForSegment()` methods into `SegmentedDragonManager.cs`. Rename `SegmentedDragonManager.cs` to `DragonSnakeMovementStyle.cs`.
 
 ---
 
@@ -265,8 +265,8 @@ Follow modular sequence. Test after every phase.
 
 ### Phase 3: Consolidate Physics (Snake Body)
 - [ ] Rename `SegmentedDragonManager.cs` to `DragonSnakeMovementStyle.cs`.
-- [ ] Copy bounding box math from `DragonSpacingManager.cs` into `DragonSnakeMovementStyle.cs`.
-- [ ] Copy breadcrumb trailing math from `DragonMovementManager.cs` into `DragonSnakeMovementStyle.cs`.
+- [ ] Copy `GetTargetDistanceForSegment()` method from `DragonSpacingManager.cs` directly into `DragonSnakeMovementStyle.cs`.
+- [ ] Copy `UpdateBreadcrumbs()` logic from `DragonMovementManager.cs` directly into `DragonSnakeMovementStyle.cs`.
 - [ ] Delete `DragonSpacingManager.cs` and `DragonMovementManager.cs`.
 - **Test:** Move Root object manually in Scene View. Verify child segments trail perfectly. Verify gaps close when segments are destroyed.
 
