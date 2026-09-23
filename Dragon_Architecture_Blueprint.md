@@ -162,6 +162,64 @@ graph TD
 
 ---
 
+
+### Pillar E: Quest Machine Nodes (The Logic Links)
+**Player View:** Dragon seamlessly transitions between flight modes and reacts to health/crystal changes.
+**Code Function:** Lightweight adapter classes. Bridge PixelCrushers' UI to specific game code. Allow node graph to directly call `BossNavigator` and evaluate `BossStatsAndHealth` without writing manual C# logic.
+**Why:** Exposes specific game functions inside visual editor UI.
+
+```text
++-----------------------------------+
+|   QuestAction_CommandSplineFlight |
+|      (Inherits QuestAction)       |
++-----------------------------------+
+| + targetSpline: SplineComputer    |
++-----------------------------------+
+| + Execute(): void                 |
+|   (Calls RequestSplinePath)       |
++-----------------------------------+
+```
+
+```text
++-----------------------------------+
+| QuestAction_CommandFreestyleFlight|
+|      (Inherits QuestAction)       |
++-----------------------------------+
+| + targetPosition: Vector3         |
++-----------------------------------+
+| + Execute(): void                 |
+|   (Calls RequestFreestyleTarget)  |
++-----------------------------------+
+```
+
+```text
++-----------------------------------+
+| QuestCondition_CheckHealthDrops   |
+|     (Inherits QuestCondition)     |
++-----------------------------------+
+| + targetThreshold: float          |
++-----------------------------------+
+| + IsTrue(): bool                  |
+|   (Reads BossStatsAndHealth)      |
++-----------------------------------+
+```
+
+```text
++-----------------------------------+
+| DragonBrainQuestGenerator_V2      |
+|    (Editor/Automation Script)     |
++-----------------------------------+
+| - questAsset: Quest               |
+| - rootNode: QuestNode             |
++-----------------------------------+
+| + GenerateQuestTree(): void       |
+| - ConnectNodes(nodeA, nodeB): void|
+| - ApplyActionsToNode(node): void  |
++-----------------------------------+
+```
+
+---
+
 ## 2. Prefab Hierarchy & Dependencies
 
 Target component structure for `Boss_AsianFireDragonNew`. Shows exact script placement.

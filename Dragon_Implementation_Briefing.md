@@ -115,13 +115,14 @@ Do not attempt to salvage the old scripts. Build the new ones fresh, then delete
 ```
 
 1. **Create** a new script `QuestMachineDragonBrain.cs` that implements `IDragonBrain`.
-2. Write a **new** Editor script (`DragonBrainQuestGenerator_V2.cs`) to build the logic tree.
-3. Configure the generated logic tree to handle these specific fallback scenarios using Quest Machine variables (e.g., `ActiveCrystals == 0`):
+2. **Create** the custom Quest Machine adapter nodes: `QuestAction_CommandSplineFlight`, `QuestAction_CommandFreestyleFlight`, and `QuestCondition_CheckHealthDrops` (See `Dragon_Architecture_Blueprint.md` for class signatures).
+3. Write a **new** Editor script (`DragonBrainQuestGenerator_V2.cs`) to build the logic tree using these custom nodes.
+4. Configure the generated logic tree to handle these specific fallback scenarios using Quest Machine variables (e.g., `ActiveCrystals == 0`):
    - *Condition: High Health* -> Action: Output 'Swoop' (Counter-attack).
    - *Condition: Low Health + ActiveCrystals > 0* -> Action: Output 'Defend' (Flee to Crystal).
    - *Condition: Low Health + ActiveCrystals == 0 + MinionsAlive > 0* -> Action: Output 'Bait & Herd' (Use Minions).
    - *Condition: Low Health + ActiveCrystals == 0 + MinionsAlive == 0* -> Action: Output 'Tactical Weave' (Last Stand using Evasion Splines offensively).
-4. **Delete** the legacy AI scripts: `BossCreature.cs`, `AirborneBossMovement.cs`, `BaseBossMovement.cs`, `DesireEvaluator.cs`, and `BossEventBus.cs`.
+5. **Delete** the legacy AI scripts: `BossCreature.cs`, `AirborneBossMovement.cs`, `BaseBossMovement.cs`, `DesireEvaluator.cs`, and `BossEventBus.cs`.
 
 ---
 *Note: Refer to `Dragon_Architecture_Blueprint.md` for specific ASCII class diagrams and Mermaid logic flowcharts detailing the final structure.*
