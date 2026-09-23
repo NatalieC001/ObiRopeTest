@@ -167,5 +167,41 @@ Addresses redundant legacy logic.
 
 ### Flaw 4: Status Scripts
 - **`CreatureStatusEffects.cs`:** Manages speed multipliers. Keep script. `BossNavigator.cs` reads script to adjust flight speed.
-- **`DesireEvaluator.cs`:** Runs math. Delete script. Move math into Quest Machine Node Conditions. **Why:** Moves math into visual editor. Eases combat balancing.
-- **`BossEventBus.cs`:** Fires events. Delete script. Modify `HealthCrystal.cs`. `HealthCrystal.cs` fires event directly to `QuestMachineDragonBrain.cs`. **Why:** Removes middleman manager. Sensors ping Brain directly.
+```text
++-----------------------------------+
+|       CreatureStatusEffects       |
++-----------------------------------+
+| + CurrentSpeedMultiplier: float   |
+| + IsBrittle: bool                 |
++-----------------------------------+
+| + ApplyElementalEffect(): void    |
+| - TemporarySpeedModifier(): Enum  |
++-----------------------------------+
+```
+
+- **`DesireEvaluator.cs`:** Runs math. Delete script. Move math into Quest Machine Node Conditions.
+**Why:** Moves math into visual editor. Eases combat balancing.
+```text
++-----------------------------------+
+|          DesireEvaluator          |
++-----------------------------------+
+| + survivalWeight: float           |
+| + territoryWeight: float          |
++-----------------------------------+
+| + Evaluate(brain, tags): Result   |
++-----------------------------------+
+```
+
+- **`BossEventBus.cs`:** Fires events. Delete script. Modify `HealthCrystal.cs`. `HealthCrystal.cs` fires event directly to `QuestMachineDragonBrain.cs`.
+**Why:** Removes middleman manager. Sensors ping Brain directly.
+```text
++-----------------------------------+
+|            BossEventBus           |
++-----------------------------------+
+| + OnBossDamaged: Action           |
+| + OnCrystalDamaged: Action        |
++-----------------------------------+
+| + TriggerBossDamaged(): void      |
+| + TriggerCrystalDamaged(): void   |
++-----------------------------------+
+```
