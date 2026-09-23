@@ -1,48 +1,50 @@
 # Dragon Boss Architecture Blueprint
 
-Defines Greenfield implementation for Quest Machine integration. Target: Decouple AI from movement.
+This document defines the greenfield implementation strategy for the Dragon Boss. The overarching goal is to completely decouple the AI logic from the physical movement scripts using the Quest Machine asset.
 
 ---
 
-## 0. Combat Dynamics (The Game Loop)
+## 1. Combat Dynamics (The Game Loop)
 
-Player Objective: Destroy Power Crystals. Pick off minions. Force Dragon into unrecoverable state. Survive.
-Dragon Objective: Protect Power Crystals. Maintain minion pack count. Corral player using Dark Spirit Clouds. Pivot entirely to defense when player threatens crystals. Kill player.
-
----
-
-## 1. Required Plugins
-This architecture strictly couples with two third-party assets:
-- **PixelCrushers Quest Machine:** Replaces all C# AI logic with a visual node editor.
-- **Dreamteck Splines:** Provides the `SplineComputer` tracks and `SplineFollower` motors used by the `BossNavigator`.
+The architecture is driven by the following opposing objectives:
+*   **Player Objective:** Destroy the Power Crystals. Pick off the minion pack. Force the Dragon into an unrecoverable state where it cannot heal. Survive the encounters.
+*   **Dragon Objective:** Protect the Power Crystals at all costs. Maintain a high minion pack count. Corral the player using area-of-effect hazards (like Dark Spirit Clouds). If the player threatens a crystal, the Dragon must pivot entirely to defense. Kill the player.
 
 ---
 
-## 2. Target Architecture
+## 2. Required Plugins & Namespaces
 
-Builds four core scripts.
+This architecture relies strictly on two third-party Unity assets. Ensure their namespaces are included in your new scripts:
+1.  **PixelCrushers Quest Machine:** Replaces all C# AI logic with a visual node editor (`using PixelCrushers.QuestMachine;`).
+2.  **Dreamteck Splines:** Provides the `SplineComputer` tracks and `SplineFollower` motors used for movement (`using Dreamteck.Splines;`).
+
+---
+
+## 3. The Four Core Pillars (Target Architecture)
+
+The system must be built using four isolated scripts.
 
 ### Pillar A: `QuestMachineDragonBrain`
-**Player View:** Dragon proactively controls battlefield. Corrals player using Dark Spirit Clouds. Obscures minions. Pivots entire body and breath to defend threatened Power Crystals. Executes dynamic Last Stand. Uses evasion splines offensively to weave behind cover when starved.
-**Code Function:** Reads Quest Machine decisions (such as outputting an 'Evade' action). Triggers game scripts (by calling methods like `BossNavigator.RequestSplinePath()`). Hears signals (such as catching the `OnHealthThresholdReached` C# event from `BossStatsAndHealth`). Updates Quest Machine Node Graph variables. Evaluates state variables via Quest Machine Node Graph (thinks about what to do next). Outputs action. Calls `BossNavigator` methods.
-**Why:** Centralizes AI logic in visual node editor. Prevents hardcoded C# logic traps. Enables complex, dynamic combat behaviors.
+*   **Player View:** The Dragon proactively controls the battlefield. It corrals the player using Dark Spirit Clouds to obscure its minions. It pivots its entire body and breath weapons to defend threatened Power Crystals. When its health drops to critical thresholds, it executes a dynamic Last Stand, utilizing evasion splines offensively to weave behind cover.
+*   **Code Function:** This script acts as an adapter. It reads Quest Machine decisions (such as outputting an 'Evade' action) and triggers the corresponding game scripts (by calling methods like `BossNavigator.RequestSplinePath()`). It listens for signals (such as catching the `OnHealthThresholdReached` C# event from `BossStatsAndHealth`) and updates the Quest Machine Node Graph variables accordingly.
+*   **Architectural Benefit:** Centralizing all AI logic in the visual node editor prevents hardcoded C# logic traps and enables complex, dynamic combat behaviors that are easy to balance visually.
 
 ```mermaid
 graph TD
-    Data[Sensor: BossStatsAndHealth invokes OnHealthThresholdReached] --> Adapter[QuestMachineDragonBrain catches Event]
-    Adapter --> QM[Updates Quest Machine Variables]
-    QM --> Evaluate{Quest Machine Evaluates Variables}
+    Data["Sensor: BossStatsAndHealth invokes OnHealthThresholdReached"] --> Adapter["QuestMachineDragonBrain catches Event"]
+    Adapter --> QM["Updates Quest Machine Variables"]
+    QM --> Evaluate{"Quest Machine Evaluates Health"}
 
-    Evaluate -- Health is High --> Swoop[Outputs 'Swoop' Action: Counter-attack]
-    Evaluate -- Health is Low --> CheckCrystal{Are Crystals Alive?}
+    Evaluate -- Health is High --> Swoop["Outputs 'Swoop' Action: Counter-attack"]
+    Evaluate -- Health is Low --> CheckCrystal{"Are Crystals Alive?"}
 
-    CheckCrystal -- Yes --> Defend[Outputs 'Defend' Action: Flee to Crystal]
-    CheckCrystal -- No --> CheckMinions{Are Minions Alive?}
+    CheckCrystal -- Yes --> Defend["Outputs 'Defend' Action: Flee to Crystal"]
+    CheckCrystal -- No --> CheckMinions{"Are Minions Alive?"}
 
-    CheckMinions -- Yes --> Herd[Outputs 'Bait & Herd' Action: Use Minions]
-    CheckMinions -- No --> LastStand[Outputs 'Tactical Weave' Action: Uses Evasion Splines Offensively]
+    CheckMinions -- Yes --> Herd["Outputs 'Bait & Herd' Action: Use Minions"]
+    CheckMinions -- No --> LastStand["Outputs 'Tactical Weave' Action: Uses Evasion Splines Offensively"]
 
-    Swoop --> Execute[HandleQuestMachineAction translates Action]
+    Swoop --> Execute["HandleQuestMachineAction translates Action"]
     Defend --> Execute
     Herd --> Execute
     LastStand --> Execute
@@ -66,17 +68,17 @@ graph TD
 ```
 
 ### Pillar B: `BossStatsAndHealth`
-**Player View:** Dragon takes calculated damage from player arrow hits. Loses stamina during prolonged attacks. Loses power when pack minions die. Visually reacts to status effects like fire or ice.
-**Code Function:** Stores `currentHealth`, `currentStamina`, and an `isDead` boolean flag (rejects multiple arrow hits on the exact same frame during dissolve). Tracks elemental status states. Tracks minion deaths and deducts total boss power. Fires C# event upon crossing thresholds (e.g., reaching critical health or zero stamina).
-**Why:** Creates pure data container. Stops health script from forcing movement. Decouples stats from AI decisions.
+*   **Player View:** The Dragon takes calculated damage from player arrow hits. It loses stamina during prolonged attacks. It loses overall power when its pack minions die. It applies visual shader effects when reacting to elemental status hits (e.g., burning, frozen).
+*   **Code Function:** This script acts as a pure data container. It stores the `currentHealth` and `currentStamina` float variables. It manages an `isDead` boolean flag (which rejects multiple arrow hits occurring on the exact same frame during a dissolve sequence) and tracks elemental status states. It fires C# events when specific thresholds are crossed.
+*   **Architectural Benefit:** Creating a pure data container stops the health script from directly forcing the Dragon to move, successfully decoupling stat tracking from AI decisions.
 
 ```mermaid
 graph TD
-    Damage[Player Hits Dragon] --> Method["Calls TakeDamage(amount, type)"]
-    Method --> Update[Updates currentHealth Float]
-    Update --> Check{Is currentHealth < Threshold?}
-    Check -- Yes --> FireEvent[Invokes OnHealthThresholdReached Event]
-    Check -- No --> Wait[Wait for Next Hit]
+    Damage["Player Hits Dragon"] --> Method["Calls TakeDamage(amount, type)"]
+    Method --> Update["Updates currentHealth Float"]
+    Update --> Check{"Is currentHealth < Threshold?"}
+    Check -- Yes --> FireEvent["Invokes OnHealthThresholdReached Event"]
+    Check -- No --> Wait["Wait for Next Hit"]
 ```
 
 ```text
@@ -86,6 +88,7 @@ graph TD
 | + currentHealth: float            |
 | + currentStamina: float           |
 | + maxHealth: float                |
+| + criticalHealthThreshold: float  |
 +-----------------------------------+
 | + TakeDamage(amount, type): void  |
 | + DrainStamina(amount): void      |
@@ -95,22 +98,22 @@ graph TD
 ```
 
 ### Pillar C: `BossNavigator`
-**Player View:** Dragon flies through scene geometry. Locks onto looping observation splines to recharge. Utilizes evasion splines offensively to weave behind cover. Detaches from splines. Flies freely to specific destinations.
-**Code Function:** Manipulates `transform.position` and `transform.rotation` using splines or vector math (moves the dragon smoothly through the air). Accepts raw `SplineComputer` references or literal `Vector3` coordinates as input. Routes Dragon to exact location.
-**Why:** Makes movement reusable. Stops flight script from querying BossPhase. Decouples path type from AI intent. Permits AI to use "Evasion" splines offensively during Last Stand. Forces Navigator to blindly obey Quest Machine destinations.
+*   **Player View:** The Dragon flies smoothly through the scene geometry. It locks onto looping observation splines to recharge, detaches seamlessly from splines, and flies freely to specific destinations.
+*   **Code Function:** This script controls the spatial location of the root object. It manipulates `transform.position` and `transform.rotation` using splines or vector math. It accepts raw Unity `SplineComputer` references or literal `Vector3` coordinates as inputs to route the Dragon to an exact location.
+*   **Architectural Benefit:** This makes movement completely modular. The Navigator script no longer queries AI phases (like `BossPhase.Evading`). Instead, it blindly obeys Quest Machine destinations. Furthermore, it resolves paths dynamically by querying the `BossPathManager`. This means the `BossNavigator` script can be attached to ANY flying creature without breaking.
 
 ```mermaid
 graph TD
-    Brain[Brain sends Destination] --> Input{Which Method is Called?}
+    Brain["Brain sends Destination"] --> Input{"Which Method is Called?"}
     Input -- Spline Path --> SplineMethod["Calls RequestSplinePath(path)"]
     Input -- Vector3 Target --> FreeMethod["Calls RequestFreestyleTarget(pos)"]
     Input -- Blend Action --> BlendMethod["Calls RequestBlendToSpline()"]
 
-    SplineMethod --> Tick[TickMovement evaluates currentMode]
+    SplineMethod --> Tick["TickMovement evaluates currentMode"]
     FreeMethod --> Tick
     BlendMethod --> Tick
 
-    Tick --> Move[Updates transform.position via splineFollower or Vector math]
+    Tick["Updates transform.position via splineFollower or Vector math"]
 ```
 
 ```text
@@ -129,15 +132,15 @@ graph TD
 ```
 
 ### Pillar D: `DragonSnakeMovementStyle`
-**Player View:** Dragon body slithers naturally behind head. Player destroys destructible body piece. Body pieces slide forward seamlessly to close structural gaps.
-**Code Function:** Updates `positionHistory` list with Head transform data every frame (handles snake physics). Creates breadcrumb trail. Uses `Rigidbody.MovePosition()` (Kinematic) to interpolate child segments along `positionHistory` (prevents arrows from tunneling through fast-moving colliders) based on cumulative bounding box lengths (drags body pieces exactly along the path the head took).
-**Why:** Merges three redundant scripts into one. Eliminates duplicate history lists. Confines body physics to single script.
+*   **Player View:** The Dragon's body slithers naturally behind the head. If the player destroys a destructible body piece, the remaining body pieces slide forward seamlessly to close the structural gaps.
+*   **Code Function:** This script exclusively handles the snake physics. It updates a `positionHistory` list with the Head's transform data every frame to create a breadcrumb trail. It then uses `Rigidbody.MovePosition()` (set to Kinematic) to interpolate the child segment transforms along that `positionHistory` trail based on their cumulative bounding box lengths.
+*   **Architectural Benefit:** This script confines all body physics to a single file, eliminating duplicate history lists across the codebase. Because the physics are totally isolated, you can create a completely different monster simply by swapping out this one script, leaving the AI and Navigator entirely untouched.
 
 ```mermaid
 graph TD
-    Head[BossNavigator moves Root Transform] --> Record[RecordHeadBreadcrumbs updates positionHistory]
-    Record --> Loop[CalculateSegmentSpacings evaluates activeSegments]
-    Loop --> Drag[DragSegmentsAlongHistory moves child transforms]
+    Head["BossNavigator moves Root Transform"] --> Record["RecordHeadBreadcrumbs updates positionHistory"]
+    Record --> Loop["CalculateSegmentSpacings evaluates activeSegments"]
+    Loop --> Drag["DragSegmentsAlongHistory moves child transforms"]
 ```
 
 ```text
@@ -159,11 +162,12 @@ graph TD
 
 ---
 
+## 4. Pillar E: Quest Machine Nodes (The Logic Links)
 
-### Pillar E: Quest Machine Nodes (The Logic Links)
-**Player View:** Dragon seamlessly transitions between flight modes and reacts to health/crystal changes.
-**Code Function:** Lightweight adapter classes. Bridge PixelCrushers' UI to specific game code. Allow node graph to directly call `BossNavigator` and evaluate `BossStatsAndHealth` without writing manual C# logic.
-**Why:** Exposes specific game functions inside visual editor UI.
+To connect the visual Quest Machine UI to our custom C# scripts, you must build lightweight adapter classes.
+
+*   **Code Function:** These classes bridge PixelCrushers' UI to our specific game code. They allow the node graph to directly call `BossNavigator` and evaluate `BossStatsAndHealth` without writing manual C# logic.
+*   **Architectural Benefit:** Quest Machine cannot natively talk to custom scripts out-of-the-box. These adapters expose our specific game functions inside the visual editor UI.
 
 ```text
 +-----------------------------------+
@@ -217,9 +221,9 @@ graph TD
 
 ---
 
-## 2. Prefab Hierarchy & Dependencies
+## 5. Prefab Hierarchy & Dependencies
 
-Target component structure for `Boss_AsianFireDragonNew`. Shows exact script placement.
+This is the exact target component structure for the `Boss_AsianFireDragonNew` prefab. Ensure all scripts are placed correctly.
 
 ```text
 ▼ Boss_AsianFireDragonNew (Root GameObject)
@@ -239,6 +243,44 @@ Target component structure for `Boss_AsianFireDragonNew`. Shows exact script pla
     |-- Dragon_BackLegs (Spawned dynamically, PermanentDragonSegment.cs)
     |-- Dragon_Tail (Spawned dynamically, PermanentDragonSegment.cs)
 ```
-**Anatomy Note:** `PermanentDragonSegment.cs` attaches to Head, Legs, and Tail. Prevents gory destruction mid-fight. `DragonSegment.cs` attaches to middle body pieces. Permits mid-fight destruction. `DragonSnakeMovementStyle.cs` tracks all parts identically in its history array.
+
+**Anatomy Note:**
+The `PermanentDragonSegment.cs` script attaches to the Head, Legs, and Tail to prevent gory destruction mid-fight. The `DragonSegment.cs` script attaches only to the middle body pieces, permitting them to be destroyed by the player. The `DragonSnakeMovementStyle.cs` script tracks both types of segments identically in its history array.
 
 ---
+
+## 6. Implementation Checklist (Order of Operations)
+
+Follow this modular sequence to implement the greenfield architecture.
+
+### Core Directives
+1.  **Exclude C# AI Logic:** Ensure that C# scripts contain no combat decision logic (e.g., checking `if (health < threshold)` to trigger an attack). All combat logic must be evaluated natively inside the Quest Machine node editor.
+2.  **Ensure Proper Component References:** Custom Quest Actions must locate the correct Boss instance by calling `GetComponent<BossNavigator>()` on the `Quest` asset's assigned owner object.
+
+### Phase 1: Isolate Data (Vitals)
+- [ ] Create a new script `BossStatsAndHealth.cs`.
+- [ ] Define a serialized float `public float criticalHealthThreshold = 50f;` so designers can balance it in the Inspector.
+- [ ] Ensure `TakeDamage()` checks a private `isDead` flag first (to prevent double-kills from rapid arrow hits).
+- [ ] Ensure `TakeDamage()` updates the health float and strictly fires an `OnHealthThresholdReached` C# event when `currentHealth` drops below `criticalHealthThreshold`.
+
+### Phase 2: Isolate Movement (Navigator)
+- [ ] Create a new script `BossNavigator.cs` inheriting directly from `MonoBehaviour`.
+- [ ] Expose `RequestSplinePath(SplineComputer path)`, `RequestFreestyleTarget(Vector3 pos)`, and `RequestBlendToSpline()` as public methods.
+- [ ] Ensure `TickMovement()` multiplies the baseline flight speed by `CreatureStatusEffects.CurrentSpeedMultiplier`.
+
+### Phase 3: Consolidate Physics (Snake Body)
+- [ ] Create a new script `DragonSnakeMovementStyle.cs`.
+- [ ] Declare a single `positionHistory` array to track the head's breadcrumbs.
+- [ ] Write the math to calculate segment spacing based on bounding box lengths.
+- [ ] Write the math to interpolate child segments along the history array. **Crucial constraint:** Use `Rigidbody.MovePosition()` and `Rigidbody.MoveRotation()` (do NOT use `transform.position`) to prevent fast-moving arrows from tunneling through the colliders.
+
+### Phase 4: Implement AI (Quest Machine)
+- [ ] Modify the existing `HealthCrystal.cs` script so it fires events directly to `QuestMachineDragonBrain.OnCrystalDamaged(HealthCrystal crystal)`. (Ensure you pass the specific crystal reference).
+- [ ] Create a new script `QuestMachineDragonBrain.cs` that implements `IDragonBrain`.
+- [ ] Create the custom Quest Machine adapter nodes defined in Pillar E: `QuestAction_CommandSplineFlight`, `QuestAction_CommandFreestyleFlight`, and `QuestCondition_CheckHealthDrops`.
+- [ ] Write a new Editor automation script (`DragonBrainQuestGenerator_V2.cs`) to build the logic tree using these custom nodes.
+- [ ] Configure the generated logic tree to handle the following fallback scenarios using Quest Machine variables (e.g., `ActiveCrystals == 0`):
+  - *Condition: High Health* -> Action: Output 'Swoop' (Counter-attack).
+  - *Condition: Low Health + ActiveCrystals > 0* -> Action: Output 'Defend' (Flee to Crystal).
+  - *Condition: Low Health + ActiveCrystals == 0 + MinionsAlive > 0* -> Action: Output 'Bait & Herd' (Use Minions).
+  - *Condition: Low Health + ActiveCrystals == 0 + MinionsAlive == 0* -> Action: Output 'Tactical Weave' (Last Stand using Evasion Splines offensively).
