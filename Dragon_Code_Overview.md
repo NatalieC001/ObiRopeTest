@@ -59,7 +59,7 @@ graph TD
 
 ```mermaid
 graph TD
-    Damage[Player Hits Dragon] --> Method[Calls TakeDamage(amount, type)]
+    Damage[Player Hits Dragon] --> Method["Calls TakeDamage(amount, type)"]
     Method --> Update[Updates currentHealth Float]
     Update --> Check{Is currentHealth < Threshold?}
     Check -- Yes --> FireEvent[Invokes OnHealthThresholdReached Event]
@@ -90,9 +90,9 @@ graph TD
 ```mermaid
 graph TD
     Brain[Brain sends Destination] --> Input{Which Method is Called?}
-    Input -- Spline Path --> SplineMethod[Calls RequestSplinePath(path)]
-    Input -- Vector3 Target --> FreeMethod[Calls RequestFreestyleTarget(pos)]
-    Input -- Blend Action --> BlendMethod[Calls RequestBlendToSpline()]
+    Input -- Spline Path --> SplineMethod["Calls RequestSplinePath(path)"]
+    Input -- Vector3 Target --> FreeMethod["Calls RequestFreestyleTarget(pos)"]
+    Input -- Blend Action --> BlendMethod["Calls RequestBlendToSpline()"]
 
     SplineMethod --> Tick[TickMovement evaluates currentMode]
     FreeMethod --> Tick
