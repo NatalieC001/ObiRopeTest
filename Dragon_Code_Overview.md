@@ -17,7 +17,7 @@ Builds four core scripts.
 
 ### Pillar A: `QuestMachineDragonBrain`
 **Player View:** Dragon proactively controls battlefield. Corrals player using Dark Spirit Clouds. Obscures minions. Pivots entire body and breath to defend threatened Power Crystals. Executes dynamic Last Stand. Uses evasion splines offensively to weave behind cover when starved.
-**Code Function:** Translates Quest Machine actions into C# commands. Listens for C# events from `BossStatsAndHealth` and environment sensors. Updates Quest Machine Node Graph variables. Evaluates state variables via Quest Machine Node Graph. Outputs action. Calls `BossNavigator` methods.
+**Code Function:** Reads Quest Machine decisions. Triggers game scripts. Hears signals from `BossStatsAndHealth` and environment sensors. Updates Quest Machine Node Graph variables. Evaluates state variables via Quest Machine Node Graph. Outputs action. Calls `BossNavigator` methods.
 **Why:** Centralizes AI logic in visual node editor. Prevents hardcoded C# logic traps. Enables complex, dynamic combat behaviors.
 
 ```mermaid
