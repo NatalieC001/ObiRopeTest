@@ -211,3 +211,57 @@ Addresses redundant legacy logic.
 | + TriggerCrystalDamaged(): void   |
 +-----------------------------------+
 ```
+
+---
+
+## 3. Prefab Hierarchy & Dependencies
+
+Target component structure for `Boss_AsianFireDragonNew`. Shows exact script placement.
+
+```text
+▼ Boss_AsianFireDragonNew (Root GameObject)
+  |-- SplineFollower (Required by BossNavigator)
+  |-- BossNavigator.cs (Handles Movement)
+  |-- BossStatsAndHealth.cs (Stores Vitals)
+  |-- QuestMachineDragonBrain.cs (Runs AI)
+  |-- DragonSnakeMovementStyle.cs (Trails Body)
+  |-- CreatureStatusEffects.cs (Modifies Speed)
+  |
+  ▼ Body_Container (Empty parent for organization)
+    |-- Dragon_Head (Spawned dynamically)
+    |-- Dragon_Body (Spawned dynamically, contains DragonSegment.cs)
+    |-- Dragon_Tail (Spawned dynamically)
+```
+
+---
+
+## 4. Refactoring Checklist (Order of Operations)
+
+Follow this modular sequence. Test after every phase.
+
+### Phase 1: Isolate Data (Vitals)
+- [ ] Rename `BossCreature.cs` to `BossStatsAndHealth.cs`.
+- [ ] Delete `Update()` loop inside `BossStatsAndHealth.cs`.
+- [ ] Delete `EvaluateThreat()` and `ForceImmediateEvasion()`.
+- [ ] Create `OnHealthThresholdReached` C# event.
+- **Test:** Shoot Dragon. Verify health float drops. Verify C# event fires. Dragon should not move.
+
+### Phase 2: Isolate Movement (Navigator)
+- [ ] Rename `AirborneBossMovement.cs` to `BossNavigator.cs`.
+- [ ] Delete all references to `BossPhase` enum.
+- [ ] Expose `RequestSplinePath()`, `RequestFreestyleTarget()`, and `RequestBlendToSpline()` as public methods.
+- **Test:** Call `RequestFreestyleTarget(pos)` via Inspector/Debug button. Verify Dragon flies to coordinate.
+
+### Phase 3: Consolidate Physics (Snake Body)
+- [ ] Rename `SegmentedDragonManager.cs` to `DragonSnakeMovementStyle.cs`.
+- [ ] Copy bounding box math from `DragonSpacingManager.cs` into `DragonSnakeMovementStyle.cs`.
+- [ ] Copy breadcrumb trailing math from `DragonMovementManager.cs` into `DragonSnakeMovementStyle.cs`.
+- [ ] Delete `DragonSpacingManager.cs` and `DragonMovementManager.cs`.
+- **Test:** Move Root object manually in Scene View. Verify child segments trail perfectly. Verify gaps close when segments are destroyed.
+
+### Phase 4: Implement AI (Quest Machine)
+- [ ] Delete `DesireEvaluator.cs` and `BossEventBus.cs`.
+- [ ] Modify `HealthCrystal.cs` to invoke `QuestMachineDragonBrain.OnCrystalDamaged()`.
+- [ ] Create Quest Machine asset in Unity Editor.
+- [ ] Build logic tree (e.g., Condition: Health < 50 -> Action: Call `BossNavigator.RequestFreestyleTarget()`).
+- **Test:** Play Game. Verify Dragon reacts autonomously to health drops and crystal attacks.
