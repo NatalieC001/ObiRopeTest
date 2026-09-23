@@ -6,6 +6,11 @@
 ## Objective
 The current Dragon Boss scripts (movement, AI, spacing) are fundamentally flawed and will be discarded. You will build a new, clean architecture from scratch based on the four-pillar design. The final architecture relies entirely on **Quest Machine** acting as the sole brain, while C# scripts act strictly as sensors (Vitals) and actuators (Movement/Physics).
 
+## Required Plugins & Namespaces
+This architecture depends on two core third-party assets. You must include their namespaces in the new scripts:
+- **PixelCrushers Quest Machine:** Used for all AI node evaluation (`using PixelCrushers.QuestMachine;`).
+- **Dreamteck Splines:** Used for spatial movement and pathfinding via `SplineComputer` and `SplineFollower` components (`using Dreamteck.Splines;`).
+
 ## Core Directives & Constraints
 - **Zero AI Logic in C#:** Do not write `if (health < 0)` combat decisions in the C# movement or vitals scripts. All combat logic must exist as nodes/conditions inside the visual Quest Machine editor.
 - **Strict Method Targeting:**
@@ -21,6 +26,23 @@ The current Dragon Boss scripts (movement, AI, spacing) are fundamentally flawed
 Do not attempt to salvage the old scripts. Build the new ones fresh, then delete the old ones.
 
 ### Phase 1: `BossStatsAndHealth` (The Vitals Sensor)
+
+```text
++-----------------------------------+
+|        BossStatsAndHealth         |
++-----------------------------------+
+| + currentHealth: float            |
+| + currentStamina: float           |
+| + maxHealth: float                |
+| + criticalHealthThreshold: float  |
++-----------------------------------+
+| + TakeDamage(amount, type): void  |
+| + DrainStamina(amount): void      |
+| + event OnHealthThresholdReached  |
+| + event OnStaminaDepleted         |
++-----------------------------------+
+```
+
 1. **Create** a new script `BossStatsAndHealth.cs`.
 2. Give it a serialized float `public float criticalHealthThreshold = 50f;`.
 3. Give it `currentHealth` and `currentStamina`.
@@ -28,6 +50,22 @@ Do not attempt to salvage the old scripts. Build the new ones fresh, then delete
 5. Do not include an `Update()` loop.
 
 ### Phase 2: `BossNavigator` (The Movement Actuator)
+
+```text
++-----------------------------------+
+|           BossNavigator           |
++-----------------------------------+
+| - currentMode: MovementMode       |
+| - splineFollower: SplineFollower  |
+| - targetDestination: Vector3      |
++-----------------------------------+
+| + RequestSplinePath(path): void   |
+| + RequestFreestyleTarget(pos):void|
+| + RequestBlendToSpline(): void    |
+| - TickMovement(): void            |
++-----------------------------------+
+```
+
 1. **Create** a new script `BossNavigator.cs`.
 2. It must inherit directly from `MonoBehaviour`.
 3. Expose `RequestSplinePath(SplineComputer path)`, `RequestFreestyleTarget(Vector3 pos)`, and `RequestBlendToSpline()` as public methods.
@@ -35,6 +73,24 @@ Do not attempt to salvage the old scripts. Build the new ones fresh, then delete
 5. Ensure it has zero references to AI phases or decisions.
 
 ### Phase 3: `DragonSnakeMovementStyle` (The Physics Actuator)
+
+```text
++-----------------------------------+
+|     DragonSnakeMovementStyle      |
++-----------------------------------+
+| - positionHistory: List<PosData>  |
+| - activeSegments: List<Segment>   |
+| - segmentSpacing: float           |
+| - isClosingGap: bool              |
++-----------------------------------+
+| + InitializeAnatomy(): void       |
+| - RecordHeadBreadcrumbs(): void   |
+| - DragSegmentsAlongHistory(): void|
+| - CalculateSegmentSpacings(): void|
+| + HandleSegmentDestroyed(): void  |
++-----------------------------------+
+```
+
 1. **Create** a new script `DragonSnakeMovementStyle.cs`.
 2. It must contain a single `positionHistory` array to track the head's breadcrumbs.
 3. Write clean math to calculate segment spacing based on bounding box lengths.
@@ -42,6 +98,22 @@ Do not attempt to salvage the old scripts. Build the new ones fresh, then delete
 5. **Delete** the legacy physics scripts: `SegmentedDragonManager.cs`, `DragonSpacingManager.cs`, and `DragonMovementManager.cs`.
 
 ### Phase 4: `QuestMachineDragonBrain` (The Adapter & AI)
+
+```text
++-----------------------------------+
+|     QuestMachineDragonBrain       |
+|    (Implements IDragonBrain)      |
++-----------------------------------+
+| - runtimeQuestInstance: Quest     |
+| - motor: BossNavigator            |
+| - vitals: BossStatsAndHealth      |
++-----------------------------------+
+| + OnDamageTaken(amount): void     |
+| + OnStaminaDepleted(): void       |
+| + HandleQuestMachineAction(): void|
++-----------------------------------+
+```
+
 1. **Create** a new script `QuestMachineDragonBrain.cs` that implements `IDragonBrain`.
 2. Write a **new** Editor script (`DragonBrainQuestGenerator_V2.cs`) to build the logic tree.
 3. Configure the generated logic tree to handle these specific fallback scenarios using Quest Machine variables (e.g., `ActiveCrystals == 0`):

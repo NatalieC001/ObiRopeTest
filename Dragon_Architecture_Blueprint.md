@@ -11,7 +11,14 @@ Dragon Objective: Protect Power Crystals. Maintain minion pack count. Corral pla
 
 ---
 
-## 1. Target Architecture
+## 1. Required Plugins
+This architecture strictly couples with two third-party assets:
+- **PixelCrushers Quest Machine:** Replaces all C# AI logic with a visual node editor.
+- **Dreamteck Splines:** Provides the `SplineComputer` tracks and `SplineFollower` motors used by the `BossNavigator`.
+
+---
+
+## 2. Target Architecture
 
 Builds four core scripts.
 
