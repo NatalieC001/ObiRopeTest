@@ -234,10 +234,15 @@ Target component structure for `Boss_AsianFireDragonNew`. Shows exact script pla
   |-- CreatureStatusEffects.cs (Modifies Speed)
   |
   ▼ Body_Container (Empty parent for organization)
-    |-- Dragon_Head (Spawned dynamically)
-    |-- Dragon_Body (Spawned dynamically, contains DragonSegment.cs)
-    |-- Dragon_Tail (Spawned dynamically)
+    |-- Dragon_Head (Spawned dynamically, PermanentDragonSegment.cs)
+    |-- Dragon_FrontLegs (Spawned dynamically, PermanentDragonSegment.cs)
+    |-- Dragon_Body (Spawned dynamically, DragonSegment.cs)
+    |-- Dragon_Body (Spawned dynamically, DragonSegment.cs)
+    |-- Dragon_Body (Spawned dynamically, DragonSegment.cs)
+    |-- Dragon_BackLegs (Spawned dynamically, PermanentDragonSegment.cs)
+    |-- Dragon_Tail (Spawned dynamically, PermanentDragonSegment.cs)
 ```
+**Anatomy Note:** `PermanentDragonSegment.cs` attaches to Head, Legs, and Tail. Prevents gory destruction mid-fight. `DragonSegment.cs` attaches to middle body pieces. Permits mid-fight destruction. `DragonSnakeMovementStyle.cs` tracks all parts identically in its history array.
 
 ---
 
