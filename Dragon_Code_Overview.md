@@ -22,7 +22,7 @@ Builds four core scripts.
 
 ```mermaid
 graph TD
-    Data[Sensor: BossStatsAndHealth fires C# Event] --> Adapter[QuestMachineDragonBrain catches Event]
+    Data[Sensor: BossStatsAndHealth invokes OnHealthThresholdReached] --> Adapter[QuestMachineDragonBrain catches Event]
     Adapter --> QM[Updates Quest Machine Variables]
     QM --> Evaluate{Quest Machine Evaluates Variables}
 
@@ -30,11 +30,11 @@ graph TD
     Evaluate -- Player is Boxed In --> Swoop[Outputs 'Swoop' Action]
     Evaluate -- Crystal is Attacked --> Defend[Outputs 'Defend' Action]
 
-    Evade --> Execute[Adapter translates Action to C#]
+    Evade --> Execute[HandleQuestMachineAction translates Action]
     Swoop --> Execute
     Defend --> Execute
 
-    Execute --> Motor["Calls BossNavigator.RequestSplinePath() or RequestFreestyleTarget()"]
+    Execute --> Motor["Calls BossNavigator.RequestSplinePath(path) or RequestFreestyleTarget(pos)"]
 ```
 
 ```text
@@ -59,9 +59,10 @@ graph TD
 
 ```mermaid
 graph TD
-    Damage[Player Hits Dragon] --> Update[Update Health Float]
-    Update --> Check{Is Health < Threshold?}
-    Check -- Yes --> FireEvent[Fire OnHealthThresholdReached Event]
+    Damage[Player Hits Dragon] --> Method[Calls TakeDamage(amount, type)]
+    Method --> Update[Updates currentHealth Float]
+    Update --> Check{Is currentHealth < Threshold?}
+    Check -- Yes --> FireEvent[Invokes OnHealthThresholdReached Event]
     Check -- No --> Wait[Wait for Next Hit]
 ```
 
@@ -88,10 +89,16 @@ graph TD
 
 ```mermaid
 graph TD
-    Brain[Brain sends Destination] --> Motor{Motor Evaluates Command}
-    Motor -- Spline Command --> Lock[Motor locks Dragon to Spline Track]
-    Motor -- Freestyle Command --> Fly[Motor calculates Freestyle Flight Path]
-    Motor -- Blend Command --> Lerp[Motor Lerps Dragon back to Spline]
+    Brain[Brain sends Destination] --> Input{Which Method is Called?}
+    Input -- Spline Path --> SplineMethod[Calls RequestSplinePath(path)]
+    Input -- Vector3 Target --> FreeMethod[Calls RequestFreestyleTarget(pos)]
+    Input -- Blend Action --> BlendMethod[Calls RequestBlendToSpline()]
+
+    SplineMethod --> Tick[TickMovement evaluates currentMode]
+    FreeMethod --> Tick
+    BlendMethod --> Tick
+
+    Tick --> Move[Updates transform.position via splineFollower or Vector math]
 ```
 
 ```text
@@ -117,10 +124,9 @@ graph TD
 
 ```mermaid
 graph TD
-    Head[BossNavigator Moves Head] --> Record[Record Head Position in History List]
-    Record --> Loop[Loop Through Body Segments]
-    Loop --> Spacing[Calculate Bounding Box Distance for Segment]
-    Spacing --> Drag[Drag Segment to History Position]
+    Head[BossNavigator moves Root Transform] --> Record[RecordHeadBreadcrumbs updates positionHistory]
+    Record --> Loop[CalculateSegmentSpacings evaluates activeSegments]
+    Loop --> Drag[DragSegmentsAlongHistory moves child transforms]
 ```
 
 ```text
