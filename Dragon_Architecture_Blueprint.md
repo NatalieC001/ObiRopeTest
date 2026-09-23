@@ -1,6 +1,6 @@
-# Dragon Boss Refactor Plan
+# Dragon Boss Architecture Blueprint
 
-Maps Quest Machine integration. Target: Decouple AI from movement.
+Defines Greenfield implementation for Quest Machine integration. Target: Decouple AI from movement.
 
 ---
 
@@ -86,11 +86,11 @@ graph TD
 | + event OnStaminaDepleted         |
 +-----------------------------------+
 ```
-**Refactor Action:** Delete `BossCreature.cs` `Update()` loop. Delete AI logic. Rename file to `BossStatsAndHealth.cs`. Add elemental state tracking properties.
+**Implementation Directive:** Delete `BossCreature.cs` `Update()` loop. Delete AI logic. Rename file to `BossStatsAndHealth.cs`. Add elemental state tracking properties.
 
 ### Pillar C: `BossNavigator`
 **Player View:** Dragon flies through scene geometry. Locks onto looping observation splines to recharge. Utilizes evasion splines offensively to weave behind cover. Detaches from splines. Flies freely to specific destinations.
-**Code Function:** Manipulates `transform.position` and `transform.rotation` using splines or vector math (moves the dragon smoothly through the air). Accepts Unity `SplineComputer` paths or literal `Vector3` coordinates as input. Routes Dragon to exact location.
+**Code Function:** Manipulates `transform.position` and `transform.rotation` using splines or vector math (moves the dragon smoothly through the air). Accepts raw `SplineComputer` references or literal `Vector3` coordinates as input. Routes Dragon to exact location.
 **Why:** Makes movement reusable. Stops flight script from querying BossPhase. Decouples path type from AI intent. Permits AI to use "Evasion" splines offensively during Last Stand. Forces Navigator to blindly obey Quest Machine destinations.
 
 ```mermaid
@@ -121,7 +121,7 @@ graph TD
 | - TickMovement(): void            |
 +-----------------------------------+
 ```
-**Refactor Action:** Rewrite `AirborneBossMovement.cs`. Rename file to `BossNavigator.cs`. Delete `BossPhase` references.
+**Implementation Directive:** Rewrite `AirborneBossMovement.cs`. Rename file to `BossNavigator.cs`. Delete `BossPhase` references.
 
 ### Pillar D: `DragonSnakeMovementStyle`
 **Player View:** Dragon body slithers naturally behind head. Player destroys destructible body piece. Body pieces slide forward seamlessly to close structural gaps.
@@ -151,82 +151,17 @@ graph TD
 | + HandleSegmentDestroyed(): void  |
 +-----------------------------------+
 ```
-**Refactor Action:** Delete `DragonMovementManager.cs`. Delete `DragonSpacingManager.cs`. Merge `UpdateBreadcrumbs()` and `GetTargetDistanceForSegment()` methods into `SegmentedDragonManager.cs`. Rename `SegmentedDragonManager.cs` to `DragonSnakeMovementStyle.cs`.
+**Implementation Directive:** Delete `DragonMovementManager.cs`. Delete `DragonSpacingManager.cs`. Merge `UpdateBreadcrumbs()` and `GetTargetDistanceForSegment()` methods into `SegmentedDragonManager.cs`. Rename `SegmentedDragonManager.cs` to `DragonSnakeMovementStyle.cs`.
 
 ---
 
-## 2. Current Flaws & Fixes
-
-Addresses redundant legacy logic.
-
-### Flaw 1: `BossCreature.cs`
-**Problem:** Holds health data and AI logic. `EvaluateThreat()` method checks `currentHealth`. Method calls `movementManager.ForceImmediateEvasion()`. Logic bypasses Quest Machine completely.
-**Fix:** Delete `EvaluateDesires()`. Delete `ForceImmediateEvasion()`. Move evasion logic into Quest Machine Node Graph. Move health data into `BossStatsAndHealth.cs`.
-**Why:** Guarantees Quest Machine acts as sole brain. Prevents hidden C# overrides from breaking boss fight sequence.
-
-### Flaw 2: `AirborneBossMovement.cs`
-**Problem:** Controls flight and AI logic. Checks `BossCreature.currentPhase`. Checks `isTethered`.
-**Fix:** Rename file to `BossNavigator.cs`. Delete phase checks. Move tether math into `DragonSnakeMovementStyle.cs`.
-**Why:** Enforces single responsibility. Navigator flies exclusively. Physics script handles structural tethers.
-
-### Flaw 3: Physics Scripts
-**Problem:** Three separate scripts drag body parts.
-- `SegmentedDragonManager.cs` maintains `positionHistory` list.
-- `DragonMovementManager.cs` maintains duplicate `positionHistory` list.
-- `DragonSpacingManager.cs` calculates distances.
-**Fix:** Delete `DragonMovementManager.cs`. Delete `DragonSpacingManager.cs`. Move math into `DragonSnakeMovementStyle.cs`.
-**Why:** Removes memory waste. Stops three scripts from computing identical body segment coordinates simultaneously.
-
-### Flaw 4: Status Scripts
-- **`CreatureStatusEffects.cs`:** Manages speed multipliers. Keep script. `BossNavigator.cs` reads script to adjust flight speed.
-```text
-+-----------------------------------+
-|       CreatureStatusEffects       |
-+-----------------------------------+
-| + CurrentSpeedMultiplier: float   |
-| + IsBrittle: bool                 |
-+-----------------------------------+
-| + ApplyElementalEffect(): void    |
-| - TemporarySpeedModifier(): Enum  |
-+-----------------------------------+
-```
-
-- **`DesireEvaluator.cs`:** Runs math. Delete script. Move math into Quest Machine Node Conditions.
-**Why:** Moves math into visual editor. Eases combat balancing.
-```text
-+-----------------------------------+
-|          DesireEvaluator          |
-+-----------------------------------+
-| + survivalWeight: float           |
-| + territoryWeight: float          |
-+-----------------------------------+
-| + Evaluate(brain, tags): Result   |
-+-----------------------------------+
-```
-
-- **`BossEventBus.cs`:** Fires events. Delete script. Modify `HealthCrystal.cs`. `HealthCrystal.cs` fires event directly to `QuestMachineDragonBrain.cs`.
-**Why:** Removes middleman manager. Sensors ping Brain directly.
-```text
-+-----------------------------------+
-|            BossEventBus           |
-+-----------------------------------+
-| + OnBossDamaged: Action           |
-| + OnCrystalDamaged: Action        |
-+-----------------------------------+
-| + TriggerBossDamaged(): void      |
-| + TriggerCrystalDamaged(): void   |
-+-----------------------------------+
-```
-
----
-
-## 3. Prefab Hierarchy & Dependencies
+## 2. Prefab Hierarchy & Dependencies
 
 Target component structure for `Boss_AsianFireDragonNew`. Shows exact script placement.
 
 ```text
 ▼ Boss_AsianFireDragonNew (Root GameObject)
-  |-- SplineFollower (Required by BossNavigator)
+  |-- SplineFollower (Required by BossNavigator. Must set `follow = false` to prevent plugin hijacking).
   |-- BossNavigator.cs (Handles Movement)
   |-- BossStatsAndHealth.cs (Stores Vitals)
   |-- QuestMachineDragonBrain.cs (Runs AI)
@@ -246,9 +181,9 @@ Target component structure for `Boss_AsianFireDragonNew`. Shows exact script pla
 
 ---
 
-## 4. Refactoring Checklist (Order of Operations)
+## 3. Implementation Checklist (Order of Operations)
 
-Follow modular sequence. Test after every phase.
+Build system from scratch in modular sequence. Test after every phase.
 
 ### Phase 1: Isolate Data (Vitals)
 - [ ] Rename `BossCreature.cs` to `BossStatsAndHealth.cs`.
@@ -260,7 +195,7 @@ Follow modular sequence. Test after every phase.
 ### Phase 2: Isolate Movement (Navigator)
 - [ ] Rename `AirborneBossMovement.cs` to `BossNavigator.cs`.
 - [ ] Delete all references to `BossPhase` enum.
-- [ ] Expose `RequestSplinePath()`, `RequestFreestyleTarget()`, and `RequestBlendToSpline()` as public methods.
+- [ ] Expose `RequestSplinePath(SplineComputer path)`, `RequestFreestyleTarget(Vector3 pos)`, and `RequestBlendToSpline()` as public methods.
 - **Test:** Call `RequestFreestyleTarget(pos)` via Inspector/Debug button. Verify Dragon flies to coordinate.
 
 ### Phase 3: Consolidate Physics (Snake Body)
@@ -274,7 +209,7 @@ Follow modular sequence. Test after every phase.
 - [ ] Delete `DesireEvaluator.cs` and `BossEventBus.cs`.
 - [ ] Modify `HealthCrystal.cs` to invoke `QuestMachineDragonBrain.OnCrystalDamaged()`.
 - [ ] Create Quest Machine asset in Unity Editor.
-- [ ] Build logic tree for fallback scenarios (High Health -> Attack, Low Health + Crystals -> Flee, Low Health + No Crystals -> Use Minions, Total Starvation -> Tactical Weave).
+- [ ] Build logic tree for fallback scenarios evaluating variables like `ActiveCrystals == 0` or `MinionsAlive > 0` (High Health -> Attack, Low Health + Crystals -> Flee, Low Health + No Crystals -> Use Minions, Total Starvation -> Tactical Weave).
 - **Test 1:** Keep Dragon health high. Attack Dragon. Verify Dragon counter-attacks (Swoops).
 - **Test 2:** Drop Dragon health. Keep Crystals alive. Verify Dragon flees to recharge.
 - **Test 3:** Drop Dragon health. Destroy all Crystals. Keep Minions alive. Verify Dragon uses minion pack.
