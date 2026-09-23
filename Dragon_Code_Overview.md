@@ -24,15 +24,21 @@ Builds four core scripts.
 graph TD
     Data[Sensor: BossStatsAndHealth invokes OnHealthThresholdReached] --> Adapter[QuestMachineDragonBrain catches Event]
     Adapter --> QM[Updates Quest Machine Variables]
-    QM --> Evaluate{Quest Machine Evaluates Variables}
+    QM --> Evaluate{Quest Machine Evaluates Health}
 
-    Evaluate -- Health is Critical --> Evade[Outputs 'Evade' Action]
-    Evaluate -- Player is Boxed In --> Swoop[Outputs 'Swoop' Action]
-    Evaluate -- Crystal is Attacked --> Defend[Outputs 'Defend' Action]
+    Evaluate -- Health is High --> Swoop[Outputs 'Swoop' Action: Counter-attack]
+    Evaluate -- Health is Low --> CheckCrystal{Are Crystals Alive?}
 
-    Evade --> Execute[HandleQuestMachineAction translates Action]
-    Swoop --> Execute
+    CheckCrystal -- Yes --> Defend[Outputs 'Defend' Action: Flee to Crystal]
+    CheckCrystal -- No --> CheckMinions{Are Minions Alive?}
+
+    CheckMinions -- Yes --> Herd[Outputs 'Bait & Herd' Action: Use Minions]
+    CheckMinions -- No --> LastStand[Outputs 'Attack' Action: Go Down Fighting]
+
+    Swoop --> Execute[HandleQuestMachineAction translates Action]
     Defend --> Execute
+    Herd --> Execute
+    LastStand --> Execute
 
     Execute --> Motor["Calls BossNavigator.RequestSplinePath(path) or RequestFreestyleTarget(pos)"]
 ```
@@ -263,5 +269,8 @@ Follow this modular sequence. Test after every phase.
 - [ ] Delete `DesireEvaluator.cs` and `BossEventBus.cs`.
 - [ ] Modify `HealthCrystal.cs` to invoke `QuestMachineDragonBrain.OnCrystalDamaged()`.
 - [ ] Create Quest Machine asset in Unity Editor.
-- [ ] Build logic tree (e.g., Condition: Health < 50 -> Action: Call `BossNavigator.RequestFreestyleTarget()`).
-- **Test:** Play Game. Verify Dragon reacts autonomously to health drops and crystal attacks.
+- [ ] Build logic tree for fallback scenarios (High Health -> Attack, Low Health + Crystals -> Flee, Low Health + No Crystals -> Use Minions, Total Starvation -> Last Stand).
+- **Test 1:** Keep Dragon health high. Attack Dragon. Verify Dragon counter-attacks (Swoops).
+- **Test 2:** Drop Dragon health. Keep Crystals alive. Verify Dragon flees to recharge.
+- **Test 3:** Drop Dragon health. Destroy all Crystals. Keep Minions alive. Verify Dragon uses minion pack.
+- **Test 4:** Drop Dragon health. Destroy all Crystals. Kill all Minions. Verify Dragon executes aggressive Last Stand.
