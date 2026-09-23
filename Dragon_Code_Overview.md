@@ -16,7 +16,7 @@ Dragon Objective: Protect Power Crystals. Maintain minion pack count. Corral pla
 Builds four core scripts.
 
 ### Pillar A: `QuestMachineDragonBrain`
-**Player View:** Dragon proactively controls battlefield. Corrals player using Dark Spirit Clouds. Obscures minions. Pivots entire body and breath to defend threatened Power Crystals. Flees to regenerate when health drops to critical thresholds.
+**Player View:** Dragon proactively controls battlefield. Corrals player using Dark Spirit Clouds. Obscures minions. Pivots entire body and breath to defend threatened Power Crystals. Executes dynamic Last Stand. Uses evasion splines offensively to weave behind cover when starved.
 **Code Function:** Translates data. Catches C# events from `BossStatsAndHealth` and environment sensors. Updates Quest Machine Node Graph variables. Processes logic tree. Outputs action. Calls `BossNavigator` methods.
 **Why:** Centralizes AI logic in visual node editor. Prevents hardcoded C# logic traps. Enables complex, dynamic combat behaviors.
 
@@ -24,7 +24,7 @@ Builds four core scripts.
 graph TD
     Data[Sensor: BossStatsAndHealth invokes OnHealthThresholdReached] --> Adapter[QuestMachineDragonBrain catches Event]
     Adapter --> QM[Updates Quest Machine Variables]
-    QM --> Evaluate{Quest Machine Evaluates Health}
+    QM --> Evaluate{Quest Machine Evaluates Variables}
 
     Evaluate -- Health is High --> Swoop[Outputs 'Swoop' Action: Counter-attack]
     Evaluate -- Health is Low --> CheckCrystal{Are Crystals Alive?}
@@ -33,7 +33,7 @@ graph TD
     CheckCrystal -- No --> CheckMinions{Are Minions Alive?}
 
     CheckMinions -- Yes --> Herd[Outputs 'Bait & Herd' Action: Use Minions]
-    CheckMinions -- No --> LastStand[Outputs 'Attack' Action: Go Down Fighting]
+    CheckMinions -- No --> LastStand[Outputs 'Tactical Weave' Action: Uses Evasion Splines Offensively]
 
     Swoop --> Execute[HandleQuestMachineAction translates Action]
     Defend --> Execute
@@ -89,9 +89,9 @@ graph TD
 **Refactor Action:** Delete `BossCreature.cs` `Update()` loop. Delete AI logic. Rename file to `BossStatsAndHealth.cs`. Add elemental state tracking properties.
 
 ### Pillar C: `BossNavigator`
-**Player View:** Dragon flies through scene geometry. Locks onto looping observation splines to recharge. Detaches from splines. Flies freely to specific destinations.
-**Code Function:** Controls `transform.position` and rotation. Accepts Spline paths or Vector3 coordinates. Routes Dragon to exact location.
-**Why:** Makes movement reusable. Stops flight script from querying BossPhase. Forces Navigator to blindly obey Quest Machine destinations.
+**Player View:** Dragon flies through scene geometry. Locks onto looping observation splines to recharge. Utilizes evasion splines offensively to weave behind cover. Detaches from splines. Flies freely to specific destinations.
+**Code Function:** Controls `transform.position` and rotation. Accepts Spline paths (Observation or Evasion) or Vector3 coordinates. Routes Dragon to exact location.
+**Why:** Makes movement reusable. Stops flight script from querying BossPhase. Decouples path type from AI intent. Permits AI to use "Evasion" splines offensively during Last Stand. Forces Navigator to blindly obey Quest Machine destinations.
 
 ```mermaid
 graph TD
@@ -243,14 +243,14 @@ Target component structure for `Boss_AsianFireDragonNew`. Shows exact script pla
 
 ## 4. Refactoring Checklist (Order of Operations)
 
-Follow this modular sequence. Test after every phase.
+Follow modular sequence. Test after every phase.
 
 ### Phase 1: Isolate Data (Vitals)
 - [ ] Rename `BossCreature.cs` to `BossStatsAndHealth.cs`.
 - [ ] Delete `Update()` loop inside `BossStatsAndHealth.cs`.
 - [ ] Delete `EvaluateThreat()` and `ForceImmediateEvasion()`.
 - [ ] Create `OnHealthThresholdReached` C# event.
-- **Test:** Shoot Dragon. Verify health float drops. Verify C# event fires. Dragon should not move.
+- **Test:** Shoot Dragon. Verify health float drops. Verify C# event fires. Dragon must not move.
 
 ### Phase 2: Isolate Movement (Navigator)
 - [ ] Rename `AirborneBossMovement.cs` to `BossNavigator.cs`.
@@ -269,8 +269,8 @@ Follow this modular sequence. Test after every phase.
 - [ ] Delete `DesireEvaluator.cs` and `BossEventBus.cs`.
 - [ ] Modify `HealthCrystal.cs` to invoke `QuestMachineDragonBrain.OnCrystalDamaged()`.
 - [ ] Create Quest Machine asset in Unity Editor.
-- [ ] Build logic tree for fallback scenarios (High Health -> Attack, Low Health + Crystals -> Flee, Low Health + No Crystals -> Use Minions, Total Starvation -> Last Stand).
+- [ ] Build logic tree for fallback scenarios (High Health -> Attack, Low Health + Crystals -> Flee, Low Health + No Crystals -> Use Minions, Total Starvation -> Tactical Weave).
 - **Test 1:** Keep Dragon health high. Attack Dragon. Verify Dragon counter-attacks (Swoops).
 - **Test 2:** Drop Dragon health. Keep Crystals alive. Verify Dragon flees to recharge.
 - **Test 3:** Drop Dragon health. Destroy all Crystals. Keep Minions alive. Verify Dragon uses minion pack.
-- **Test 4:** Drop Dragon health. Destroy all Crystals. Kill all Minions. Verify Dragon executes aggressive Last Stand.
+- **Test 4:** Drop Dragon health. Destroy all Crystals. Kill all Minions. Verify Dragon executes Last Stand. Verify Dragon actively calls `BossNavigator.RequestSplinePath()` with an Evasion Spline to weave behind cover offensively.
