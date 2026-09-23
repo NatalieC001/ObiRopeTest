@@ -17,7 +17,7 @@ Builds four core scripts.
 
 ### Pillar A: `QuestMachineDragonBrain`
 **Player View:** Dragon proactively controls battlefield. Corrals player using Dark Spirit Clouds. Obscures minions. Pivots entire body and breath to defend threatened Power Crystals. Executes dynamic Last Stand. Uses evasion splines offensively to weave behind cover when starved.
-**Code Function:** Reads Quest Machine decisions. Triggers game scripts. Hears signals from `BossStatsAndHealth` and environment sensors. Updates Quest Machine Node Graph variables. Evaluates state variables via Quest Machine Node Graph. Outputs action. Calls `BossNavigator` methods.
+**Code Function:** Reads Quest Machine decisions (such as outputting an 'Evade' action). Triggers game scripts (by calling methods like `BossNavigator.RequestSplinePath()`). Hears signals (such as catching the `OnHealthThresholdReached` C# event from `BossStatsAndHealth`). Updates Quest Machine Node Graph variables. Evaluates state variables via Quest Machine Node Graph (thinks about what to do next). Outputs action. Calls `BossNavigator` methods.
 **Why:** Centralizes AI logic in visual node editor. Prevents hardcoded C# logic traps. Enables complex, dynamic combat behaviors.
 
 ```mermaid
@@ -90,7 +90,7 @@ graph TD
 
 ### Pillar C: `BossNavigator`
 **Player View:** Dragon flies through scene geometry. Locks onto looping observation splines to recharge. Utilizes evasion splines offensively to weave behind cover. Detaches from splines. Flies freely to specific destinations.
-**Code Function:** Manipulates `transform.position` and `transform.rotation` using splines or vector math. Accepts Unity `SplineComputer` paths or literal `Vector3` coordinates as input. Routes Dragon to exact location.
+**Code Function:** Manipulates `transform.position` and `transform.rotation` using splines or vector math (moves the dragon smoothly through the air). Accepts Unity `SplineComputer` paths or literal `Vector3` coordinates as input. Routes Dragon to exact location.
 **Why:** Makes movement reusable. Stops flight script from querying BossPhase. Decouples path type from AI intent. Permits AI to use "Evasion" splines offensively during Last Stand. Forces Navigator to blindly obey Quest Machine destinations.
 
 ```mermaid
@@ -125,7 +125,7 @@ graph TD
 
 ### Pillar D: `DragonSnakeMovementStyle`
 **Player View:** Dragon body slithers naturally behind head. Player destroys destructible body piece. Body pieces slide forward seamlessly to close structural gaps.
-**Code Function:** Updates `positionHistory` list with Head transform data every frame. Creates breadcrumb trail. Interpolates child segment transforms along `positionHistory` based on cumulative bounding box lengths.
+**Code Function:** Updates `positionHistory` list with Head transform data every frame (handles snake physics). Creates breadcrumb trail. Interpolates child segment transforms along `positionHistory` based on cumulative bounding box lengths (drags body pieces exactly along the path the head took).
 **Why:** Merges three redundant scripts into one. Eliminates duplicate history lists. Confines body physics to single script.
 
 ```mermaid
