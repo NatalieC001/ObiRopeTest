@@ -1,12 +1,16 @@
-using UnityEngine;
-using Dreamteck.Splines;
 using DG.Tweening;
+using Dreamteck.Splines;
+using System;
+using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
+using UnityEngine;
 
 /// <summary>
 /// Controls the multi-part Asian Dragon boss.
-/// Handles instantiating the segments along the spline, maintaining their spacing,
-/// and shrinking/closing gaps smoothly when segments are destroyed.
+/// Added: segment regrowth support driven by a HealthCrystal. When a crystal is active
+/// and the dragon is on its observation/recharge behavior, it will regrow missing body segments
+/// up to the original spawn count at a configurable rate.
 /// </summary>
 public class SegmentedDragonManager : MonoBehaviour
 {
@@ -41,7 +45,7 @@ public class SegmentedDragonManager : MonoBehaviour
     // The Dreamteck follower component for the Head. The rest of the body follows this.
     private SplineFollower headFollower;
     private BossCreature bossBrain;
-
+    public event Action OnHeadSpawned;
     // --- TETHER STATE ---
     private RopeArrow currentTether = null;
     public bool IsTethered { get; private set; } = false;
@@ -64,6 +68,9 @@ public class SegmentedDragonManager : MonoBehaviour
     }
     private List<PositionData> positionHistory = new List<PositionData>();
     private float headTotalDistance = 0f;
+
+    // --- Regrowth state ---
+    public int originalSegmentCount { get; private set; } = 0;
 
     public void InitializeDragon(SplineComputer track)
     {
@@ -88,6 +95,7 @@ public class SegmentedDragonManager : MonoBehaviour
         // Disable the head's follower component entirely. The body will follow the ROOT object instead!
         headFollower.enabled = false;
         headFollower.follow = false;
+        OnHeadSpawned?.Invoke(); //elemental breath controller uses this to resolve mouthTransform
 
         currentIndex++;
 
@@ -114,6 +122,9 @@ public class SegmentedDragonManager : MonoBehaviour
 
         // 5. Spawn Tail
         SpawnSegment(tailPrefab, currentIndex, track);
+
+        // Remember original count for regeneration
+        originalSegmentCount = activeSegments.Count;
 
         // Clear follower components from body segments - they will be driven entirely by the History buffer!
         for (int i = 1; i < activeSegments.Count; i++)
@@ -212,6 +223,36 @@ public class SegmentedDragonManager : MonoBehaviour
         totalBossPower += segment.powerContribution;
     }
 
+    public void RegrowOneSegment()
+    {
+        // Regrow at the index before tail: place just before the final tail segment if exists.
+        int insertIndex = Mathf.Max(1, activeSegments.Count - 1); // don't insert before head
+        int spawnIndex = activeSegments.Count; // name index for naming only
+
+        SpawnSegment(bodyPrefab, spawnIndex, bossSpline);
+
+        // Move the newly added segment to the correct index in the list
+        DragonSegment newSegment = activeSegments[activeSegments.Count - 1];
+        activeSegments.RemoveAt(activeSegments.Count - 1);
+        activeSegments.Insert(insertIndex, newSegment);
+
+        // Re-register segments with spacing manager
+        if (spacingManager != null)
+        {
+            spacingManager.RegisterSegment(newSegment);
+            spacingManager.RefreshSegments(activeSegments);
+        }
+
+        // Recalculate indices and notify
+        for (int i = 0; i < activeSegments.Count; i++)
+        {
+            activeSegments[i].SegmentIndex = i;
+        }
+
+        OnSegmentCountChanged?.Invoke(activeSegments.Count);
+        Debug.Log($"[SegmentedDragonManager] Regrew a body segment. New count: {activeSegments.Count}/{originalSegmentCount}");
+    }
+
     /// <summary>
     /// Updates the target spline for all active segments (e.g. when the boss evades to a new track).
     /// </summary>
@@ -232,7 +273,6 @@ public class SegmentedDragonManager : MonoBehaviour
 
         if (TetherAnchorTransform != null)
         {
-            // Max Radius is the chain length (sum of gaps) from the head to this tethered segment
             TetherMaxLength = spacingManager != null ? spacingManager.GetTargetDistanceForSegment(segment) : segment.SegmentIndex * segmentSpacing;
             tetheredSegmentDistanceInHistory = headTotalDistance - TetherMaxLength;
         }
@@ -242,7 +282,6 @@ public class SegmentedDragonManager : MonoBehaviour
             tetheredSegmentDistanceInHistory = 0f;
         }
 
-        // Notify the base movement system to start struggling
         BaseBossMovement movement = GetComponent<BaseBossMovement>();
         if (movement != null)
         {
@@ -264,12 +303,6 @@ public class SegmentedDragonManager : MonoBehaviour
             TetherMaxLength = 0f;
             currentTetheredSegment = null;
             tetheredSegmentDistanceInHistory = 0f;
-
-            BaseBossMovement movement = GetComponent<BaseBossMovement>();
-            if (movement != null)
-            {
-                movement.HandleTetherDetached();
-            }
         }
     }
 
@@ -318,8 +351,6 @@ public class SegmentedDragonManager : MonoBehaviour
             });
 
             float maxNeededHistoryDistance = spacingManager != null ? spacingManager.GetTotalDragonLength() * 2f : segmentSpacing * activeSegments.Count * 2f;
-
-            // If tethered, we need to keep enough history back to the anchor point, which the head can walk far away from
             if (IsTethered && TetherAnchorTransform != null)
             {
                 float extraHistoryForTether = (headTotalDistance - tetheredSegmentDistanceInHistory) + maxNeededHistoryDistance;
@@ -429,6 +460,12 @@ public class SegmentedDragonManager : MonoBehaviour
         }
     }
 
+    public bool IsMissingSegments()
+    {
+        return activeSegments.Count < originalSegmentCount;
+    }
+
+
     public void PauseSplineFollow()
     {
         // No longer needed, root object handles its own follow state
@@ -522,6 +559,8 @@ public class SegmentedDragonManager : MonoBehaviour
         gapCloseTimer = 0f;
     }
 
+
+
     /// <summary>
     /// Called by BossCreature when the overall health reaches 0.
     /// Commands all remaining permanent pieces (Head, Legs, Tail) to die.
@@ -542,6 +581,7 @@ public class SegmentedDragonManager : MonoBehaviour
                 DissolveEffect dissolve = segment.GetComponentInChildren<DissolveEffect>();
                 if (dissolve != null)
                 {
+                    // NEW: 2. Directly accessing public property without Reflection.
                     float duration = dissolve.dissolveDuration;
                     if (duration > longestDissolveDuration) longestDissolveDuration = duration;
                 }
@@ -563,4 +603,5 @@ public class SegmentedDragonManager : MonoBehaviour
         // AND the TrainingLevelManager detects the null object to advance the wave!
         Destroy(gameObject, longestDissolveDuration + 0.1f);
     }
+
 }

@@ -7,7 +7,8 @@ public enum SpawnIntent
     Rearguard,
     AllIn,
     Ambush,
-    DefendCrystal
+    DefendCrystal,
+    Circle
 }
 
 public class MinionRequestBroker : MonoBehaviour
