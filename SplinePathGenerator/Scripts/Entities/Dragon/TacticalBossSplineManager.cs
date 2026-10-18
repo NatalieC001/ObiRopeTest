@@ -621,6 +621,6 @@ public class TacticalBossSplineManager : MonoBehaviour
         }
 
         BossCreature brain = GetComponent<BossCreature>();
-        if (brain != null) brain.BeginRecharging();
+        if (brain != null) PixelCrushers.MessageSystem.SendMessage(this, "Brain", "RechargeFull", string.Empty);
     }
 }
