@@ -1,6 +1,33 @@
 using UnityEngine;
 using Obi;
 
+/// <summary>
+/// ====================================================================================================
+/// ROPE ARROW PAIR OB7 - LOGIC DATA AND REFEREE
+/// ====================================================================================================
+///
+/// WHAT THIS CLASS IS:
+/// This class acts as the data container and logic "Referee" for a single pair of rope arrows and the
+/// Obi Rope generated between them. Once two arrows are linked, this class takes control over
+/// determining the interaction state based on the targets hit.
+///
+/// ARCHITECTURE & SEPARATION OF CONCERNS:
+/// This class handles logic, NOT physics. It determines *what* should happen, and then delegates the
+/// physical execution to the `BashPhysicsManager`.
+///
+/// HOW IT WORKS UNDER THE HOOD:
+/// 1. Weight Evaluation: It checks `ObjectWeight.Mobility` on both targets (or falls back to legacy tags).
+/// 2. State Determination:
+///    - Lightweight + Lightweight = BASH
+///    - Lightweight + Heavyweight/Immovable = TETHER
+///    - Heavy/Immovable + Heavy/Immovable = TRIPWIRE
+/// 3. Physics Delegation:
+///    If a Lightweight target is about to be pulled (Bash or Tether), this class signals the
+///    `BashPhysicsManager` to apply temporary physics overrides (like drag and kinematic states)
+///    to prevent VR whiplash.
+/// 4. Cleanup: When the rope breaks or the mechanic ends, it signals the `BashPhysicsManager`
+///    to return the target safely back to its default resting state.
+/// </summary>
 [CreateAssetMenu(fileName = "NewRopeArrowPair", menuName = "Rope Arrows/Rope Arrow Pair", order = 1)]
 public class RopeArrowPairOB7 : ScriptableObject
 {
@@ -76,12 +103,27 @@ public class RopeArrowPairOB7 : ScriptableObject
             CurrentState = RopeState.Bash;
             DisableTargetLogic(Arrow1.transform.parent?.gameObject);
             DisableTargetLogic(Arrow2.transform.parent?.gameObject);
+
+            // Physics overrides for VR Bashing
+            if (BashPhysicsManager.Instance != null)
+            {
+                BashPhysicsManager.Instance.ApplyBashPhysics(Arrow1.transform.parent?.gameObject);
+                BashPhysicsManager.Instance.ApplyBashPhysics(Arrow2.transform.parent?.gameObject);
+            }
         }
         else if (t1Movable || t2Movable)
         {
             CurrentState = RopeState.Tether;
-            if (t1Movable) DisableTargetLogic(Arrow1.transform.parent?.gameObject);
-            if (t2Movable) DisableTargetLogic(Arrow2.transform.parent?.gameObject);
+            if (t1Movable)
+            {
+                DisableTargetLogic(Arrow1.transform.parent?.gameObject);
+                if (BashPhysicsManager.Instance != null) BashPhysicsManager.Instance.ApplyBashPhysics(Arrow1.transform.parent?.gameObject);
+            }
+            if (t2Movable)
+            {
+                DisableTargetLogic(Arrow2.transform.parent?.gameObject);
+                if (BashPhysicsManager.Instance != null) BashPhysicsManager.Instance.ApplyBashPhysics(Arrow2.transform.parent?.gameObject);
+            }
             IsInfusible = true;
             infusionTimer = MAX_INFUSION_TIME;
         }
@@ -118,6 +160,17 @@ public class RopeArrowPairOB7 : ScriptableObject
     private bool IsMovable(GameObject obj)
     {
         if (obj == null) return false;
+
+        // NEW LOGIC: Check explicit ObjectWeight component first
+        ObjectWeight weight = obj.GetComponentInParent<ObjectWeight>();
+        if (weight == null) weight = obj.GetComponent<ObjectWeight>();
+
+        if (weight != null)
+        {
+            return weight.mobility == RopeTargetMobility.Lightweight;
+        }
+
+        // LEGACY FALLBACK for sandbox testing
         return obj.CompareTag("Enemy") || obj.GetComponentInParent<MovingTarget>() != null || obj.GetComponent<MovingTarget>() != null;
     }
 
@@ -136,6 +189,12 @@ public class RopeArrowPairOB7 : ScriptableObject
         MovingTarget mt = obj.GetComponentInParent<MovingTarget>();
         if (mt == null) mt = obj.GetComponent<MovingTarget>();
         if (mt != null) mt.EnableInternalLogic();
+
+        // Always revert physics state when logic is re-enabled (slumped/broken rope)
+        if (BashPhysicsManager.Instance != null)
+        {
+            BashPhysicsManager.Instance.RevertBashPhysics(obj);
+        }
     }
 
     public void HandleArrowDestroyed(StickingArrow destroyedArrow)
